@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(EfCoreVersion)" />
+    <PackageReference Include="Laraue.Telegram.NET.UpdatesQueue.EFCore" Version="$(LaraueTelegramNetVersion)" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="$(NpgsqlEfCoreVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Laraue.Telegram.NET.Authentication" Version="$(LaraueTelegramNetVersion)" />
+  </ItemGroup>
+</Project>

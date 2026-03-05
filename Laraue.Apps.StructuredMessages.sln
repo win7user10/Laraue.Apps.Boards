@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E66D8188-7DF1-4581-B431-7A2A06826342}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{66F858C1-4885-4064-B257-ABFFB763755E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.DataAccess", "src\Laraue.Apps.StructuredMessages.DataAccess\Laraue.Apps.StructuredMessages.DataAccess.csproj", "{57A6F2DA-6E02-4731-A12B-76CE9DDD7402}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.TelegramHost", "src\Laraue.Apps.StructuredMessages.TelegramHost\Laraue.Apps.StructuredMessages.TelegramHost.csproj", "{94D25C82-4A20-44DC-88B6-E3F9A634EFF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.Services", "src\Laraue.Apps.StructuredMessages.Services\Laraue.Apps.StructuredMessages.Services.csproj", "{3D21378E-16F0-4C64-B171-4D78443C3B32}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D21378E-16F0-4C64-B171-4D78443C3B32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D21378E-16F0-4C64-B171-4D78443C3B32}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D21378E-16F0-4C64-B171-4D78443C3B32}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D21378E-16F0-4C64-B171-4D78443C3B32}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402} = {E66D8188-7DF1-4581-B431-7A2A06826342}
+		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8} = {E66D8188-7DF1-4581-B431-7A2A06826342}
+		{3D21378E-16F0-4C64-B171-4D78443C3B32} = {E66D8188-7DF1-4581-B431-7A2A06826342}
+	EndGlobalSection
+EndGlobal
