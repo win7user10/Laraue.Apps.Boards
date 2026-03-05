@@ -3,7 +3,7 @@ using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Telegram.NET.Authentication.Services;
 using LinqToDB.EntityFrameworkCore;
 
-namespace Laraue.Apps.StructuredMessages.Services;
+namespace Laraue.Apps.StructuredMessages.TelegramServices;
 
 public class TelegramUserQueryService(DatabaseContext context)
     : ITelegramUserQueryService<User, Guid>

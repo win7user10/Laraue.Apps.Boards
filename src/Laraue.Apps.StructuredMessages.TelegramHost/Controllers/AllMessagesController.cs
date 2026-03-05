@@ -1,21 +1,27 @@
-﻿using Laraue.Apps.StructuredMessages.Services;
+﻿using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Routing.Attributes;
-using Telegram.Bot;
+using SaveTelegramMessageRequest = Laraue.Apps.StructuredMessages.TelegramServices.SaveTelegramMessageRequest;
 
 namespace Laraue.Apps.StructuredMessages.TelegramHost.Controllers;
 
-public class AllMessagesController(ITelegramBotClient client) : TelegramController
+public class AllMessagesController(ITelegramMessageService telegramMessageService)
+    : TelegramController
 {
-    [TelegramMessageRoute("(.*)")]
-    public async Task Handle(
+    [TelegramMessageRoute(".*")]
+    public Task HandleMessages(
         RequestContext request,
         CancellationToken cancellationToken)
     {
-        await client.SendMessage(
-            request.Update.GetUserId(),
-            $"Saved: {request.Update.Message!.Text}",
-            cancellationToken: cancellationToken);
+        return telegramMessageService.SaveMessage(
+            new SaveTelegramMessageRequest
+            {
+                Text = request.Update.Message!.Text!,
+                UserId = request.UserId,
+                TelegramUserId = request.Update.GetUserId(),
+                SentAt = request.Update.Message!.Date,
+            },
+            cancellationToken);
     }
 }
