@@ -18,6 +18,7 @@ public class AllMessagesController(ITelegramMessageService telegramMessageServic
             new SaveTelegramMessageRequest
             {
                 Text = request.Update.Message!.Text!,
+                MessageId = request.Update.Message.MessageId,
                 UserId = request.UserId,
                 TelegramUserId = request.Update.GetUserId(),
                 SentAt = request.Update.Message!.Date,
