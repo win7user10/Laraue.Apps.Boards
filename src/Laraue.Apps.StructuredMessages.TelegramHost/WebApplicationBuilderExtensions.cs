@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Telegram.NET.Authentication.Extensions;
 using Laraue.Telegram.NET.Core;
@@ -50,6 +51,12 @@ public static class WebApplicationBuilderExtensions
                 .AddTelegramMiddleware<AutoCallbackResponseMiddleware>()
                 .AddTelegramAuthentication<User, Guid, TelegramUserQueryService, RequestContext>();
 
+            builder.Services
+                .AddScoped<ITelegramMessageService, TelegramMessageService>();
+            
+            builder.Services
+                .AddScoped<IMessageService, MessageService>();
+            
             builder.Services.AddControllers();
 
             return builder;

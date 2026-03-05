@@ -12,10 +12,12 @@ public class Message
     [MaxLength(4096)]
     public required string Content { get; set; }
     
+    public DateTime CreatedAt { get; set; }
+    
     /// <summary>
     /// The user messages belongs to.
     /// </summary>
-    public long UserId { get; set; }
+    public Guid UserId { get; set; }
     public User? User { get; set; }
     
     /// <summary>

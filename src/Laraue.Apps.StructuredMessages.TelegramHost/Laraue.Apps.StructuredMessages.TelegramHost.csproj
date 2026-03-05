@@ -9,7 +9,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Laraue.Apps.StructuredMessages.Services\Laraue.Apps.StructuredMessages.Services.csproj" />
+        <ProjectReference Include="..\Laraue.Apps.StructuredMessages.TelegramServices\Laraue.Apps.StructuredMessages.TelegramServices.csproj" />
     </ItemGroup>
 
 </Project>

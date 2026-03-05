@@ -9,6 +9,6 @@ public class MessageType
     [MaxLength(128)]
     public required string Name { get; set; }
     
-    public long UserId { get; set; }
+    public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 }
