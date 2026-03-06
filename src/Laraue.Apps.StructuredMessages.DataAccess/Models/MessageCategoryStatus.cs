@@ -2,13 +2,15 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class MessageType
+public class MessageCategoryStatus
 {
     public long Id { get; set; }
     
     [MaxLength(128)]
     public required string Name { get; set; }
     
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
+    public long MessageCategoryId { get; set; }
+    public MessageCategory? MessageCategory { get; set; }
+
+    public bool IsFinal { get; set; }
 }

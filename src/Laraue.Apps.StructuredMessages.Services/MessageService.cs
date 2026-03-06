@@ -1,6 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
-using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -10,8 +10,8 @@ public interface IMessageService
         SaveMessageRequest request,
         CancellationToken cancellationToken);
     
-    Task<MessageTypeDto[]> GetMessageTypes(
-        Guid userId,
+    Task UpdateMessageCategory(
+        UpdateMessageCategoryRequest request,
         CancellationToken cancellationToken);
 }
 
@@ -35,18 +35,16 @@ public class MessageService(DatabaseContext context) : IMessageService
         return entity.Id;
     }
 
-    public Task<MessageTypeDto[]> GetMessageTypes(
-        Guid userId,
+    public Task UpdateMessageCategory(
+        UpdateMessageCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        return context.MessageTypes
-            .Where(x => x.UserId == userId)
-            .Select(x => new MessageTypeDto
-            {
-                Name = x.Name,
-                Id = x.Id
-            })
-            .ToArrayAsyncEF(cancellationToken);
+        return context.Messages
+            .Where(x => x.UserId == request.UserId)
+            .Where(x => x.Id == request.Id)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.MessageTypeId, request.CategoryId),
+                cancellationToken);
     }
 }
 
@@ -57,8 +55,9 @@ public class SaveMessageRequest
     public required DateTime CreatedAt { get; set; }
 }
 
-public class MessageTypeDto
+public class UpdateMessageCategoryRequest
 {
-    public long Id { get; set; }
-    public required string Name { get; set; }
+    public Guid UserId { get; set; }
+    public required long Id { get; set; }
+    public required long CategoryId { get; set; }
 }

@@ -49,13 +49,16 @@ public static class WebApplicationBuilderExtensions
                 .AddEfCoreUpdatesQueue<DatabaseContext>()
                 .AddTelegramMiddleware<HandleExceptionsMiddleware>()
                 .AddTelegramMiddleware<AutoCallbackResponseMiddleware>()
+                .AddTelegramMiddleware<HandleAllMessagesMiddleware>()
                 .AddTelegramAuthentication<User, Guid, TelegramUserQueryService, RequestContext>();
 
             builder.Services
-                .AddScoped<ITelegramMessageService, TelegramMessageService>();
-            
+                .AddScoped<ITelegramMessageService, TelegramMessageService>()
+                .AddScoped<ITelegramMessageCategoryService, TelegramMessageCategoryService>();
+
             builder.Services
-                .AddScoped<IMessageService, MessageService>();
+                .AddScoped<IMessageService, MessageService>()
+                .AddScoped<IMessageCategoryService, MessageCategoryService>();
             
             builder.Services.AddControllers();
 

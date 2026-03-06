@@ -24,11 +24,11 @@ public class Message
     /// Message category.
     /// </summary>
     public long? MessageTypeId { get; set; }
-    public MessageType? MessageType { get; set; }
+    public MessageCategory? MessageType { get; set; }
 
     /// <summary>
     /// Actual message status.
     /// </summary>
     public long? MessageTypeStatusId { get; set; }
-    public MessageTypeStatus? MessageTypeStatus { get; set; }
+    public MessageCategoryStatus? MessageTypeStatus { get; set; }
 }

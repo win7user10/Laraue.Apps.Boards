@@ -14,8 +14,8 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext
     
     public DbSet<User> Users { get; init; }
     public DbSet<Message> Messages { get; init; }
-    public DbSet<MessageType> MessageTypes { get; init; }
-    public DbSet<MessageTypeStatus> MessageTypeStatuses { get; init; }
+    public DbSet<MessageCategory> MessageTypes { get; init; }
+    public DbSet<MessageCategoryStatus> MessageTypeStatuses { get; init; }
 
     public DbSet<Update> Updates { get; set; }
     
