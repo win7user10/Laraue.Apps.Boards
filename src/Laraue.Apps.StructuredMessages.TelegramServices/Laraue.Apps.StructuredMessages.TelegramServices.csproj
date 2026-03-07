@@ -5,4 +5,8 @@
         <ProjectReference Include="..\Laraue.Apps.StructuredMessages.Services\Laraue.Apps.StructuredMessages.Services.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Laraue.Telegram.NET.Interceptors.EFCore" Version="$(LaraueTelegramNetVersion)" />
+    </ItemGroup>
+
 </Project>

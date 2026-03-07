@@ -6,5 +6,5 @@ public static class TelegramRoutes
     public const string SetMessageCategory = "m/sc";
     
     public const string Categories = "/categories";
-    public const string CreateCategory = "/categories add {name}";
+    public const string CreateCategoryFromMessage = "ccfm";
 }

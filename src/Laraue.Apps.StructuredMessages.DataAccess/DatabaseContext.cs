@@ -1,11 +1,12 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Telegram.NET.Interceptors.EFCore;
 using Laraue.Telegram.NET.UpdatesQueue.EFCore;
 using Laraue.Telegram.NET.UpdatesQueue.EFCore.DataAccess;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.DataAccess;
 
-public class DatabaseContext : DbContext, IUpdatesQueueDbContext
+public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsDbContext<Guid>
 {
     public DatabaseContext(DbContextOptions options) 
         : base(options)
@@ -18,8 +19,8 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext
     public DbSet<MessageCategoryStatus> MessageTypeStatuses { get; init; }
 
     public DbSet<Update> Updates { get; set; }
-    
     public DbSet<FailedUpdate> FailedUpdates { get; set; }
+    public DbSet<InterceptorStateModel<Guid>> InterceptorState { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

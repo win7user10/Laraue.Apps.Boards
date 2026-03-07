@@ -6,7 +6,11 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface IMessageCategoryService
 {
-    Task<MessageCategoryDto[]> GetMessageCategories(
+    Task<MessageCategoryDto> GetMessageCategory(
+        long id,
+        CancellationToken cancellationToken);
+    
+    Task<MessageCategoryListDto[]> GetMessageCategories(
         Guid userId,
         CancellationToken cancellationToken);
     
@@ -18,13 +22,26 @@ public interface IMessageCategoryService
 public class MessageCategoryService(DatabaseContext context)
     : IMessageCategoryService
 {
-    public Task<MessageCategoryDto[]> GetMessageCategories(
+    public Task<MessageCategoryDto> GetMessageCategory(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        return context.MessageTypes
+            .Where(x => x.Id == id)
+            .Select(x => new MessageCategoryDto
+            {
+                Name = x.Name,
+            })
+            .FirstAsyncEF(cancellationToken);
+    }
+
+    public Task<MessageCategoryListDto[]> GetMessageCategories(
         Guid userId,
         CancellationToken cancellationToken)
     {
         return context.MessageTypes
             .Where(x => x.UserId == userId)
-            .Select(x => new MessageCategoryDto
+            .Select(x => new MessageCategoryListDto
             {
                 Name = x.Name,
                 Id = x.Id
@@ -49,9 +66,14 @@ public class MessageCategoryService(DatabaseContext context)
     }
 }
 
-public class MessageCategoryDto
+public class MessageCategoryListDto
 {
     public long Id { get; set; }
+    public required string Name { get; set; }
+}
+
+public class MessageCategoryDto
+{
     public required string Name { get; set; }
 }
 

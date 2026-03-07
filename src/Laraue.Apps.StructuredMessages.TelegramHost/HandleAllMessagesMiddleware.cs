@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.TelegramServices;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services;
 using Laraue.Telegram.NET.Abstractions;
 using Laraue.Telegram.NET.Core.Extensions;
 using Telegram.Bot.Types.Enums;
@@ -16,16 +17,18 @@ public class HandleAllMessagesMiddleware(
         
         if (context.GetExecutedRoute() is null && context.Update.Type == UpdateType.Message)
         {
-            var text = context.Update.Message!.Text!;
+            var message = context.Update.Message!;
+            var text = message.Text!;
             
             await telegramMessageService.HandleSaveMessage(
                 new SaveMessageTelegramRequest
                 {
                     Text = text,
-                    MessageId = context.Update.Message.MessageId,
+                    TelegramMessageId = message.MessageId,
                     UserId = context.UserId,
                     TelegramUserId = context.Update.GetUserId(),
-                    SentAt = context.Update.Message!.Date,
+                    SentAt = message.Date,
+                    From = message.From?.Username,
                 },
                 ct);
             

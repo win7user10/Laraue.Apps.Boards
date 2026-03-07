@@ -1,5 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.TelegramServices;
-using Laraue.Telegram.NET.Abstractions.Request;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Routing.Attributes;
 
@@ -17,19 +17,4 @@ public class MessageCategoriesController(ITelegramMessageCategoryService message
             ReplyData.FromMessageRequest(requestContext),
             cancellationToken);
     }
-    
-    [TelegramMessageRoute(TelegramRoutes.CreateCategory)]
-    public Task CreateCategory(
-        RequestContext requestContext,
-        [FromPath] string name,
-        CancellationToken cancellationToken)
-    {
-        return messageCategoryService.HandleCreateCategory(
-            ReplyData.FromMessageRequest(requestContext),
-            new CreateMessageCategoryTelegramRequest
-            {
-                Name = name,
-                MessageId = requestContext.Update.Message!.Id,
-            },
-            cancellationToken);}
 }

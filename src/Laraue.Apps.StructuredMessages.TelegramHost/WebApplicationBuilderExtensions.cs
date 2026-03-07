@@ -2,14 +2,18 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices;
+using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Telegram.NET.Authentication.Extensions;
 using Laraue.Telegram.NET.Core;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Middleware;
 using Laraue.Telegram.NET.Core.Routing.Middleware;
+using Laraue.Telegram.NET.Interceptors.EFCore.Extensions;
 using Laraue.Telegram.NET.UpdatesQueue.EFCore.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Laraue.Apps.StructuredMessages.TelegramHost;
 
@@ -46,6 +50,8 @@ public static class WebApplicationBuilderExtensions
         {
             builder.Services
                 .AddTelegramCore()
+                .AddTelegramRequestEfCoreInterceptors<Guid, DatabaseContext>(
+                    [typeof(CreateCategoryFromMessageInterceptor).Assembly])
                 .AddEfCoreUpdatesQueue<DatabaseContext>()
                 .AddTelegramMiddleware<HandleExceptionsMiddleware>()
                 .AddTelegramMiddleware<AutoCallbackResponseMiddleware>()

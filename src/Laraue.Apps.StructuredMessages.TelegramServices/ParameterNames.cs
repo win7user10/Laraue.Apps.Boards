@@ -4,4 +4,5 @@ public static class ParameterNames
 {
     public const string Id = "i";
     public const string CategoryId = "ci";
+    public const string TelegramMessageId = "tmi";
 }
