@@ -6,6 +6,7 @@ using Laraue.Telegram.NET.Core.Utils;
 using Laraue.Telegram.NET.Interceptors.Services;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 
@@ -36,31 +37,22 @@ public class TelegramMessageService(
         await SendMessageToChat(id, cancellationToken);
     }
 
-    public async Task HandleUpdateMessageCategory(
+    public Task HandleUpdateMessageCategory(
         ReplyData replyData,
         UpdateMessageCategoryTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await messageService.UserHasAccessToMessage(
+        return UpdateMessageIfPermitted(
             replyData.UserId,
             request.MessageId,
-            cancellationToken))
-        {
-            // TODO - message deleted or no access?
-            return;
-        }
-        
-        await messageService.UpdateMessageCategory(
-            new UpdateMessageCategoryRequest
+            () =>
             {
-                CategoryId = request.CategoryId,
-                Id = request.MessageId,
-            },
-            cancellationToken);
-
-        await SendMessageToChat(
-            request.MessageId,
-            cancellationToken);
+                return messageService.UpdateMessage(
+                    request.MessageId,
+                    setters => setters
+                        .SetProperty(x => x.CategoryId, request.CategoryId),
+                    cancellationToken);
+            }, cancellationToken);
     }
 
     public async Task HandleCreateCategory(
@@ -84,41 +76,56 @@ public class TelegramMessageService(
                 },
                 cancellationToken);
     }
+    
+    public async Task HandleChangeContent(
+        ReplyData replyData,
+        HandleChangeContentTelegramRequest request,
+        CancellationToken cancellationToken)
+    {
+        var tmb = new TelegramMessageBuilder()
+            .Append("Send new text. The previous text can be copied from the previous message:");
 
-    public async Task HandleUpdateMessageStatus(
+        await client.SendTextMessageAsync(
+            replyData.TelegramId,
+            tmb,
+            cancellationToken: cancellationToken);
+
+        await interceptorState
+            .SetAsync<ChangeMessageTextInterceptor, ChangeMessageTextInterceptorContext>(
+                replyData.UserId,
+                new ChangeMessageTextInterceptorContext
+                {
+                    MessageId = request.MessageId,
+                },
+                cancellationToken);
+    }
+
+    public Task HandleUpdateStatus(
         ReplyData replyData,
         UpdateMessageStatusTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await messageService.UserHasAccessToMessage(
+        return UpdateMessageIfPermitted(
             replyData.UserId,
             request.MessageId,
-            cancellationToken))
-        {
-            // TODO - message deleted or no access?
-            return;
-        }
-        
-        if (!await messageStatusService.UserHasAccessToStatus(
-            replyData.UserId,
-            request.StatusId,
-            cancellationToken))
-        {
-            // TODO - status deleted or no access?
-            return;
-        }
-        
-        await messageService.UpdateMessageStatus(
-            new UpdateMessageStatusRequest
+            async () =>
             {
-                StatusId = request.StatusId,
-                Id = request.MessageId,
-            },
-            cancellationToken);
-
-        await SendMessageToChat(
-            request.MessageId,
-            cancellationToken);
+                if (!await messageStatusService.UserHasAccessToStatus(
+                    replyData.UserId,
+                    request.StatusId,
+                    cancellationToken))
+                {
+                    // TODO - status deleted or no access?
+                    return;
+                }
+                
+                await messageService.UpdateMessage(
+                    request.MessageId,
+                    setters => setters
+                        .SetProperty(x => x.StatusId, request.StatusId),
+                    cancellationToken);
+                
+            }, cancellationToken);
     }
 
     public async Task HandleCreateStatus(
@@ -174,6 +181,28 @@ public class TelegramMessageService(
             message,
             cancellationToken);
     }
+
+    private async Task UpdateMessageIfPermitted(
+        Guid userId,
+        long messageId,
+        Func<Task> executeUpdate,
+        CancellationToken cancellationToken)
+    {
+        if (!await messageService.UserHasAccessToMessage(
+                userId,
+                messageId,
+                cancellationToken))
+        {
+            // TODO - message deleted or no access?
+            return;
+        }
+
+        await executeUpdate();
+
+        await SendMessageToChat(
+            messageId,
+            cancellationToken);
+    }
     
     private async Task SendReadyMessageToChat(
         MessageDto message,
@@ -181,12 +210,21 @@ public class TelegramMessageService(
     {
         var tmb = GetTitleBuilder("✅", message);
 
+        tmb.AddInlineKeyboardButtons([
+            InlineKeyboardButton.WithCopyText(
+                "Copy",
+                message.Content),
+            new CallbackRoutePath(TelegramRoutes.UpdateMessageText, RouteMethod.Post)
+                .WithQueryParameters(new HandleChangeContentTelegramRequest
+                {
+                    MessageId = message.Id
+                })
+                .ToInlineKeyboardButton("Edit")
+        ]);
+
         await client.SendTextMessageAsync(
             message.UserTelegramId,
             tmb,
-            replyParameters: message.TelegramMessageId.HasValue
-                ? new ReplyParameters { MessageId = message.TelegramMessageId.Value } 
-                : null,
             cancellationToken: cancellationToken);
     }
     
@@ -208,8 +246,11 @@ public class TelegramMessageService(
                 var buttons = typesChunked
                     .Select(x => 
                         new CallbackRoutePath(TelegramRoutes.SetMessageCategory)
-                            .WithQueryParameter(ParameterNames.MessageId, message.Id)
-                            .WithQueryParameter(ParameterNames.MessageCategoryId, x.Id)
+                            .WithQueryParameters(new UpdateMessageCategoryTelegramRequest
+                            {
+                                MessageId = message.Id,
+                                CategoryId = x.Id,
+                            })
                             .ToInlineKeyboardButton(x.Name));
             
                 tmb.AddInlineKeyboardButtons(buttons);
@@ -225,9 +266,6 @@ public class TelegramMessageService(
         await client.SendTextMessageAsync(
             message.UserTelegramId,
             tmb,
-            replyParameters: message.TelegramMessageId.HasValue
-                ? new ReplyParameters { MessageId = message.TelegramMessageId.Value } 
-                : null,
             cancellationToken: cancellationToken);
     }
     
@@ -273,9 +311,6 @@ public class TelegramMessageService(
         await client.SendTextMessageAsync(
             message.UserTelegramId,
             tmb,
-            replyParameters: message.TelegramMessageId.HasValue
-                ? new ReplyParameters { MessageId = message.TelegramMessageId.Value } 
-                : null,
             cancellationToken: cancellationToken);
     }
 
@@ -298,6 +333,9 @@ public class TelegramMessageService(
 
         tmb
             .AppendRow()
+            .AppendRow()
+            .Append("Message: ")
+            .AppendRow(message.Content)
             .AppendRow();
         
         return tmb;

@@ -15,13 +15,18 @@ public interface ITelegramMessageService
         HandleCreateCategoryFromMessageRequest request,
         CancellationToken cancellationToken);
     
-    Task HandleUpdateMessageStatus(
+    Task HandleUpdateStatus(
         ReplyData replyData,
         UpdateMessageStatusTelegramRequest request,
         CancellationToken cancellationToken);
     
     Task HandleCreateStatus(
         HandleCreateStatusFromMessageRequest request,
+        CancellationToken cancellationToken);
+
+    Task HandleChangeContent(
+        ReplyData replyData,
+        HandleChangeContentTelegramRequest request,
         CancellationToken cancellationToken);
     
     Task SendMessageToChat(

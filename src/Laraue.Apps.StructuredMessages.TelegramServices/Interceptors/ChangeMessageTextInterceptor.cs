@@ -1,26 +1,23 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Authentication.Services;
-using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Interceptors.Services;
-using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 
-public class CreateCategoryFromMessageInterceptor(
+public class ChangeMessageTextInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
-    IMessageCategoryService messageCategoryService,
-    ITelegramMessageService telegramMessageService,
-    ITelegramBotClient client)
-    : BaseRequestInterceptor<Guid, string, CreateCategoryFromMessageInterceptorContext>(
+    IMessageService messageService,
+    ITelegramMessageService telegramMessageService)
+    : BaseRequestInterceptor<Guid, string, ChangeMessageTextInterceptorContext>(
         requestContext,
         interceptorState)
 {
     protected override Task ValidateAsync(
         TelegramRequestContext<Guid> requestContext,
         InterceptResult<string> interceptResult,
-        CreateCategoryFromMessageInterceptorContext interceptorContext,
+        ChangeMessageTextInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
         var text = requestContext.Update.Message?.Text;
@@ -31,10 +28,7 @@ public class CreateCategoryFromMessageInterceptor(
                 interceptResult.SetError("Text message was excepted");
                 break;
             case 0:
-                interceptResult.SetError("Category name should contain 1 symbol at least");
-                break;
-            case > 128:
-                interceptResult.SetError("Category name should be less than 128 symbols");
+                interceptResult.SetError("Text should contain 1 symbol at least");
                 break;
             default:
                 interceptResult.SetResult(text);
@@ -45,23 +39,16 @@ public class CreateCategoryFromMessageInterceptor(
     }
 
     protected override async Task<ExecutionState> ExecuteRouteAsync(
-        TelegramRequestContext<Guid> requestContext,
+        TelegramRequestContext<Guid> requestContext, 
         string model,
-        CreateCategoryFromMessageInterceptorContext interceptorContext,
+        ChangeMessageTextInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
-        await messageCategoryService.CreateMessageCategory(
-            new CreateMessageCategoryRequest
-            {
-                Name = model,
-                UserId = requestContext.UserId,
-            }, cancellationToken);
-
-        await client
-            .SendMessage(
-                requestContext.Update.GetUserId(),
-                $"Category created: '{model}'",
-                cancellationToken: cancellationToken);
+        await messageService.UpdateMessage(
+            interceptorContext.MessageId,
+            setters => setters
+                .SetProperty(x => x.Content, model),
+            cancellationToken);
 
         await telegramMessageService
             .SendMessageToChat(
@@ -71,10 +58,10 @@ public class CreateCategoryFromMessageInterceptor(
         return ExecutionState.FullyExecuted;
     }
 
-    public override string Id => "CreateCategory";
+    public override string Id => "ChangeMessageText";
 }
 
-public class CreateCategoryFromMessageInterceptorContext
+public class ChangeMessageTextInterceptorContext
 {
     public long MessageId { get; set; }
 }

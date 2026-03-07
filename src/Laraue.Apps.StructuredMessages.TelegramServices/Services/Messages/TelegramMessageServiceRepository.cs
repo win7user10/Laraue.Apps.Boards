@@ -30,6 +30,7 @@ public class TelegramMessageServiceRepository(DatabaseContext databaseContext)
                 StatusName = x.Status!.Name,
                 UserTelegramId = x.User!.TelegramId,
                 TelegramMessageId = x.TelegramMessageId,
+                Content = x.Content,
             })
             .FirstAsyncEF(cancellationToken);
     }
@@ -46,4 +47,5 @@ public class MessageDto
     public required string? StatusName { get; set; }
     public required long UserTelegramId { get; set; }
     public required int? TelegramMessageId { get; set; }
+    public required string Content { get; set; }
 }

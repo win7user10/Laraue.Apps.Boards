@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -16,12 +17,9 @@ public interface IMessageService
         SaveMessageRequest request,
         CancellationToken cancellationToken);
     
-    Task UpdateMessageCategory(
-        UpdateMessageCategoryRequest request,
-        CancellationToken cancellationToken);
-    
-    Task UpdateMessageStatus(
-        UpdateMessageStatusRequest request,
+    Task UpdateMessage(
+        long messageId,
+        Action<UpdateSettersBuilder<Message>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -55,24 +53,14 @@ public class MessageService(DatabaseContext context) : IMessageService
         return entity.Id;
     }
 
-    public Task UpdateMessageCategory(
-        UpdateMessageCategoryRequest request,
+    public Task UpdateMessage(
+        long messageId,
+        Action<UpdateSettersBuilder<Message>> setters,
         CancellationToken cancellationToken)
     {
         return context.Messages
-            .Where(x => x.Id == request.Id)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(x => x.CategoryId, request.CategoryId),
-                cancellationToken);
-    }
-
-    public Task UpdateMessageStatus(UpdateMessageStatusRequest request, CancellationToken cancellationToken)
-    {
-        return context.Messages
-            .Where(x => x.Id == request.Id)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(x => x.StatusId, request.StatusId),
-                cancellationToken);
+            .Where(x => x.Id == messageId)
+            .ExecuteUpdateAsync(setters, cancellationToken);
     }
 }
 
@@ -95,4 +83,10 @@ public class UpdateMessageStatusRequest
 {
     public required long Id { get; set; }
     public required long StatusId { get; set; }
+}
+
+public class UpdateMessageTextRequest
+{
+    public required long Id { get; set; }
+    public required string Content { get; set; }
 }

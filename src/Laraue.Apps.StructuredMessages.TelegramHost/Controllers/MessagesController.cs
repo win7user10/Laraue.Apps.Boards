@@ -63,7 +63,19 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
         RequestContext context,
         CancellationToken cancellationToken)
     {
-        return telegramMessageService.HandleUpdateMessageStatus(
+        return telegramMessageService.HandleUpdateStatus(
+            ReplyData.FromCallbackRequest(context),
+            request,
+            cancellationToken);
+    }
+    
+    [TelegramCallbackRoute(TelegramRoutes.UpdateMessageText, RouteMethod.Post)]
+    public Task UpdateMessageContent(
+        [FromQuery] HandleChangeContentTelegramRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        return telegramMessageService.HandleChangeContent(
             ReplyData.FromCallbackRequest(context),
             request,
             cancellationToken);
