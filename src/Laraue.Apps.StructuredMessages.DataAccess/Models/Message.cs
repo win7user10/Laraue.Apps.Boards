@@ -23,12 +23,16 @@ public class Message
     /// <summary>
     /// Message category.
     /// </summary>
-    public long? MessageTypeId { get; set; }
-    public MessageCategory? MessageType { get; set; }
+    public long? CategoryId { get; set; }
+    public MessageCategory? Category { get; set; }
 
     /// <summary>
     /// Actual message status.
     /// </summary>
-    public long? MessageTypeStatusId { get; set; }
-    public MessageCategoryStatus? MessageTypeStatus { get; set; }
+    public long? StatusId { get; set; }
+    public MessageCategoryStatus? Status { get; set; }
+    
+    [MaxLength(32)]
+    public string? Sender { get; set; }
+    public int? TelegramMessageId { get; set; }
 }

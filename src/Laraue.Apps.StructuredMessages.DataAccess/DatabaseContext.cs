@@ -15,8 +15,8 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     
     public DbSet<User> Users { get; init; }
     public DbSet<Message> Messages { get; init; }
-    public DbSet<MessageCategory> MessageTypes { get; init; }
-    public DbSet<MessageCategoryStatus> MessageTypeStatuses { get; init; }
+    public DbSet<MessageCategory> MessageCategories { get; init; }
+    public DbSet<MessageCategoryStatus> MessageStatuses { get; init; }
 
     public DbSet<Update> Updates { get; set; }
     public DbSet<FailedUpdate> FailedUpdates { get; set; }

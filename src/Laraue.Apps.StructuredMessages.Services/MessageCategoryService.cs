@@ -17,6 +17,11 @@ public interface IMessageCategoryService
     Task<long> CreateMessageCategory(
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken);
+    
+    Task<bool> UserHasAccessToCategory(
+        Guid userId,
+        long id,
+        CancellationToken cancellationToken);
 }
 
 public class MessageCategoryService(DatabaseContext context)
@@ -26,7 +31,7 @@ public class MessageCategoryService(DatabaseContext context)
         long id,
         CancellationToken cancellationToken)
     {
-        return context.MessageTypes
+        return context.MessageCategories
             .Where(x => x.Id == id)
             .Select(x => new MessageCategoryDto
             {
@@ -39,7 +44,7 @@ public class MessageCategoryService(DatabaseContext context)
         Guid userId,
         CancellationToken cancellationToken)
     {
-        return context.MessageTypes
+        return context.MessageCategories
             .Where(x => x.UserId == userId)
             .Select(x => new MessageCategoryListDto
             {
@@ -59,10 +64,18 @@ public class MessageCategoryService(DatabaseContext context)
             UserId = request.UserId
         };
         
-        context.MessageTypes.Add(category);
+        context.MessageCategories.Add(category);
         await context.SaveChangesAsync(cancellationToken);
 
         return category.Id;
+    }
+
+    public Task<bool> UserHasAccessToCategory(Guid userId, long id, CancellationToken cancellationToken)
+    {
+        return context.MessageCategories
+            .Where(x => x.UserId == userId)
+            .Where(x => x.Id == id)
+            .AnyAsyncEF(cancellationToken);
     }
 }
 

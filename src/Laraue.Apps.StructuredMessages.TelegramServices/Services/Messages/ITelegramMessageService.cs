@@ -12,10 +12,19 @@ public interface ITelegramMessageService
         CancellationToken cancellationToken);
     
     Task HandleCreateCategory(
-        HandleCreateCategoryFromMessageRequest fromMessageRequest,
+        HandleCreateCategoryFromMessageRequest request,
         CancellationToken cancellationToken);
     
-    Task SendMessageSaved(
-        SendMessageSavedRequest request,
+    Task HandleUpdateMessageStatus(
+        ReplyData replyData,
+        UpdateMessageStatusTelegramRequest request,
+        CancellationToken cancellationToken);
+    
+    Task HandleCreateStatus(
+        HandleCreateStatusFromMessageRequest request,
+        CancellationToken cancellationToken);
+    
+    Task SendMessageToChat(
+        long messageId,
         CancellationToken cancellationToken);
 }

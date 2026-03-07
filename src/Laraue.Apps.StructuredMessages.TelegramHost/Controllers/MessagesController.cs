@@ -11,6 +11,23 @@ namespace Laraue.Apps.StructuredMessages.TelegramHost.Controllers;
 public class MessagesController(ITelegramMessageService telegramMessageService)
     : TelegramController
 {
+    [TelegramCallbackRoute(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)]
+    public async Task CreateCategory(
+        [FromQuery] CreateCategoryFromMessageTelegramRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        await telegramMessageService.HandleCreateCategory(
+            new HandleCreateCategoryFromMessageRequest
+            {
+                UserId = context.UserId,
+                From = context.Update.GetUser()?.Username,
+                MessageId = request.MessageId,
+                TelegramUserId = context.Update.GetUserId(),
+            },
+            cancellationToken);
+    }
+    
     [TelegramCallbackRoute(TelegramRoutes.SetMessageCategory)]
     public Task SetMessageCategory(
         [FromQuery] UpdateMessageCategoryTelegramRequest request,
@@ -23,20 +40,32 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
             cancellationToken);
     }
     
-    [TelegramCallbackRoute(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)]
-    public async Task CreateCategory(
-        [FromQuery] CreateCategoryFromMessageTelegramRequest request,
+    [TelegramCallbackRoute(TelegramRoutes.CreateStatusFromMessage, RouteMethod.Post)]
+    public async Task CreateStatus(
+        [FromQuery] CreateStatusFromMessageTelegramRequest request,
         RequestContext context,
         CancellationToken cancellationToken)
     {
-        await telegramMessageService.HandleCreateCategory(
-            new HandleCreateCategoryFromMessageRequest
+        await telegramMessageService.HandleCreateStatus(
+            new HandleCreateStatusFromMessageRequest
             {
                 UserId = context.UserId,
-                From = context.Update.GetUser()?.Username,
-                TelegramMessageId = request.MessageId,
+                MessageId = request.MessageId,
                 TelegramUserId = context.Update.GetUserId(),
+                MessageCategoryId = request.MessageCategoryId,
             },
+            cancellationToken);
+    }
+    
+    [TelegramCallbackRoute(TelegramRoutes.SetMessageStatus)]
+    public Task SetMessageStatus(
+        [FromQuery] UpdateMessageStatusTelegramRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        return telegramMessageService.HandleUpdateMessageStatus(
+            ReplyData.FromCallbackRequest(context),
+            request,
             cancellationToken);
     }
 }

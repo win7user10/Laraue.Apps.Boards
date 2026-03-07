@@ -2,8 +2,11 @@
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 
-public class CreateCategoryFromMessageTelegramRequest
+public class UpdateMessageStatusTelegramRequest
 {
     [FromQuery(ParameterNames.MessageId)]
     public required long MessageId { get; set; }
+    
+    [FromQuery(ParameterNames.StatusId)]
+    public required long StatusId { get; set; }
 }

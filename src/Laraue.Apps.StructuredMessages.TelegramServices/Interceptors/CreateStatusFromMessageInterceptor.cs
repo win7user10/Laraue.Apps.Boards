@@ -7,20 +7,21 @@ using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 
-public class CreateCategoryFromMessageInterceptor(
+public class CreateStatusFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
-    IMessageCategoryService messageCategoryService,
+    IMessageStatusService messageStatusService,
+    IMessageCategoryService categoryService,
     ITelegramMessageService telegramMessageService,
     ITelegramBotClient client)
-    : BaseRequestInterceptor<Guid, string, CreateCategoryFromMessageInterceptorContext>(
+    : BaseRequestInterceptor<Guid, string, CreateStatusFromMessageInterceptorContext>(
         requestContext,
         interceptorState)
 {
     protected override Task ValidateAsync(
         TelegramRequestContext<Guid> requestContext,
         InterceptResult<string> interceptResult,
-        CreateCategoryFromMessageInterceptorContext interceptorContext,
+        CreateStatusFromMessageInterceptorContext fromMessageInterceptorContext,
         CancellationToken cancellationToken = default)
     {
         var text = requestContext.Update.Message?.Text;
@@ -31,10 +32,10 @@ public class CreateCategoryFromMessageInterceptor(
                 interceptResult.SetError("Text message was excepted");
                 break;
             case 0:
-                interceptResult.SetError("Category name should contain 1 symbol at least");
+                interceptResult.SetError("Status name should contain 1 symbol at least");
                 break;
             case > 128:
-                interceptResult.SetError("Category name should be less than 128 symbols");
+                interceptResult.SetError("Status name should be less than 128 symbols");
                 break;
             default:
                 interceptResult.SetResult(text);
@@ -47,34 +48,48 @@ public class CreateCategoryFromMessageInterceptor(
     protected override async Task<ExecutionState> ExecuteRouteAsync(
         TelegramRequestContext<Guid> requestContext,
         string model,
-        CreateCategoryFromMessageInterceptorContext fromMessageInterceptorContext,
+        CreateStatusFromMessageInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
-        await messageCategoryService.CreateMessageCategory(
-            new CreateMessageCategoryRequest
+        if (!await categoryService.UserHasAccessToCategory(
+            requestContext.UserId,
+            interceptorContext.MessageCategoryId,
+            cancellationToken))
+        {
+            await client.SendMessage(
+                requestContext.Update.GetUserId(),
+                "Unable to save status. Category was not found.",
+                cancellationToken: cancellationToken);
+            
+            return ExecutionState.FullyExecuted;
+        }
+            
+        await messageStatusService.CreateMessageCategoryStatus(
+            new CreateMessageCategoryStatusRequest
             {
                 Name = model,
-                UserId = requestContext.UserId,
+                CategoryId = interceptorContext.MessageCategoryId,
             }, cancellationToken);
 
         await client
             .SendMessage(
                 requestContext.Update.GetUserId(),
-                $"Category created: '{model}'",
+                $"Status created: '{model}'",
                 cancellationToken: cancellationToken);
 
         await telegramMessageService
             .SendMessageToChat(
-                fromMessageInterceptorContext.MessageId,
+                interceptorContext.MessageId,
                 cancellationToken);
 
         return ExecutionState.FullyExecuted;
     }
 
-    public override string Id => "CreateCategory";
+    public override string Id => "CreateCategoryStatus";
 }
 
-public class CreateCategoryFromMessageInterceptorContext
+public class CreateStatusFromMessageInterceptorContext
 {
     public required long MessageId { get; set; }
+    public required long MessageCategoryId { get; set; }
 }

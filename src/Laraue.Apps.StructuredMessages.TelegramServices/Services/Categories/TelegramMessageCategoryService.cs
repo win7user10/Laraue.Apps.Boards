@@ -29,7 +29,7 @@ public class TelegramMessageCategoryService(
             var buttons = typesChunked
                 .Select(x => 
                     new CallbackRoutePath(TelegramRoutes.Category)
-                        .WithQueryParameter(ParameterNames.Id, x.Id)
+                        .WithQueryParameter(ParameterNames.MessageCategoryId, x.Id)
                         .ToInlineKeyboardButton(x.Name));
             
             tmb.AddInlineKeyboardButtons(buttons);

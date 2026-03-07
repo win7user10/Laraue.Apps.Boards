@@ -4,9 +4,9 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 
 public class UpdateMessageCategoryTelegramRequest
 {
-    [FromQuery(ParameterNames.Id)]
-    public required long Id { get; set; }
+    [FromQuery(ParameterNames.MessageId)]
+    public required long MessageId { get; set; }
     
-    [FromQuery(ParameterNames.CategoryId)]
+    [FromQuery(ParameterNames.MessageCategoryId)]
     public required long CategoryId { get; set; }
 }
