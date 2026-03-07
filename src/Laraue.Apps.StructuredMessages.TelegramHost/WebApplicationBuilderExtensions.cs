@@ -4,6 +4,8 @@ using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Telegram.NET.Authentication.Extensions;
 using Laraue.Telegram.NET.Core;

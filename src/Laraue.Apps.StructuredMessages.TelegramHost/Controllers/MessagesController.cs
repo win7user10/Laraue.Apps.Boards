@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Abstractions.Request;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Routing;
@@ -29,7 +30,7 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
         CancellationToken cancellationToken)
     {
         await telegramMessageService.HandleCreateCategory(
-            new HandleCreateCategoryRequest
+            new HandleCreateCategoryFromMessageRequest
             {
                 UserId = context.UserId,
                 From = context.Update.GetUser()?.Username,

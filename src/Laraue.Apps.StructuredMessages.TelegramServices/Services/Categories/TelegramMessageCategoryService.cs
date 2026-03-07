@@ -1,19 +1,11 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Utils;
 using Laraue.Telegram.NET.Interceptors.Services;
 using Telegram.Bot;
 
-namespace Laraue.Apps.StructuredMessages.TelegramServices.Services;
-
-public interface ITelegramMessageCategoryService
-{
-    Task HandleGetCategories(
-        ReplyData reply,
-        CancellationToken cancellationToken);
-}
+namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
 
 public class TelegramMessageCategoryService(
     IMessageCategoryService messageCategoryService,

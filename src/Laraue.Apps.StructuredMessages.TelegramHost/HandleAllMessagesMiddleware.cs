@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services;
+using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Abstractions;
 using Laraue.Telegram.NET.Core.Extensions;
 using Telegram.Bot.Types.Enums;
