@@ -11,7 +11,7 @@ public interface IMessageStatusService
         CancellationToken cancellationToken);
 
     Task<MessageStatusDto[]> GetStatuses(
-        Guid userId,
+        long categoryId,
         CancellationToken cancellationToken);
     
     Task<bool> UserHasAccessToStatus(
@@ -38,10 +38,12 @@ public class MessageStatusService(DatabaseContext context) : IMessageStatusServi
         return status.Id;
     }
 
-    public Task<MessageStatusDto[]> GetStatuses(Guid userId, CancellationToken cancellationToken)
+    public Task<MessageStatusDto[]> GetStatuses(
+        long categoryId,
+        CancellationToken cancellationToken)
     {
         return context.MessageStatuses
-            .Where(x => x.MessageCategory!.UserId == userId)
+            .Where(x => x.MessageCategoryId == categoryId)
             .Select(x => new MessageStatusDto
             {
                 Id = x.Id,

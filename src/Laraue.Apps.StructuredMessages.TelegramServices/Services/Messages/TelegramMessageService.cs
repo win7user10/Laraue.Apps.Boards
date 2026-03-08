@@ -34,7 +34,10 @@ public class TelegramMessageService(
             },
             cancellationToken);
 
-        await SendMessageToChat(id, cancellationToken);
+        await UpdateMessageInChat(
+            id,
+            editMessageId: null,
+            cancellationToken);
     }
 
     public Task HandleUpdateMessageCategory(
@@ -45,6 +48,7 @@ public class TelegramMessageService(
         return UpdateMessageIfPermitted(
             replyData.UserId,
             request.MessageId,
+            replyData.MessageId,
             () =>
             {
                 return messageService.UpdateMessage(
@@ -63,16 +67,17 @@ public class TelegramMessageService(
             .Append("Send category name:");
 
         await client.SendTextMessageAsync(
-            request.TelegramUserId,
+            request.ReplyData.TelegramId,
             tmb,
             cancellationToken: cancellationToken);
 
         await interceptorState
             .SetAsync<CreateCategoryFromMessageInterceptor, CreateCategoryFromMessageInterceptorContext>(
-                request.UserId,
+                request.ReplyData.UserId,
                 new CreateCategoryFromMessageInterceptorContext
                 {
                     MessageId = request.MessageId,
+                    TelegramMessageId = request.ReplyData.MessageId,
                 },
                 cancellationToken);
     }
@@ -108,6 +113,7 @@ public class TelegramMessageService(
         return UpdateMessageIfPermitted(
             replyData.UserId,
             request.MessageId,
+            replyData.MessageId,
             async () =>
             {
                 if (!await messageStatusService.UserHasAccessToStatus(
@@ -136,35 +142,38 @@ public class TelegramMessageService(
             .Append("Send status name:");
 
         await client.SendTextMessageAsync(
-            request.TelegramUserId,
+            request.ReplyData.TelegramId,
             tmb,
             cancellationToken: cancellationToken);
 
         await interceptorState
             .SetAsync<CreateStatusFromMessageInterceptor, CreateStatusFromMessageInterceptorContext>(
-                request.UserId,
+                request.ReplyData.UserId,
                 new CreateStatusFromMessageInterceptorContext
                 {
                     MessageId = request.MessageId,
                     MessageCategoryId = request.MessageCategoryId,
+                    TelegramMessageId = request.ReplyData.MessageId,
                 },
                 cancellationToken);
     }
 
-    public async Task SendMessageToChat(
+    public async Task UpdateMessageInChat(
         long messageId,
+        int? editMessageId,
         CancellationToken cancellationToken)
     {
         var message = await repository.GetMessage(
             messageId,
             cancellationToken);
-
+        
         if (message.CategoryId is null)
         {
             await SendMessageWithCategoriesToChat(
                 message,
+                editMessageId,
                 cancellationToken);
-
+            
             return;
         }
 
@@ -172,6 +181,7 @@ public class TelegramMessageService(
         {
             await SendMessageWithStatusesToChat(
                 message,
+                editMessageId,
                 cancellationToken);
             
             return;
@@ -179,19 +189,21 @@ public class TelegramMessageService(
         
         await SendReadyMessageToChat(
             message,
+            editMessageId,
             cancellationToken);
     }
 
     private async Task UpdateMessageIfPermitted(
         Guid userId,
         long messageId,
+        int telegramMessageId,
         Func<Task> executeUpdate,
         CancellationToken cancellationToken)
     {
         if (!await messageService.UserHasAccessToMessage(
-                userId,
-                messageId,
-                cancellationToken))
+            userId,
+            messageId,
+            cancellationToken))
         {
             // TODO - message deleted or no access?
             return;
@@ -199,13 +211,15 @@ public class TelegramMessageService(
 
         await executeUpdate();
 
-        await SendMessageToChat(
+        await UpdateMessageInChat(
             messageId,
+            telegramMessageId,
             cancellationToken);
     }
     
     private async Task SendReadyMessageToChat(
         MessageDto message,
+        int? editMessageId,
         CancellationToken cancellationToken)
     {
         var tmb = GetTitleBuilder("✅", message);
@@ -222,14 +236,17 @@ public class TelegramMessageService(
                 .ToInlineKeyboardButton("Edit")
         ]);
 
-        await client.SendTextMessageAsync(
+        await SendOrEditMessage(
+            editMessageId,
+            message.TelegramMessageId,
             message.UserTelegramId,
             tmb,
-            cancellationToken: cancellationToken);
+            cancellationToken);
     }
     
     private async Task SendMessageWithCategoriesToChat(
         MessageDto message,
+        int? editMessageId,
         CancellationToken cancellationToken)
     {
         var categories = await messageCategoryService.GetMessageCategories(
@@ -263,18 +280,21 @@ public class TelegramMessageService(
                 .ToInlineKeyboardButton("➕ New")
         ]);
 
-        await client.SendTextMessageAsync(
+        await SendOrEditMessage(
+            editMessageId,
+            message.TelegramMessageId,
             message.UserTelegramId,
             tmb,
-            cancellationToken: cancellationToken);
+            cancellationToken);
     }
     
     private async Task SendMessageWithStatusesToChat(
         MessageDto message,
+        int? editMessageId,
         CancellationToken cancellationToken)
     {
         var statuses = await messageStatusService.GetStatuses(
-            message.UserId,
+            message.CategoryId.GetValueOrDefault(),
             cancellationToken);
         
         var tmb = GetTitleBuilder("📥", message)
@@ -307,11 +327,45 @@ public class TelegramMessageService(
                 })
                 .ToInlineKeyboardButton("➕ New")
         ]);
-
-        await client.SendTextMessageAsync(
+        
+        await SendOrEditMessage(
+            editMessageId,
+            message.TelegramMessageId,
             message.UserTelegramId,
             tmb,
-            cancellationToken: cancellationToken);
+            cancellationToken);
+    }
+
+    private Task SendOrEditMessage(
+        int? editMessageId,
+        int? replyMessageId,
+        long userTelegramId,
+        TelegramMessageBuilder tmb,
+        CancellationToken cancellationToken)
+    {
+        if (editMessageId is not null)
+        {
+            return client.EditMessageTextAsync(
+                userTelegramId,
+                editMessageId.Value,
+                tmb,
+                cancellationToken: cancellationToken);
+        }
+
+        if (replyMessageId is not null)
+        {
+            return client.SendTextMessageAsync(
+                userTelegramId,
+                tmb,
+                replyParameters: new ReplyParameters
+                {
+                    MessageId = replyMessageId.Value,
+                    AllowSendingWithoutReply = true,
+                },
+                cancellationToken: cancellationToken);
+        }
+        
+        return Task.CompletedTask;
     }
 
     private static TelegramMessageBuilder GetTitleBuilder(string icon, MessageDto message)

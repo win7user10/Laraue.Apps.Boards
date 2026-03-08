@@ -29,7 +29,8 @@ public interface ITelegramMessageService
         HandleChangeContentTelegramRequest request,
         CancellationToken cancellationToken);
     
-    Task SendMessageToChat(
+    Task UpdateMessageInChat(
         long messageId,
+        int? editMessageId,
         CancellationToken cancellationToken);
 }

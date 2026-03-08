@@ -20,10 +20,9 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
         await telegramMessageService.HandleCreateCategory(
             new HandleCreateCategoryFromMessageRequest
             {
-                UserId = context.UserId,
                 From = context.Update.GetUser()?.Username,
                 MessageId = request.MessageId,
-                TelegramUserId = context.Update.GetUserId(),
+                ReplyData = ReplyData.FromCallbackRequest(context),
             },
             cancellationToken);
     }
@@ -49,10 +48,9 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
         await telegramMessageService.HandleCreateStatus(
             new HandleCreateStatusFromMessageRequest
             {
-                UserId = context.UserId,
                 MessageId = request.MessageId,
-                TelegramUserId = context.Update.GetUserId(),
                 MessageCategoryId = request.MessageCategoryId,
+                ReplyData = ReplyData.FromCallbackRequest(context),
             },
             cancellationToken);
     }

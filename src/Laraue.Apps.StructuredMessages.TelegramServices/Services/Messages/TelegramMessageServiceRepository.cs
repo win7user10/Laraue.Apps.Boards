@@ -41,10 +41,10 @@ public class MessageDto
     public required long Id { get; set; }
     public required Guid UserId { get; set; }
     public required string? Sender { get; set; }
-    public required long? CategoryId { get; set; }
-    public required string? CategoryName { get; set; }
-    public required long? StatusId { get; set; }
-    public required string? StatusName { get; set; }
+    public long? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
+    public long? StatusId { get; set; }
+    public string? StatusName { get; set; }
     public required long UserTelegramId { get; set; }
     public required int? TelegramMessageId { get; set; }
     public required string Content { get; set; }
