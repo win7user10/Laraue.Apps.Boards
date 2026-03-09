@@ -103,4 +103,16 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
             request,
             cancellationToken);
     }
+    
+    [TelegramCallbackRoute(TelegramRoutes.Message, RouteMethod.Delete)]
+    public Task DeleteMessage(
+        [FromQuery] HandleDeleteMessageTelegramRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        return telegramMessageService.HandleDelete(
+            ReplyData.FromCallbackRequest(context),
+            request,
+            cancellationToken);
+    }
 }

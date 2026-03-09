@@ -41,6 +41,11 @@ public interface ITelegramMessageService
         HandleChangeContentTelegramRequest request,
         CancellationToken cancellationToken);
     
+    Task HandleDelete(
+        ReplyData replyData,
+        HandleDeleteMessageTelegramRequest request,
+        CancellationToken cancellationToken);
+    
     Task UpdateMessageInChat(
         long messageId,
         int? editMessageId,

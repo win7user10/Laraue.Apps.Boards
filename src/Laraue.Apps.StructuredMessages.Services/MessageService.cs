@@ -21,6 +21,10 @@ public interface IMessageService
         long messageId,
         Action<UpdateSettersBuilder<Message>> setters,
         CancellationToken cancellationToken);
+    
+    Task DeleteMessage(
+        long id,
+        CancellationToken cancellationToken);
 }
 
 public class MessageService(DatabaseContext context) : IMessageService
@@ -61,6 +65,13 @@ public class MessageService(DatabaseContext context) : IMessageService
         return context.Messages
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(setters, cancellationToken);
+    }
+
+    public Task DeleteMessage(long id, CancellationToken cancellationToken)
+    {
+        return context.Messages
+            .Where(x => x.Id == id)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 }
 

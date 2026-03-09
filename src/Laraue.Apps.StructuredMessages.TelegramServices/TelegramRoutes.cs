@@ -11,4 +11,5 @@ public static class TelegramRoutes
     public const string CreateStatusFromMessage = "csfm";
     
     public const string UpdateMessageText = "m/ut";
+    public const string Message = "m";
 }

@@ -230,6 +230,31 @@ public class TelegramMessageService(
             }, cancellationToken);
     }
 
+    public async Task HandleDelete(
+        ReplyData replyData,
+        HandleDeleteMessageTelegramRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await messageService.UserHasAccessToMessage(
+            replyData.UserId,
+            request.MessageId,
+            cancellationToken))
+        {
+            // TODO - status deleted or no access?
+            return;
+        }
+        
+        await messageService.DeleteMessage(request.MessageId, cancellationToken);
+
+        var tmb = new TelegramMessageBuilder()
+            .Append("Deleted");
+
+        await client.EditMessageTextAsync(
+            replyData,
+            tmb,
+            cancellationToken: cancellationToken);
+    }
+
     public Task HandleUpdateStatus(
         ReplyData replyData,
         UpdateMessageStatusTelegramRequest request,
@@ -363,6 +388,15 @@ public class TelegramMessageService(
                     MessageId = message.Id
                 })
                 .ToInlineKeyboardButton("Edit")
+        ]);
+        
+        tmb.AddInlineKeyboardButtons([
+            new CallbackRoutePath(TelegramRoutes.Message, RouteMethod.Delete)
+                .WithQueryParameters(new HandleDeleteMessageTelegramRequest
+                {
+                    MessageId = message.Id
+                })
+                .ToInlineKeyboardButton("Delete")
         ]);
 
         await SendOrEditMessage(
