@@ -49,14 +49,73 @@ public class TelegramMessageService(
             replyData.UserId,
             request.MessageId,
             replyData.MessageId,
-            () =>
+            _ =>
             {
                 return messageService.UpdateMessage(
                     request.MessageId,
                     setters => setters
-                        .SetProperty(x => x.CategoryId, request.CategoryId),
+                        .SetProperty(x => x.CategoryId, request.CategoryId)
+                        .SetProperty(x => x.StatusId, (long?)null),
                     cancellationToken);
             }, cancellationToken);
+    }
+
+    public async Task OpenChangeCategoryWindow(
+        Guid userId,
+        int? editMessageId,
+        HandleOpenChangeCategoryWindowRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await messageService.UserHasAccessToMessage(
+            userId,
+            request.MessageId,
+            cancellationToken))
+        {
+            // TODO - message deleted or no access?
+            return;
+        }
+
+        var message = await repository.GetMessage(
+            request.MessageId,
+            cancellationToken);
+        
+        var categories = await messageCategoryService.GetMessageCategories(
+            message.UserId,
+            cancellationToken);
+
+        var tmb = new TelegramMessageBuilder()
+            .AppendRow("Choose category:");
+
+        if (categories.Length > 0)
+        {
+            foreach (var typesChunked in categories.Chunk(2))
+            {
+                var buttons = typesChunked
+                    .Select(x => 
+                        new CallbackRoutePath(TelegramRoutes.UpdateMessageCategory, RouteMethod.Post)
+                            .WithQueryParameters(new UpdateMessageCategoryTelegramRequest
+                            {
+                                MessageId = message.Id,
+                                CategoryId = x.Id,
+                            })
+                            .ToInlineKeyboardButton(x.Name));
+            
+                tmb.AddInlineKeyboardButtons(buttons);
+            }
+        }
+
+        tmb.AddInlineKeyboardButtons([
+            new CallbackRoutePath(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)
+                .WithQueryParameter(ParameterNames.MessageId, message.Id)
+                .ToInlineKeyboardButton("➕ New Category")
+        ]);
+
+        await SendOrEditMessage(
+            editMessageId,
+            message.TelegramMessageId,
+            message.UserTelegramId,
+            tmb,
+            cancellationToken);
     }
 
     public async Task HandleCreateCategory(
@@ -77,32 +136,98 @@ public class TelegramMessageService(
                 new CreateCategoryFromMessageInterceptorContext
                 {
                     MessageId = request.MessageId,
-                    TelegramMessageId = request.ReplyData.MessageId,
                 },
                 cancellationToken);
     }
-    
-    public async Task HandleChangeContent(
+
+    public async Task OpenChangeStatusWindow(
+        Guid userId,
+        int? editMessageId,
+        HandleOpenChangeStatusWindowRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await messageService.UserHasAccessToMessage(
+            userId,
+            request.MessageId,
+            cancellationToken))
+        {
+            // TODO - message deleted or no access?
+            return;
+        }
+
+        var message = await repository.GetMessage(
+            request.MessageId,
+            cancellationToken);
+        
+        var statuses = await messageStatusService.GetStatuses(
+            message.CategoryId.GetValueOrDefault(),
+            cancellationToken);
+                
+        var tmb = new TelegramMessageBuilder()
+            .AppendRow("Choose status:");
+        
+        foreach (var typesChunked in statuses.Chunk(2))
+        {
+            var buttons = typesChunked
+                .Select(x => 
+                    new CallbackRoutePath(TelegramRoutes.UpdateMessageStatus, RouteMethod.Post)
+                        .WithQueryParameters(new UpdateMessageStatusTelegramRequest
+                        {
+                            MessageId = message.Id,
+                            StatusId = x.Id,
+                        })
+                        .ToInlineKeyboardButton(x.Name));
+            
+            tmb.AddInlineKeyboardButtons(buttons);
+        }
+
+        tmb.AddInlineKeyboardButtons([
+            new CallbackRoutePath(TelegramRoutes.CreateStatusFromMessage, RouteMethod.Post)
+                .WithQueryParameters(new CreateStatusFromMessageTelegramRequest
+                {
+                    MessageId = message.Id,
+                    MessageCategoryId = message.CategoryId.GetValueOrDefault(),
+                })
+                .ToInlineKeyboardButton("➕ New Status")
+        ]);
+
+        await SendOrEditMessage(
+            editMessageId,
+            message.TelegramMessageId,
+            message.UserTelegramId,
+            tmb,
+            cancellationToken);
+    }
+
+    public Task HandleChangeContent(
         ReplyData replyData,
         HandleChangeContentTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var tmb = new TelegramMessageBuilder()
-            .Append("Send new text. The previous text can be copied from the previous message:");
+        return UpdateMessageIfPermitted(
+            replyData.UserId,
+            request.MessageId,
+            replyData.MessageId,
+            async _ =>
+            {
+                var tmb = new TelegramMessageBuilder()
+                    .Append("Send new text. The previous text can be copied from the previous message:");
 
-        await client.SendTextMessageAsync(
-            replyData.TelegramId,
-            tmb,
-            cancellationToken: cancellationToken);
+                await client.SendTextMessageAsync(
+                    replyData.TelegramId,
+                    tmb,
+                    cancellationToken: cancellationToken);
 
-        await interceptorState
-            .SetAsync<ChangeMessageTextInterceptor, ChangeMessageTextInterceptorContext>(
-                replyData.UserId,
-                new ChangeMessageTextInterceptorContext
-                {
-                    MessageId = request.MessageId,
-                },
-                cancellationToken);
+                await interceptorState
+                    .SetAsync<ChangeMessageTextInterceptor, ChangeMessageTextInterceptorContext>(
+                        replyData.UserId,
+                        new ChangeMessageTextInterceptorContext
+                        {
+                            MessageId = request.MessageId,
+                        },
+                        cancellationToken);
+                
+            }, cancellationToken);
     }
 
     public Task HandleUpdateStatus(
@@ -114,7 +239,7 @@ public class TelegramMessageService(
             replyData.UserId,
             request.MessageId,
             replyData.MessageId,
-            async () =>
+            async _ =>
             {
                 if (!await messageStatusService.UserHasAccessToStatus(
                     replyData.UserId,
@@ -166,27 +291,7 @@ public class TelegramMessageService(
         var message = await repository.GetMessage(
             messageId,
             cancellationToken);
-        
-        if (message.CategoryId is null)
-        {
-            await SendMessageWithCategoriesToChat(
-                message,
-                editMessageId,
-                cancellationToken);
-            
-            return;
-        }
 
-        if (message.StatusId is null)
-        {
-            await SendMessageWithStatusesToChat(
-                message,
-                editMessageId,
-                cancellationToken);
-            
-            return;
-        }
-        
         await SendReadyMessageToChat(
             message,
             editMessageId,
@@ -197,7 +302,7 @@ public class TelegramMessageService(
         Guid userId,
         long messageId,
         int telegramMessageId,
-        Func<Task> executeUpdate,
+        Func<MessageDto, Task> executeUpdate,
         CancellationToken cancellationToken)
     {
         if (!await messageService.UserHasAccessToMessage(
@@ -208,8 +313,12 @@ public class TelegramMessageService(
             // TODO - message deleted or no access?
             return;
         }
+        
+        var message = await repository.GetMessage(
+            messageId,
+            cancellationToken);
 
-        await executeUpdate();
+        await executeUpdate(message);
 
         await UpdateMessageInChat(
             messageId,
@@ -222,7 +331,27 @@ public class TelegramMessageService(
         int? editMessageId,
         CancellationToken cancellationToken)
     {
-        var tmb = GetTitleBuilder("✅", message);
+        var tmb = new TelegramMessageBuilder()
+            .Append(message.Content);
+        
+        tmb.AddInlineKeyboardButtons([
+            new CallbackRoutePath(TelegramRoutes.UpdateMessageCategory)
+                .WithQueryParameters(new HandleOpenChangeCategoryWindowRequest
+                {
+                    MessageId = message.Id
+                })
+                .ToInlineKeyboardButton($"Category: {message.CategoryName ?? "Not set"}")
+        ]);
+        
+        if (message.CategoryId is not null)
+            tmb.AddInlineKeyboardButtons([
+                new CallbackRoutePath(TelegramRoutes.UpdateMessageStatus)
+                    .WithQueryParameters(new HandleOpenChangeStatusWindowRequest
+                    {
+                        MessageId = message.Id
+                    })
+                    .ToInlineKeyboardButton($"Status: {message.StatusName ?? "Not set"}")
+            ]);
 
         tmb.AddInlineKeyboardButtons([
             InlineKeyboardButton.WithCopyText(
@@ -236,98 +365,6 @@ public class TelegramMessageService(
                 .ToInlineKeyboardButton("Edit")
         ]);
 
-        await SendOrEditMessage(
-            editMessageId,
-            message.TelegramMessageId,
-            message.UserTelegramId,
-            tmb,
-            cancellationToken);
-    }
-    
-    private async Task SendMessageWithCategoriesToChat(
-        MessageDto message,
-        int? editMessageId,
-        CancellationToken cancellationToken)
-    {
-        var categories = await messageCategoryService.GetMessageCategories(
-            message.UserId,
-            cancellationToken);
-
-        var tmb = GetTitleBuilder("📥", message)
-            .AppendRow("Choose category:");
-
-        if (categories.Length > 0)
-        {
-            foreach (var typesChunked in categories.Chunk(2))
-            {
-                var buttons = typesChunked
-                    .Select(x => 
-                        new CallbackRoutePath(TelegramRoutes.SetMessageCategory)
-                            .WithQueryParameters(new UpdateMessageCategoryTelegramRequest
-                            {
-                                MessageId = message.Id,
-                                CategoryId = x.Id,
-                            })
-                            .ToInlineKeyboardButton(x.Name));
-            
-                tmb.AddInlineKeyboardButtons(buttons);
-            }
-        }
-
-        tmb.AddInlineKeyboardButtons([
-            new CallbackRoutePath(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)
-                .WithQueryParameter(ParameterNames.MessageId, message.Id)
-                .ToInlineKeyboardButton("➕ New")
-        ]);
-
-        await SendOrEditMessage(
-            editMessageId,
-            message.TelegramMessageId,
-            message.UserTelegramId,
-            tmb,
-            cancellationToken);
-    }
-    
-    private async Task SendMessageWithStatusesToChat(
-        MessageDto message,
-        int? editMessageId,
-        CancellationToken cancellationToken)
-    {
-        var statuses = await messageStatusService.GetStatuses(
-            message.CategoryId.GetValueOrDefault(),
-            cancellationToken);
-        
-        var tmb = GetTitleBuilder("📥", message)
-            .AppendRow("Choose initial status:");
-
-        if (statuses.Length > 0)
-        {
-            foreach (var typesChunked in statuses.Chunk(2))
-            {
-                var buttons = typesChunked
-                    .Select(x => 
-                        new CallbackRoutePath(TelegramRoutes.SetMessageStatus)
-                            .WithQueryParameters(new UpdateMessageStatusTelegramRequest
-                            {
-                                MessageId = message.Id,
-                                StatusId = x.Id,
-                            })
-                            .ToInlineKeyboardButton(x.Name));
-            
-                tmb.AddInlineKeyboardButtons(buttons);
-            }
-        }
-
-        tmb.AddInlineKeyboardButtons([
-            new CallbackRoutePath(TelegramRoutes.CreateStatusFromMessage, RouteMethod.Post)
-                .WithQueryParameters(new CreateStatusFromMessageTelegramRequest
-                {
-                    MessageId = message.Id,
-                    MessageCategoryId = message.CategoryId.GetValueOrDefault(),
-                })
-                .ToInlineKeyboardButton("➕ New")
-        ]);
-        
         await SendOrEditMessage(
             editMessageId,
             message.TelegramMessageId,
@@ -366,32 +403,5 @@ public class TelegramMessageService(
         }
         
         return Task.CompletedTask;
-    }
-
-    private static TelegramMessageBuilder GetTitleBuilder(string icon, MessageDto message)
-    {
-        var tmb = new TelegramMessageBuilder()
-            .Append($"{icon} Message saved");
-
-        if (message.Sender is not null)
-            tmb.Append($" from: @{message.Sender}");
-
-        if (message.CategoryName is not null)
-            tmb
-                .AppendRow()
-                .AppendRow()
-                .Append($"Category: {message.CategoryName}");
-
-        if (message.StatusName is not null)
-            tmb.Append($" -> {message.StatusName}");
-
-        tmb
-            .AppendRow()
-            .AppendRow()
-            .Append("Message: ")
-            .AppendRow(message.Content)
-            .AppendRow();
-        
-        return tmb;
     }
 }

@@ -11,8 +11,20 @@ public interface ITelegramMessageService
         UpdateMessageCategoryTelegramRequest request,
         CancellationToken cancellationToken);
     
+    Task OpenChangeCategoryWindow(
+        Guid userId,
+        int? editMessageId,
+        HandleOpenChangeCategoryWindowRequest request,
+        CancellationToken cancellationToken);
+    
     Task HandleCreateCategory(
         HandleCreateCategoryFromMessageRequest request,
+        CancellationToken cancellationToken);
+    
+    Task OpenChangeStatusWindow(
+        Guid userId,
+        int? editMessageId,
+        HandleOpenChangeStatusWindowRequest request,
         CancellationToken cancellationToken);
     
     Task HandleUpdateStatus(

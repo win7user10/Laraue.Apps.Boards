@@ -2,7 +2,6 @@
 using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Authentication.Services;
 using Laraue.Telegram.NET.Core.Extensions;
-using Laraue.Telegram.NET.Core.Utils;
 using Laraue.Telegram.NET.Interceptors.Services;
 using Telegram.Bot;
 
@@ -72,19 +71,14 @@ public class CreateStatusFromMessageInterceptor(
                 CategoryId = interceptorContext.MessageCategoryId,
             }, cancellationToken);
 
-        await telegramMessageService
-            .UpdateMessageInChat(
-                interceptorContext.MessageId,
-                interceptorContext.TelegramMessageId,
-                cancellationToken);
-
-        await client
-            .SendTextMessageAsync(
-                requestContext.Update.GetUserId(),
-                new TelegramMessageBuilder()
-                    .AppendRow($"Status created: '{model}'")
-                    .Append("Message updated"),
-                cancellationToken: cancellationToken);
+        await telegramMessageService.OpenChangeStatusWindow(
+            requestContext.UserId,
+            editMessageId: null,
+            new HandleOpenChangeStatusWindowRequest
+            {
+                MessageId = interceptorContext.MessageId,
+            },
+            cancellationToken);
 
         return ExecutionState.FullyExecuted;
     }

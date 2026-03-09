@@ -1,5 +1,4 @@
 ﻿using Laraue.Apps.StructuredMessages.TelegramServices;
-using Laraue.Apps.StructuredMessages.TelegramServices.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Abstractions.Request;
 using Laraue.Telegram.NET.Core.Extensions;
@@ -27,7 +26,20 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
             cancellationToken);
     }
     
-    [TelegramCallbackRoute(TelegramRoutes.SetMessageCategory)]
+    [TelegramCallbackRoute(TelegramRoutes.UpdateMessageCategory)]
+    public Task OpenChangeCategoryWindow(
+        [FromQuery] HandleOpenChangeCategoryWindowRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        return telegramMessageService.OpenChangeCategoryWindow(
+            context.UserId,
+            context.Update.CallbackQuery.GetMessageId(),
+            request,
+            cancellationToken);
+    }
+    
+    [TelegramCallbackRoute(TelegramRoutes.UpdateMessageCategory, RouteMethod.Post)]
     public Task SetMessageCategory(
         [FromQuery] UpdateMessageCategoryTelegramRequest request,
         RequestContext context,
@@ -55,8 +67,21 @@ public class MessagesController(ITelegramMessageService telegramMessageService)
             cancellationToken);
     }
     
-    [TelegramCallbackRoute(TelegramRoutes.SetMessageStatus)]
-    public Task SetMessageStatus(
+    [TelegramCallbackRoute(TelegramRoutes.UpdateMessageStatus)]
+    public Task OpenChangeStatusWindow(
+        [FromQuery] HandleOpenChangeStatusWindowRequest request,
+        RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        return telegramMessageService.OpenChangeStatusWindow(
+            context.UserId,
+            context.Update.CallbackQuery.GetMessageId(),
+            request,
+            cancellationToken);
+    }
+    
+    [TelegramCallbackRoute(TelegramRoutes.UpdateMessageStatus, RouteMethod.Post)]
+    public Task UpdateMessageStatus(
         [FromQuery] UpdateMessageStatusTelegramRequest request,
         RequestContext context,
         CancellationToken cancellationToken)

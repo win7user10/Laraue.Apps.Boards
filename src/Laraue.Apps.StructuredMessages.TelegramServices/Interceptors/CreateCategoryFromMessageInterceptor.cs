@@ -1,10 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Authentication.Services;
-using Laraue.Telegram.NET.Core.Extensions;
-using Laraue.Telegram.NET.Core.Utils;
 using Laraue.Telegram.NET.Interceptors.Services;
-using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 
@@ -12,8 +9,7 @@ public class CreateCategoryFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
     IMessageCategoryService messageCategoryService,
-    ITelegramMessageService telegramMessageService,
-    ITelegramBotClient client)
+    ITelegramMessageService telegramMessageService)
     : BaseRequestInterceptor<Guid, string, CreateCategoryFromMessageInterceptorContext>(
         requestContext,
         interceptorState)
@@ -59,18 +55,14 @@ public class CreateCategoryFromMessageInterceptor(
             }, cancellationToken);
 
         await telegramMessageService
-            .UpdateMessageInChat(
-                interceptorContext.MessageId,
-                interceptorContext.TelegramMessageId,
+            .OpenChangeCategoryWindow(
+                requestContext.UserId,
+                editMessageId: null,
+                new HandleOpenChangeCategoryWindowRequest
+                {
+                    MessageId = interceptorContext.MessageId,
+                },
                 cancellationToken);
-
-        await client
-            .SendTextMessageAsync(
-                requestContext.Update.GetUserId(),
-                new TelegramMessageBuilder()
-                    .AppendRow($"Category created: '{model}'")
-                    .Append("Message updated"),
-                cancellationToken: cancellationToken);
 
         return ExecutionState.FullyExecuted;
     }
@@ -81,5 +73,4 @@ public class CreateCategoryFromMessageInterceptor(
 public class CreateCategoryFromMessageInterceptorContext
 {
     public required long MessageId { get; set; }
-    public required int TelegramMessageId { get; set; }
 }

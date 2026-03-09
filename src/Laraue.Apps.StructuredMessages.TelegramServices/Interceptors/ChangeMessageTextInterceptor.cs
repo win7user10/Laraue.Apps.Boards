@@ -53,9 +53,9 @@ public class ChangeMessageTextInterceptor(
         await telegramMessageService
             .UpdateMessageInChat(
                 interceptorContext.MessageId,
-                interceptorContext.TelegramMessageId,
+                editMessageId: null,
                 cancellationToken);
-
+        
         return ExecutionState.FullyExecuted;
     }
 
@@ -64,6 +64,5 @@ public class ChangeMessageTextInterceptor(
 
 public class ChangeMessageTextInterceptorContext
 {
-    public long MessageId { get; set; }
-    public int TelegramMessageId { get; set; }
+    public required long MessageId { get; set; }
 }
