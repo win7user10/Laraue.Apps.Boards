@@ -240,7 +240,7 @@ public class TelegramMessageService(
             request.MessageId,
             cancellationToken))
         {
-            // TODO - status deleted or no access?
+            // TODO - message deleted or no access?
             return;
         }
         

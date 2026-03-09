@@ -11,4 +11,6 @@ public class MessageCategory
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
+
+    public IList<Message>? Messages { get; set; }
 }

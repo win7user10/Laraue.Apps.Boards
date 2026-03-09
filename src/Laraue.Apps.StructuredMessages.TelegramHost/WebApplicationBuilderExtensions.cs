@@ -32,24 +32,10 @@ public static class WebApplicationBuilderExtensions
             return builder;
         }
         
-        public WebApplicationBuilder AddDatabaseServices(string connectionStringName)
-        {
-            var connection = GetConnection(builder, connectionStringName);
-            
-            builder.Services
-                .AddDbContext<DatabaseContext>(opt =>
-                {
-                    opt
-                        .UseNpgsql(connection)
-                        .UseSnakeCaseNamingConvention();
-                })
-                .AddLinq2Db();
-
-            return builder;
-        }
-        
         public WebApplicationBuilder AddApplicationServices()
         {
+            builder.AddCoreServices();
+            
             builder.Services
                 .AddTelegramCore()
                 .AddTelegramRequestEfCoreInterceptors<Guid, DatabaseContext>(
@@ -73,11 +59,6 @@ public static class WebApplicationBuilderExtensions
             builder.Services.AddControllers();
 
             return builder;
-        }
-
-        private string? GetConnection(string connectionStringName)
-        {
-            return builder.Configuration.GetConnectionString(connectionStringName);
         }
     }
 }
