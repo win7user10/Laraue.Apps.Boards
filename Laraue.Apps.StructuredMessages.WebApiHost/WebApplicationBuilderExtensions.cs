@@ -16,7 +16,8 @@ public static class WebApplicationBuilderExtensions
 
             builder.Services
                 .AddScoped<IMessagesService, MessagesService>()
-                .AddScoped<ICategoriesService, CategoriesService>();
+                .AddScoped<ICategoriesService, CategoriesService>()
+                .AddScoped<IStatusesService, StatusesService>();
 
             builder.Services.AddScoped<ExceptionHandleMiddleware>();
             

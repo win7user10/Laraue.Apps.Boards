@@ -1,4 +1,6 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
+﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -12,9 +14,14 @@ public interface ICategoriesService
     Task<CategoryDto> GetCategory(
         GetCategoryRequest request,
         CancellationToken cancellationToken);
+    
+    Task<long> CreateCategory(
+        CreateCategoryRequest request,
+        CancellationToken cancellationToken);
 }
 
-public class CategoriesService(DatabaseContext context) : ICategoriesService
+public class CategoriesService(DatabaseContext context)
+    : ICategoriesService
 {
     public async Task<CategoryCountDto[]> GetCategoriesWithCount(
         Guid userId,
@@ -28,6 +35,7 @@ public class CategoriesService(DatabaseContext context) : ICategoriesService
                 Id = x.Id,
                 Name = x.Name,
                 Count = x.Messages!.Count,
+                Color = x.Color,
             })
             .OrderBy(x => x.Name)
             .ToListAsyncEF(cancellationToken);
@@ -44,7 +52,8 @@ public class CategoriesService(DatabaseContext context) : ICategoriesService
             {
                 Id = 0,
                 Count = backlogCount,
-                Name = "Backlog"
+                Name = "Backlog",
+                Color = "#000000",
             })
             .ToArray();
     }
@@ -53,23 +62,51 @@ public class CategoriesService(DatabaseContext context) : ICategoriesService
     {
         throw new NotImplementedException();
     }
+
+    public async Task<long> CreateCategory(
+        CreateCategoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var category = new MessageCategory
+        {
+            Name = request.Name,
+            UserId = request.UserId,
+            Color = request.Color,
+        };
+        
+        context.MessageCategories.Add(category);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return category.Id;
+    }
 }
 
-public class CategoryCountDto
+public record CategoryCountDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
     public required int Count { get; set; }
-    public string Color => "#ffffff";
+    public required string? Color { get; set; }
 }
 
-public class GetCategoryRequest
+public record GetCategoryRequest
 {
     public required Guid UserId { get; set; }
     public required long CategoryId { get; set; }
 }
 
-public class CategoryDto
+public record CategoryDto
 {
     
+}
+
+public record CreateCategoryRequest
+{
+    public Guid UserId { get; set; }
+    
+    [MaxLength(128)]
+    public required string Name { get; set; }
+    
+    [MaxLength(7)]
+    public required string Color { get; set; }
 }

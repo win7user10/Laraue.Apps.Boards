@@ -7,7 +7,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize]
 [ApiController]
 [Route("/api/categories")]
-public class CategoriesController(ICategoriesService categoriesService) : ControllerBase
+public class CategoriesController(ICategoriesService categoriesService)
+    : ControllerBase
 {
     [HttpGet("categories-with-count")]
     public Task<CategoryCountDto[]> GetCategoriesWithCount(CancellationToken cancellationToken) => 
@@ -25,4 +26,17 @@ public class CategoriesController(ICategoriesService categoriesService) : Contro
                 CategoryId = id
             },
             cancellationToken);
+
+    [HttpPost]
+    public Task<long> CreateCategory(
+        [FromBody] CreateCategoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        return categoriesService.CreateCategory(
+            request with
+            {
+                UserId = HttpContext.User.GetId()
+            },
+            cancellationToken);
+    }
 }   

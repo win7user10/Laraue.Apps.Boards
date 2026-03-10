@@ -9,6 +9,9 @@ public class MessageCategoryStatus
     [MaxLength(128)]
     public required string Name { get; set; }
     
+    [MaxLength(7)]
+    public string? Color { get; set; }
+    
     public long MessageCategoryId { get; set; }
     public MessageCategory? MessageCategory { get; set; }
 
