@@ -18,7 +18,9 @@ public class CategoriesController(ICategoriesService categoriesService)
     
     
     [HttpGet("{id}")]
-    public Task<CategoryDto> GetCategoriesWithCount([FromRoute] long id, CancellationToken cancellationToken) => 
+    public Task<CategoryDto> GetCategory(
+        [FromRoute] long id,
+        CancellationToken cancellationToken) => 
         categoriesService.GetCategory(
             new GetCategoryRequest
             {

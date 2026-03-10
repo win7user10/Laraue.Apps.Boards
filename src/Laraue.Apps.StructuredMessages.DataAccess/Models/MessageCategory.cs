@@ -16,4 +16,5 @@ public class MessageCategory
     public User? User { get; set; }
 
     public IList<Message>? Messages { get; set; }
+    public IList<MessageCategoryStatus>? Statuses { get; set; }
 }

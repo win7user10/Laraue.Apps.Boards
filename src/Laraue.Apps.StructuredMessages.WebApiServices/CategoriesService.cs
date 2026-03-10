@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -58,9 +59,27 @@ public class CategoriesService(DatabaseContext context)
             .ToArray();
     }
 
-    public Task<CategoryDto> GetCategory(GetCategoryRequest request, CancellationToken cancellationToken)
+    public Task<CategoryDto> GetCategory(
+        GetCategoryRequest request,
+        CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return context
+            .MessageCategories
+            .Where(x => x.Id == request.CategoryId)
+            .Select(x => new CategoryDto
+            {
+                Color = x.Color,
+                Name = x.Name,
+                Statuses = x.Statuses!
+                    .Select(s => new StatusDto
+                    {
+                        Id = s.Id,
+                        Color = s.Color,
+                        Name = s.Name,
+                    })
+                    .ToArray(),
+            })
+            .FirstOrThrowNotFoundEFAsync(cancellationToken);
     }
 
     public async Task<long> CreateCategory(
@@ -97,7 +116,16 @@ public record GetCategoryRequest
 
 public record CategoryDto
 {
-    
+    public required string Name { get; set; }
+    public required string? Color { get; set; }
+    public StatusDto[] Statuses { get; set; } = [];
+}
+
+public class StatusDto
+{
+    public required long Id { get; set; }
+    public required string Name { get; set; }
+    public required string? Color { get; set; }
 }
 
 public record CreateCategoryRequest
