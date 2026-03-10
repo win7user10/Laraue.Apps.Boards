@@ -4,4 +4,8 @@
         <ProjectReference Include="..\src\Laraue.Apps.StructuredMessages.WebApiServices\Laraue.Apps.StructuredMessages.WebApiServices.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(MicrosoftJwtAuthenticationVersion)" />
+    </ItemGroup>
+
 </Project>

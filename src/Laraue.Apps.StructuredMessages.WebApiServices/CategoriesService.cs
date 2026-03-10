@@ -8,6 +8,10 @@ public interface ICategoriesService
     Task<CategoryCountDto[]> GetCategoriesWithCount(
         Guid userId,
         CancellationToken cancellationToken);
+    
+    Task<CategoryDto> GetCategory(
+        GetCategoryRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class CategoriesService(DatabaseContext context) : ICategoriesService
@@ -44,6 +48,11 @@ public class CategoriesService(DatabaseContext context) : ICategoriesService
             })
             .ToArray();
     }
+
+    public Task<CategoryDto> GetCategory(GetCategoryRequest request, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 public class CategoryCountDto
@@ -52,4 +61,15 @@ public class CategoryCountDto
     public required string Name { get; set; }
     public required int Count { get; set; }
     public string Color => "#ffffff";
+}
+
+public class GetCategoryRequest
+{
+    public required Guid UserId { get; set; }
+    public required long CategoryId { get; set; }
+}
+
+public class CategoryDto
+{
+    
 }
