@@ -37,7 +37,7 @@ jobs:
        user: ${{ secrets.SSH_USER }} # "user"
        password: ${{ secrets.SSH_PASSWORD }} # "password"
        local: src/Laraue.Apps.StructuredMessages.TelegramHost/bin/Release/net10.0/*
-       remote: "/home/laraue/structured-message-telegram-host"
+       remote: "/home/laraue/structured-messages-telegram-host"
        post_upload: echo "Uploaded successfully"
        
     - name: Upload Web API Host
@@ -49,5 +49,5 @@ jobs:
        user: ${{ secrets.SSH_USER }} # "user"
        password: ${{ secrets.SSH_PASSWORD }} # "password"
        local: src/Laraue.Apps.StructuredMessages.WebApiHost/bin/Release/net10.0/*
-       remote: "/home/laraue/structured-message-webapi-host"
+       remote: "/home/laraue/structured-messages-webapi-host"
        post_upload: echo "Uploaded successfully"
