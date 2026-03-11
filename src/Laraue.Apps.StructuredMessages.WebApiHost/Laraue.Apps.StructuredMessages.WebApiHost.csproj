@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <ItemGroup>
-        <ProjectReference Include="..\src\Laraue.Apps.StructuredMessages.WebApiServices\Laraue.Apps.StructuredMessages.WebApiServices.csproj" />
+        <ProjectReference Include="..\Laraue.Apps.StructuredMessages.WebApiServices\Laraue.Apps.StructuredMessages.WebApiServices.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -14,7 +14,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessa
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "hosts", "hosts", "{743A9981-A9CD-42E7-B10B-FFF787337D50}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.WebApiHost", "Laraue.Apps.StructuredMessages.WebApiHost\Laraue.Apps.StructuredMessages.WebApiHost.csproj", "{B8E89702-1188-4D78-BF21-9EF3B3FB34B5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.WebApiHost", "src\Laraue.Apps.StructuredMessages.WebApiHost\Laraue.Apps.StructuredMessages.WebApiHost.csproj", "{B8E89702-1188-4D78-BF21-9EF3B3FB34B5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.WebApiServices", "src\Laraue.Apps.StructuredMessages.WebApiServices\Laraue.Apps.StructuredMessages.WebApiServices.csproj", "{D19CC756-66A6-408E-9755-824D7C836E08}"
 EndProject
