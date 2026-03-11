@@ -1,12 +1,14 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface IMessageService
+public interface ICoreMessageService
 {
     Task<bool> UserHasAccessToMessage(
         Guid userId,
@@ -22,13 +24,25 @@ public interface IMessageService
         Action<UpdateSettersBuilder<Message>> setters,
         CancellationToken cancellationToken);
     
+    Task UpdateStatus(
+        long messageId,
+        long newStatusId,
+        CancellationToken ct);
+    
+    Task UpdateCategory(
+        long messageId,
+        long newCategoryId,
+        CancellationToken ct);
+    
     Task DeleteMessage(
         long id,
         CancellationToken cancellationToken);
 }
 
-public class MessageService(DatabaseContext context) : IMessageService
+public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 {
+    public const long NullId = 0;
+    
     public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
     {
         return context.Messages
@@ -65,6 +79,61 @@ public class MessageService(DatabaseContext context) : IMessageService
         return context.Messages
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(setters, cancellationToken);
+    }
+
+    public async Task UpdateStatus(long messageId, long newStatusId, CancellationToken ct)
+    {
+        if (newStatusId != NullId)
+        {
+            var possibleStatusesIds = await context.Messages
+                .Where(x => x.Id == messageId)
+                .Select(x => x.Category!.Statuses!
+                    .Select(s => s.Id))
+                .FirstOrThrowNotFoundEFAsync(ct);
+
+            if (!possibleStatusesIds.Contains(newStatusId))
+                throw new BadRequestException(
+                    nameof(newStatusId),
+                    "Incorrect Status Id");
+        }
+
+        long? value = newStatusId == NullId ? null : newStatusId;
+
+        await context.Messages
+            .Where(x => x.Id == messageId)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.StatusId, value),
+                ct);
+    }
+
+    public async Task UpdateCategory(long messageId, long newCategoryId, CancellationToken ct)
+    {
+        if (newCategoryId != NullId)
+        {
+            var userId = await context.Messages
+                .Where(x => x.Id == messageId)
+                .Select(x => x.UserId)
+                .FirstOrDefaultAsyncEF(ct);
+        
+            var possibleCategoryIds = await context.MessageCategories
+                .Where(x => x.UserId == userId)
+                .Select(x => x.Id)
+                .ToArrayAsyncEF(ct);
+        
+            if (!possibleCategoryIds.Contains(newCategoryId))
+                throw new BadRequestException(
+                    nameof(newCategoryId),
+                    "Incorrect Category Id");
+        }
+        
+        long? value = newCategoryId == NullId ? null : newCategoryId;
+        
+        await context.Messages
+            .Where(x => x.Id == messageId)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.CategoryId, value)
+                .SetProperty(x => x.StatusId, (long?)null),
+                ct);
     }
 
     public Task DeleteMessage(long id, CancellationToken cancellationToken)

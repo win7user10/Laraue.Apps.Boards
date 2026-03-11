@@ -12,19 +12,46 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
     [HttpGet]
     public Task<MessageListDto[]> GetMessages(
         [FromQuery] GetMessagesRequest request,
-        CancellationToken cancellationToken) =>
-            messagesService.GetMessages(request with
+        CancellationToken cancellationToken)
+    {
+        return messagesService.GetMessages(
+            request with
             {
                 UserId = HttpContext.User.GetId(),
             },
             cancellationToken);
+    }
+    
+    [HttpPut("{id:long}/status/{statusId:long}")]
+    public Task UpdateStatus(
+        long id,
+        long statusId,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.UpdateStatus(
+            new UpdateStatusRequest
+            {
+                UserId = HttpContext.User.GetId(),
+                StatusId = statusId,
+                MessageId = id,
+            },
+            cancellationToken);
+    }
     
     
-    [HttpGet("backlog")]
-    public Task<MessageListDto[]> GetBacklogMessages(CancellationToken cancellationToken) =>
-        messagesService.GetBacklogMessages(new GetBacklogMessagesRequest
-        {
-            UserId = HttpContext.User.GetId(),
-        },
-        cancellationToken);
+    [HttpPut("{id:long}/category/{categoryId:long}")]
+    public Task UpdateCategory(
+        long id,
+        long categoryId,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.UpdateCategory(
+            new UpdateCategoryRequest
+            {
+                UserId = HttpContext.User.GetId(),
+                CategoryId = categoryId,
+                MessageId = id,
+            },
+            cancellationToken);
+    }
 }   

@@ -11,7 +11,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 
 public class TelegramMessageService(
-    IMessageService messageService,
+    ICoreMessageService messageService,
     IMessageCategoryService messageCategoryService,
     IMessageStatusService messageStatusService,
     ITelegramBotClient client,
@@ -49,15 +49,10 @@ public class TelegramMessageService(
             replyData.UserId,
             request.MessageId,
             replyData.MessageId,
-            _ =>
-            {
-                return messageService.UpdateMessage(
-                    request.MessageId,
-                    setters => setters
-                        .SetProperty(x => x.CategoryId, request.CategoryId)
-                        .SetProperty(x => x.StatusId, (long?)null),
-                    cancellationToken);
-            }, cancellationToken);
+            _ => messageService.UpdateCategory(
+                request.MessageId,
+                request.CategoryId,
+                cancellationToken), cancellationToken);
     }
 
     public async Task OpenChangeCategoryWindow(
@@ -266,21 +261,10 @@ public class TelegramMessageService(
             replyData.MessageId,
             async _ =>
             {
-                if (!await messageStatusService.UserHasAccessToStatus(
-                    replyData.UserId,
-                    request.StatusId,
-                    cancellationToken))
-                {
-                    // TODO - status deleted or no access?
-                    return;
-                }
-                
-                await messageService.UpdateMessage(
+                await messageService.UpdateStatus(
                     request.MessageId,
-                    setters => setters
-                        .SetProperty(x => x.StatusId, request.StatusId),
+                    request.StatusId,
                     cancellationToken);
-                
             }, cancellationToken);
     }
 

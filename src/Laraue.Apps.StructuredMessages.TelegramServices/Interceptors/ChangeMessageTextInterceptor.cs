@@ -8,7 +8,7 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 public class ChangeMessageTextInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
-    IMessageService messageService,
+    ICoreMessageService messageService,
     ITelegramMessageService telegramMessageService)
     : BaseRequestInterceptor<Guid, string, ChangeMessageTextInterceptorContext>(
         requestContext,

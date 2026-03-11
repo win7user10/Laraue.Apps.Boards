@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class MessageCategoryStatus
+public class MessageStatus
 {
     public long Id { get; set; }
     

@@ -26,7 +26,7 @@ public class MessageStatusService(DatabaseContext context) : IMessageStatusServi
         CreateMessageCategoryStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var status = new MessageCategoryStatus
+        var status = new MessageStatus
         {
             Name = request.Name,
             MessageCategoryId = request.CategoryId,

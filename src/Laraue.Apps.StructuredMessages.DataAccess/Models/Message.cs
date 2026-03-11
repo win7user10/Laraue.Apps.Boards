@@ -30,7 +30,7 @@ public class Message
     /// Actual message status.
     /// </summary>
     public long? StatusId { get; set; }
-    public MessageCategoryStatus? Status { get; set; }
+    public MessageStatus? Status { get; set; }
     
     [MaxLength(32)]
     public string? Sender { get; set; }

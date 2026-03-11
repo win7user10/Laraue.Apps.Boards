@@ -37,6 +37,7 @@ public class CategoriesService(DatabaseContext context)
                 Name = x.Name,
                 Count = x.Messages!.Count,
                 Color = x.Color,
+                StatusesCount = x.Statuses!.Count,
             })
             .OrderBy(x => x.Name)
             .ToListAsyncEF(cancellationToken);
@@ -51,10 +52,11 @@ public class CategoriesService(DatabaseContext context)
         return result
             .Prepend(new CategoryCountDto
             {
-                Id = 0,
+                Id = null,
                 Count = backlogCount,
                 Name = "Backlog",
                 Color = "#000000",
+                StatusesCount = 0,
             })
             .ToArray();
     }
@@ -102,10 +104,11 @@ public class CategoriesService(DatabaseContext context)
 
 public record CategoryCountDto
 {
-    public required long Id { get; set; }
+    public required long? Id { get; set; }
     public required string Name { get; set; }
     public required int Count { get; set; }
     public required string? Color { get; set; }
+    public required int StatusesCount { get; set; }
 }
 
 public record GetCategoryRequest

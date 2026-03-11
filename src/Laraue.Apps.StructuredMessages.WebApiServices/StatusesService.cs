@@ -24,7 +24,7 @@ public class StatusesService(DatabaseContext context) : IStatusesService
                 m => m.Id == request.CategoryId,
                 cancellationToken);
         
-        var status = new MessageCategoryStatus
+        var status = new MessageStatus
         {
             Name = request.Name,
             MessageCategoryId = request.CategoryId,

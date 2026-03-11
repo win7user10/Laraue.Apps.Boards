@@ -37,7 +37,7 @@ public static class WebApplicationBuilderExtensions
         public WebApplicationBuilder AddCoreServices()
         {
             builder.Services
-                .AddScoped<IMessageService, MessageService>()
+                .AddScoped<ICoreMessageService, CoreMessageService>()
                 .AddScoped<IMessageCategoryService, MessageCategoryService>()
                 .AddScoped<IMessageStatusService, MessageStatusService>();
 
