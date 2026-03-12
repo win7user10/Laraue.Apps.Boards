@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,9 +23,17 @@ public interface IMessagesService
     Task DeleteMessage(
         DeleteMessageRequest request,
         CancellationToken ct);
+    
+    Task<long> CreateMessage(
+        CreateMessageRequest request,
+        CancellationToken ct);
 }
 
-public class MessagesService(DatabaseContext context, ICoreMessageService messageService)
+public class MessagesService(
+    DatabaseContext context,
+    ICoreMessageService messageService,
+    ICoreCategoryService categoryService,
+    IDateTimeProvider dateTimeProvider)
     : IMessagesService
 {
     public Task<MessageListDto[]> GetMessages(
@@ -75,6 +84,31 @@ public class MessagesService(DatabaseContext context, ICoreMessageService messag
 
         await messageService.DeleteMessage(request.MessageId, ct);
     }
+
+    public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
+    {
+        long? categoryId = request.CategoryId == CoreMessageService.NullId
+            ? null
+            : request.CategoryId;
+
+        if (categoryId.HasValue
+            && !await categoryService.UserHasAccessToCategory(
+                request.UserId, request.CategoryId, ct))
+                    throw new BadRequestException(
+                        nameof(categoryId),
+                        "Category is not found");
+
+        return await messageService.SaveMessage(
+            new SaveMessageRequest
+            {
+                CreatedAt = dateTimeProvider.UtcNow,
+                Sender = request.Sender,
+                Text = request.Text,
+                UserId = request.UserId,
+                CategoryId = request.CategoryId,
+            },
+            ct);
+    }
 }
 
 public record UpdateStatusRequest
@@ -112,4 +146,12 @@ public record DeleteMessageRequest
 {
     public Guid UserId { get; set; }
     public long MessageId { get; set; }
+}
+
+public record CreateMessageRequest
+{
+    public Guid UserId { get; set; }
+    public long CategoryId { get; set; }
+    public string? Sender { get; set; }
+    public required string Text { get; set; }
 }

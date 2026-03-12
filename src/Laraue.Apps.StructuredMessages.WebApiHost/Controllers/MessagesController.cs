@@ -68,4 +68,17 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             },
             cancellationToken);
     }
+    
+    [HttpPost]
+    public Task<long> Create(
+        [FromBody] CreateMessageRequest request,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.CreateMessage(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

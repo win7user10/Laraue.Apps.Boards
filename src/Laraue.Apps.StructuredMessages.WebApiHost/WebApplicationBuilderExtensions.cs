@@ -1,5 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.DateTime.Services.Abstractions;
+using Laraue.Core.DateTime.Services.Impl;
 using Laraue.Core.Exceptions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -19,7 +21,9 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<ICategoriesService, CategoriesService>()
                 .AddScoped<IStatusesService, StatusesService>();
 
-            builder.Services.AddScoped<ExceptionHandleMiddleware>();
+            builder.Services
+                .AddSingleton<IDateTimeProvider, DateTimeProvider>()
+                .AddScoped<ExceptionHandleMiddleware>();
             
             builder.Services.AddControllers();
 

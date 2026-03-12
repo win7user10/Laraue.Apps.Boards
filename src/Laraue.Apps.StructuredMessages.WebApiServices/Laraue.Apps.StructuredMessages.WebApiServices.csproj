@@ -1,6 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  
+  
   <ItemGroup>
     <ProjectReference Include="..\Laraue.Apps.StructuredMessages.DataAccess\Laraue.Apps.StructuredMessages.DataAccess.csproj" />
     <ProjectReference Include="..\Laraue.Apps.StructuredMessages.Services\Laraue.Apps.StructuredMessages.Services.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Laraue.Core.DateTime" Version="$(LaraueCoreDateTimeVersion)" />
   </ItemGroup>
 </Project>

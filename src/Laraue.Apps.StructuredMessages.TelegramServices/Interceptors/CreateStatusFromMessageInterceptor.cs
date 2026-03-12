@@ -11,7 +11,7 @@ public class CreateStatusFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
     IMessageStatusService messageStatusService,
-    IMessageCategoryService categoryService,
+    ICoreCategoryService categoryService,
     ITelegramMessageService telegramMessageService,
     ITelegramBotClient client)
     : BaseRequestInterceptor<Guid, string, CreateStatusFromMessageInterceptorContext>(

@@ -8,7 +8,7 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 public class CreateCategoryFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
-    IMessageCategoryService messageCategoryService,
+    ICoreCategoryService coreCategoryService,
     ITelegramMessageService telegramMessageService)
     : BaseRequestInterceptor<Guid, string, CreateCategoryFromMessageInterceptorContext>(
         requestContext,
@@ -47,7 +47,7 @@ public class CreateCategoryFromMessageInterceptor(
         CreateCategoryFromMessageInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
-        await messageCategoryService.CreateMessageCategory(
+        await coreCategoryService.CreateMessageCategory(
             new CreateMessageCategoryRequest
             {
                 Name = model,

@@ -4,7 +4,7 @@ using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface IMessageCategoryService
+public interface ICoreCategoryService
 {
     Task<MessageCategoryDto> GetMessageCategory(
         long id,
@@ -24,8 +24,8 @@ public interface IMessageCategoryService
         CancellationToken cancellationToken);
 }
 
-public class MessageCategoryService(DatabaseContext context)
-    : IMessageCategoryService
+public class CoreCategoryService(DatabaseContext context)
+    : ICoreCategoryService
 {
     public Task<MessageCategoryDto> GetMessageCategory(
         long id,

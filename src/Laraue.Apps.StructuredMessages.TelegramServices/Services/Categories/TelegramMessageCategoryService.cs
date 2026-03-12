@@ -8,7 +8,7 @@ using Telegram.Bot;
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
 
 public class TelegramMessageCategoryService(
-    IMessageCategoryService messageCategoryService,
+    ICoreCategoryService coreCategoryService,
     ITelegramBotClient client,
     IInterceptorState<Guid> interceptorState)
     : ITelegramMessageCategoryService
@@ -17,7 +17,7 @@ public class TelegramMessageCategoryService(
         ReplyData reply,
         CancellationToken cancellationToken)
     {
-        var categories = await messageCategoryService.GetMessageCategories(
+        var categories = await coreCategoryService.GetMessageCategories(
             reply.UserId,
             cancellationToken);
 

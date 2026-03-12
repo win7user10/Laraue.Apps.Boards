@@ -62,6 +62,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             CreatedAt = request.CreatedAt,
             Sender = request.Sender,
             TelegramMessageId = request.TelegramMessageId,
+            CategoryId = request.CategoryId,
         };
         
         context.Add(entity);
@@ -151,6 +152,7 @@ public class SaveMessageRequest
     public required string? Sender { get; set; }
     public required DateTime CreatedAt { get; set; }
     public int? TelegramMessageId { get; set; }
+    public long? CategoryId { get; set; }
 }
 
 public class UpdateMessageCategoryRequest
