@@ -105,7 +105,7 @@ public class MessagesService(
                 Sender = request.Sender,
                 Text = request.Text,
                 UserId = request.UserId,
-                CategoryId = request.CategoryId,
+                CategoryId = categoryId,
             },
             ct);
     }
