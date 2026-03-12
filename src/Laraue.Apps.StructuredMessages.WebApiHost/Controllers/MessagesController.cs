@@ -54,4 +54,18 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             },
             cancellationToken);
     }
+    
+    [HttpDelete("{id:long}")]
+    public Task Delete(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.DeleteMessage(
+            new DeleteMessageRequest
+            {
+                UserId = HttpContext.User.GetId(),
+                MessageId = id,
+            },
+            cancellationToken);
+    }
 }   

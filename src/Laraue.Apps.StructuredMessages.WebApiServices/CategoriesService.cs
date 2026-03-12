@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB.EntityFrameworkCore;
 
@@ -52,7 +53,7 @@ public class CategoriesService(DatabaseContext context)
         return result
             .Prepend(new CategoryCountDto
             {
-                Id = null,
+                Id = CoreMessageService.NullId,
                 Count = backlogCount,
                 Name = "Backlog",
                 Color = "#000000",
@@ -104,7 +105,7 @@ public class CategoriesService(DatabaseContext context)
 
 public record CategoryCountDto
 {
-    public required long? Id { get; set; }
+    public required long Id { get; set; }
     public required string Name { get; set; }
     public required int Count { get; set; }
     public required string? Color { get; set; }

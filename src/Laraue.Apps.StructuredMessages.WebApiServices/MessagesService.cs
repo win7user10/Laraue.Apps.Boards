@@ -18,6 +18,10 @@ public interface IMessagesService
     Task UpdateCategory(
         UpdateCategoryRequest request,
         CancellationToken ct);
+    
+    Task DeleteMessage(
+        DeleteMessageRequest request,
+        CancellationToken ct);
 }
 
 public class MessagesService(DatabaseContext context, ICoreMessageService messageService)
@@ -27,10 +31,14 @@ public class MessagesService(DatabaseContext context, ICoreMessageService messag
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
+        var categoryId = request.CategoryId == CoreMessageService.NullId
+            ? null
+            : request.CategoryId;
+        
         return context
             .Messages
             .Where(x => x.UserId == request.UserId)
-            .Where(x => x.CategoryId == request.CategoryId)
+            .Where(x => x.CategoryId == categoryId)
             .OrderByDescending(x => x.Id)
             .Select(x => new MessageListDto
             {
@@ -58,6 +66,14 @@ public class MessagesService(DatabaseContext context, ICoreMessageService messag
             throw new NotFoundException();
         
         await messageService.UpdateCategory(request.MessageId, request.CategoryId, ct);
+    }
+
+    public async Task DeleteMessage(DeleteMessageRequest request, CancellationToken ct)
+    {
+        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
+            throw new NotFoundException();
+
+        await messageService.DeleteMessage(request.MessageId, ct);
     }
 }
 
@@ -90,4 +106,10 @@ public class MessageListDto
     public required string Text { get; set; }
     public required long CategoryId { get; set; }
     public required long StatusId { get; set; }
+}
+
+public record DeleteMessageRequest
+{
+    public Guid UserId { get; set; }
+    public long MessageId { get; set; }
 }
