@@ -34,9 +34,13 @@ public class TelegramMessageService(
             },
             cancellationToken);
 
-        await UpdateMessageInChat(
-            id,
+        await OpenChangeCategoryWindow(
+            request.UserId,
             editMessageId: null,
+            new HandleOpenChangeCategoryWindowRequest
+            {
+                MessageId = id
+            },
             cancellationToken);
     }
 
