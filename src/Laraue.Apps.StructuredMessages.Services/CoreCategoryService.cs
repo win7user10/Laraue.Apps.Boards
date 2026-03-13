@@ -1,15 +1,12 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreCategoryService
 {
-    Task<MessageCategoryDto> GetMessageCategory(
-        long id,
-        CancellationToken cancellationToken);
-    
     Task<MessageCategoryListDto[]> GetMessageCategories(
         Guid userId,
         CancellationToken cancellationToken);
@@ -22,23 +19,16 @@ public interface ICoreCategoryService
         Guid userId,
         long id,
         CancellationToken cancellationToken);
+    
+    Task ChangeStatusesOrder(
+        ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class CoreCategoryService(DatabaseContext context)
     : ICoreCategoryService
 {
-    public Task<MessageCategoryDto> GetMessageCategory(
-        long id,
-        CancellationToken cancellationToken)
-    {
-        return context.MessageCategories
-            .Where(x => x.Id == id)
-            .Select(x => new MessageCategoryDto
-            {
-                Name = x.Name,
-            })
-            .FirstAsyncEF(cancellationToken);
-    }
+    private const string DefaultColor = "#2f81f7";
 
     public Task<MessageCategoryListDto[]> GetMessageCategories(
         Guid userId,
@@ -61,7 +51,8 @@ public class CoreCategoryService(DatabaseContext context)
         var category = new MessageCategory
         {
             Name = request.Name,
-            UserId = request.UserId
+            UserId = request.UserId,
+            Color = request.Color ?? DefaultColor,
         };
         
         context.MessageCategories.Add(category);
@@ -77,6 +68,39 @@ public class CoreCategoryService(DatabaseContext context)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
     }
+
+    public async Task ChangeStatusesOrder(
+        ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existsStatuses = await context.MessageStatuses
+            .Where(x => x.MessageCategoryId == request.CategoryId)
+            .Select(x => new MessageStatus
+            {
+                Id = x.Id,
+                MessageCategoryId = x.MessageCategoryId,
+                SortOrder = x.SortOrder,
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var existsStatusesIds = existsStatuses
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .ToArray();
+        
+        if (!existsStatusesIds.SequenceEqual(request.Order.Keys))
+            throw new BadRequestException(
+                nameof(request.Order),
+                $"The list of statuses to update does not match the statuses in category {string.Join(',', existsStatusesIds)}");
+
+        foreach (var status in existsStatuses)
+        {
+            context.Attach(status);
+            status.SortOrder = request.Order[status.Id];
+        }
+        
+        await context.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public class MessageCategoryListDto
@@ -85,13 +109,19 @@ public class MessageCategoryListDto
     public required string Name { get; set; }
 }
 
-public class MessageCategoryDto
+public class ChangeStatusesOrderRequest
 {
-    public required string Name { get; set; }
+    public required long CategoryId { get; set; }
+    
+    /// <summary>
+    /// Order map, status id -> order value.
+    /// </summary>
+    public required IReadOnlyDictionary<long, int> Order { get; set; }
 }
 
 public class CreateMessageCategoryRequest
 {
     public required string Name { get; set; }
+    public string? Color { get; set; }
     public required Guid UserId { get; set; }
 }

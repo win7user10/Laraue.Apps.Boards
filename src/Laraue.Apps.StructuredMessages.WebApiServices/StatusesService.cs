@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.DataAccess.Models;
-using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.Exceptions.Web;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
@@ -12,29 +11,27 @@ public interface IStatusesService
         CancellationToken cancellationToken);
 }
 
-public class StatusesService(DatabaseContext context) : IStatusesService
+public class StatusesService(
+    ICoreCategoryService categoriesService,
+    IMessageStatusService statusService) : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken)
     {
-        await context.MessageCategories
-            .Where(m => m.UserId == request.UserId)
-            .AnyOrThrowNotFoundEFAsync(
-                m => m.Id == request.CategoryId,
-                cancellationToken);
-        
-        var status = new MessageStatus
-        {
-            Name = request.Name,
-            MessageCategoryId = request.CategoryId,
-            Color = request.Color,
-        };
-        
-        context.MessageStatuses.Add(status);
-        await context.SaveChangesAsync(cancellationToken);
+        if (!await categoriesService
+            .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
+            throw new BadRequestException(
+                nameof(request.CategoryId),
+                "Invalid category");
 
-        return status.Id;
+        return await statusService.Create(
+            new CreateMessageCategoryStatusRequest
+            {
+                CategoryId = request.CategoryId,
+                Name = request.Name,
+            },
+            cancellationToken);
     }
 }
 

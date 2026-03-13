@@ -64,7 +64,7 @@ public class CreateStatusFromMessageInterceptor(
             return ExecutionState.FullyExecuted;
         }
             
-        await messageStatusService.CreateMessageCategoryStatus(
+        await messageStatusService.Create(
             new CreateMessageCategoryStatusRequest
             {
                 Name = model,

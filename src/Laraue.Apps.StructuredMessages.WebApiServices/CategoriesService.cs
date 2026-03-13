@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -20,9 +20,15 @@ public interface ICategoriesService
     Task<long> CreateCategory(
         CreateCategoryRequest request,
         CancellationToken cancellationToken);
+    
+    Task ChangeStatusesOrder(
+        ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken);
 }
 
-public class CategoriesService(DatabaseContext context)
+public class CategoriesService(
+    DatabaseContext context,
+    ICoreCategoryService coreCategoryService)
     : ICategoriesService
 {
     public async Task<CategoryCountDto[]> GetCategoriesWithCount(
@@ -79,27 +85,42 @@ public class CategoriesService(DatabaseContext context)
                         Id = s.Id,
                         Color = s.Color,
                         Name = s.Name,
+                        SortOrder = s.SortOrder,
                     })
                     .ToArray(),
             })
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
     }
 
-    public async Task<long> CreateCategory(
+    public Task<long> CreateCategory(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var category = new MessageCategory
-        {
-            Name = request.Name,
-            UserId = request.UserId,
-            Color = request.Color,
-        };
-        
-        context.MessageCategories.Add(category);
-        await context.SaveChangesAsync(cancellationToken);
+        return coreCategoryService.CreateMessageCategory(
+            new CreateMessageCategoryRequest
+            {
+                UserId = request.UserId,
+                Name = request.Name,
+                Color = request.Color,
+            },
+            cancellationToken);
+    }
 
-        return category.Id;
+    public async Task ChangeStatusesOrder(
+        ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await coreCategoryService
+            .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
+            throw new NotFoundException();
+        
+        await coreCategoryService.ChangeStatusesOrder(
+            new Services.ChangeStatusesOrderRequest
+            {
+                CategoryId = request.CategoryId,
+                Order = request.Order
+            },
+            cancellationToken);
     }
 }
 
@@ -130,6 +151,7 @@ public class StatusDto
     public required long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
+    public required int SortOrder { get; set; }
 }
 
 public record CreateCategoryRequest
@@ -141,4 +163,11 @@ public record CreateCategoryRequest
     
     [MaxLength(7)]
     public required string Color { get; set; }
+}
+
+public record ChangeStatusesOrderRequest
+{
+    public Guid UserId { get; set; }
+    public required long CategoryId { get; set; }
+    public required IReadOnlyDictionary<long, int> Order { get; set; }
 }

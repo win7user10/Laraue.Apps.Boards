@@ -5,9 +5,9 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 public class MessageStatus
 {
     public long Id { get; set; }
-    
+
     [MaxLength(128)]
-    public required string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     
     [MaxLength(7)]
     public string? Color { get; set; }
@@ -15,5 +15,5 @@ public class MessageStatus
     public long MessageCategoryId { get; set; }
     public MessageCategory? MessageCategory { get; set; }
 
-    public bool IsFinal { get; set; }
+    public int SortOrder { get; set; }
 }

@@ -6,7 +6,7 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface IMessageStatusService
 {
-    Task<long> CreateMessageCategoryStatus(
+    Task<long> Create(
         CreateMessageCategoryStatusRequest request,
         CancellationToken cancellationToken);
 
@@ -22,14 +22,19 @@ public interface IMessageStatusService
 
 public class MessageStatusService(DatabaseContext context) : IMessageStatusService
 {
-    public async Task<long> CreateMessageCategoryStatus(
+    public async Task<long> Create(
         CreateMessageCategoryStatusRequest request,
         CancellationToken cancellationToken)
     {
+        var previousMaxOrder = await context.MessageStatuses
+            .Where(x => x.MessageCategoryId == request.CategoryId)
+            .MaxAsyncEF(x => x.SortOrder, cancellationToken);
+        
         var status = new MessageStatus
         {
             Name = request.Name,
             MessageCategoryId = request.CategoryId,
+            SortOrder = ++previousMaxOrder
         };
         
         context.MessageStatuses.Add(status);

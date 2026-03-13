@@ -41,4 +41,21 @@ public class CategoriesController(ICategoriesService categoriesService)
             },
             cancellationToken);
     }
+    
+    [HttpPost("{id:long}/reorder-statuses")]
+    public Task ChangeStatusesOrder(
+        [FromRoute] long id,
+        [FromBody] IReadOnlyDictionary<long, int> order,
+        CancellationToken cancellationToken)
+    {
+        return categoriesService.ChangeStatusesOrder(
+            new ChangeStatusesOrderRequest
+            {
+                CategoryId = id,
+                Order = order,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
 }   
