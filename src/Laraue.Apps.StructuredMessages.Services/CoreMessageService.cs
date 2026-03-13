@@ -59,19 +59,20 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             throw new BadRequestException(
                 nameof(request.StatusId),
                 "To set the status need to specify category");
+        
+        var statusesAvailable = await context.MessageStatuses
+            .Where(x => x.MessageCategoryId == request.CategoryId)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => x.Id)
+            .ToArrayAsyncEF(cancellationToken);
 
-        if (request.StatusId is not null)
-        {
-            var statusAvailable = await context.MessageStatuses
-                .Where(x => x.MessageCategoryId == request.CategoryId)
-                .Where(x => x.Id == request.StatusId)
-                .AnyAsyncEF(cancellationToken);
-            
-            if (!statusAvailable)
-                throw new BadRequestException(
-                    nameof(request.StatusId),
-                    "Status is not found in the category");
-        }
+        var statusId = request.StatusId;
+        if (statusId is not null && !statusesAvailable.Contains(statusId.Value))
+            throw new BadRequestException(
+                nameof(request.StatusId),
+                "Status is not found in the category");
+         
+        statusId ??= statusesAvailable.FirstOrDefault();
         
         var entity = new Message
         {
@@ -81,7 +82,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             Sender = request.Sender,
             TelegramMessageId = request.TelegramMessageId,
             CategoryId = request.CategoryId,
-            StatusId = request.StatusId,
+            StatusId = statusId,
         };
         
         context.Add(entity);
