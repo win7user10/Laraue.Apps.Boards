@@ -34,10 +34,6 @@ public interface ICoreCategoryService
 public class CoreCategoryService(DatabaseContext context)
     : ICoreCategoryService
 {
-    private const string DefaultCategoryColor = "#43f72f";
-    private const string DefaultStatusColor = "#dda61b";
-    private const string DefaultStatusName = "New";
-
     public Task<MessageCategoryListDto[]> GetList(
         Guid userId,
         CancellationToken cancellationToken)
@@ -60,14 +56,14 @@ public class CoreCategoryService(DatabaseContext context)
         {
             Name = request.Name,
             UserId = request.UserId,
-            Color = request.Color ?? DefaultCategoryColor,
+            Color = request.Color ?? CardsDefaults.DefaultCategoryColor,
         };
         
         var statuses = request.Statuses ?? [
             new Status
             {
-                Name = DefaultStatusName,
-                Color = DefaultStatusColor
+                Name = CardsDefaults.DefaultStatusName,
+                Color = CardsDefaults.DefaultStatusColor
             }];
 
         category.Statuses = statuses

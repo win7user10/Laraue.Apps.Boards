@@ -90,6 +90,10 @@ public class MessagesService(
         long? categoryId = request.CategoryId == CoreMessageService.NullId
             ? null
             : request.CategoryId;
+        
+        long? statusId = request.StatusId == CoreMessageService.NullId
+            ? null
+            : request.StatusId;
 
         if (categoryId.HasValue
             && !await categoryService.UserHasAccessToCategory(
@@ -106,6 +110,7 @@ public class MessagesService(
                 Text = request.Text,
                 UserId = request.UserId,
                 CategoryId = categoryId,
+                StatusId = statusId,
             },
             ct);
     }
@@ -152,6 +157,7 @@ public record CreateMessageRequest
 {
     public Guid UserId { get; set; }
     public long CategoryId { get; set; }
+    public long StatusId { get; set; }
     public string? Sender { get; set; }
     public required string Text { get; set; }
 }

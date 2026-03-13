@@ -34,6 +34,7 @@ public class StatusesService(
             {
                 CategoryId = request.CategoryId,
                 Name = request.Name,
+                Color = request.Color,
             },
             cancellationToken);
     }

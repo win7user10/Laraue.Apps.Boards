@@ -55,6 +55,24 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         SaveMessageRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.CategoryId is null && request.StatusId is not null)
+            throw new BadRequestException(
+                nameof(request.StatusId),
+                "To set the status need to specify category");
+
+        if (request.StatusId is not null)
+        {
+            var statusAvailable = await context.MessageStatuses
+                .Where(x => x.MessageCategoryId == request.CategoryId)
+                .Where(x => x.Id == request.StatusId)
+                .AnyAsyncEF(cancellationToken);
+            
+            if (!statusAvailable)
+                throw new BadRequestException(
+                    nameof(request.StatusId),
+                    "Status is not found in the category");
+        }
+        
         var entity = new Message
         {
             Content = request.Text,
@@ -63,6 +81,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             Sender = request.Sender,
             TelegramMessageId = request.TelegramMessageId,
             CategoryId = request.CategoryId,
+            StatusId = request.StatusId,
         };
         
         context.Add(entity);
@@ -166,6 +185,7 @@ public class SaveMessageRequest
     public required DateTime CreatedAt { get; set; }
     public int? TelegramMessageId { get; set; }
     public long? CategoryId { get; set; }
+    public long? StatusId { get; set; }
 }
 
 public class UpdateMessageCategoryRequest
