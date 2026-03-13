@@ -129,11 +129,24 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         
         long? value = newCategoryId == NullId ? null : newCategoryId;
         
+        // Set default category status after moving to category
+        long? newStatus = NullId;
+        if (value is not null)
+        {
+            var newStatusData = await context.MessageStatuses
+                .Where(s => s.MessageCategoryId == value.Value)
+                .OrderBy(s => s.SortOrder)
+                .Select(s => new { s.Id })
+                .FirstOrDefaultAsyncEF(ct);
+            
+            newStatus = newStatusData?.Id;
+        }
+        
         await context.Messages
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(x => x.CategoryId, value)
-                .SetProperty(x => x.StatusId, (long?)null),
+                .SetProperty(x => x.StatusId, newStatus),
                 ct);
     }
 

@@ -11,7 +11,7 @@ public interface ICoreCategoryService
         Guid userId,
         CancellationToken cancellationToken);
     
-    Task<long> CreateMessageCategory(
+    Task<long> Create(
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken);
     
@@ -28,7 +28,9 @@ public interface ICoreCategoryService
 public class CoreCategoryService(DatabaseContext context)
     : ICoreCategoryService
 {
-    private const string DefaultColor = "#2f81f7";
+    private const string DefaultCategoryColor = "#43f72f";
+    private const string DefaultStatusColor = "#dda61b";
+    private const string DefaultStatusName = "New";
 
     public Task<MessageCategoryListDto[]> GetMessageCategories(
         Guid userId,
@@ -44,7 +46,7 @@ public class CoreCategoryService(DatabaseContext context)
             .ToArrayAsyncEF(cancellationToken);
     }
 
-    public async Task<long> CreateMessageCategory(
+    public async Task<long> Create(
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken)
     {
@@ -52,8 +54,24 @@ public class CoreCategoryService(DatabaseContext context)
         {
             Name = request.Name,
             UserId = request.UserId,
-            Color = request.Color ?? DefaultColor,
+            Color = request.Color ?? DefaultCategoryColor,
         };
+        
+        var statuses = request.Statuses ?? [
+            new Status
+            {
+                Name = DefaultStatusName,
+                Color = DefaultStatusColor
+            }];
+
+        category.Statuses = statuses
+            .Select((s, i) => new MessageStatus
+            {
+                SortOrder = i,
+                Color = s.Color,
+                Name = s.Name,
+            })
+            .ToList();
         
         context.MessageCategories.Add(category);
         await context.SaveChangesAsync(cancellationToken);
@@ -124,4 +142,11 @@ public class CreateMessageCategoryRequest
     public required string Name { get; set; }
     public string? Color { get; set; }
     public required Guid UserId { get; set; }
+    public Status[]? Statuses { get; set; }
+}
+
+public class Status
+{
+    public required string Name { get; set; }
+    public required string Color { get; set; }
 }

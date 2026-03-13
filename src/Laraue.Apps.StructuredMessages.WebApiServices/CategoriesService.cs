@@ -96,7 +96,7 @@ public class CategoriesService(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        return coreCategoryService.CreateMessageCategory(
+        return coreCategoryService.Create(
             new CreateMessageCategoryRequest
             {
                 UserId = request.UserId,

@@ -47,7 +47,7 @@ public class CreateCategoryFromMessageInterceptor(
         CreateCategoryFromMessageInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
-        await coreCategoryService.CreateMessageCategory(
+        await coreCategoryService.Create(
             new CreateMessageCategoryRequest
             {
                 Name = model,
