@@ -22,4 +22,18 @@ public class StatusesController(IStatusesService statusesService)
             },
             cancellationToken);
     }
+    
+    [HttpDelete("{id:long}")]
+    public Task Delete(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        return statusesService.Delete(
+            new DeleteStatusRequest
+            {
+                Id = id,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

@@ -10,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 public class CreateStatusFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
-    IMessageStatusService messageStatusService,
+    ICoreStatusService coreStatusService,
     ICoreCategoryService categoryService,
     ITelegramMessageService telegramMessageService,
     ITelegramBotClient client)
@@ -64,7 +64,7 @@ public class CreateStatusFromMessageInterceptor(
             return ExecutionState.FullyExecuted;
         }
             
-        await messageStatusService.Create(
+        await coreStatusService.Create(
             new CreateMessageCategoryStatusRequest
             {
                 Name = model,

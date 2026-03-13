@@ -13,7 +13,7 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 public class TelegramMessageService(
     ICoreMessageService messageService,
     ICoreCategoryService coreCategoryService,
-    IMessageStatusService messageStatusService,
+    ICoreStatusService coreStatusService,
     ITelegramBotClient client,
     IInterceptorState<Guid> interceptorState,
     ITelegramMessageServiceRepository repository)
@@ -158,7 +158,7 @@ public class TelegramMessageService(
             request.MessageId,
             cancellationToken);
         
-        var statuses = await messageStatusService.GetStatuses(
+        var statuses = await coreStatusService.GetStatuses(
             message.CategoryId.GetValueOrDefault(),
             cancellationToken);
                 

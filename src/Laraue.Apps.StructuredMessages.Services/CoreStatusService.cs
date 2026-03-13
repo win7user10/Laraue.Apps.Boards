@@ -1,10 +1,12 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface IMessageStatusService
+public interface ICoreStatusService
 {
     Task<long> Create(
         CreateMessageCategoryStatusRequest request,
@@ -18,9 +20,13 @@ public interface IMessageStatusService
         Guid userId,
         long id,
         CancellationToken cancellationToken);
+    
+    Task Delete(
+        DeleteStatusRequest request,
+        CancellationToken cancellationToken);
 }
 
-public class MessageStatusService(DatabaseContext context) : IMessageStatusService
+public class CoreStatusService(DatabaseContext context) : ICoreStatusService
 {
     public async Task<long> Create(
         CreateMessageCategoryStatusRequest request,
@@ -64,6 +70,37 @@ public class MessageStatusService(DatabaseContext context) : IMessageStatusServi
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
     }
+
+    public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var newStatusId = await context.MessageStatuses
+            .Where(x => x.Id == request.Id)
+            .Select(x => x.MessageCategory!.Statuses!
+                .OrderBy(s => x.SortOrder)
+                .Where(s => s.Id != request.Id)
+                .Select(s => new { s.Id })
+                .FirstOrDefault())
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (newStatusId is null)
+            throw new BadRequestException(
+                nameof(request.Id),
+                "Deleting the single status in category is not allowed");
+        
+        await context.Messages
+            .Where(x => x.StatusId == request.Id)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(p => p.StatusId, newStatusId.Id),
+                cancellationToken);
+        
+        await context.MessageStatuses
+            .Where(x => x.Id == request.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+    }
 }
 
 public class CreateMessageCategoryStatusRequest
@@ -76,4 +113,9 @@ public class MessageStatusDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
+}
+
+public class DeleteStatusRequest
+{
+    public long Id { get; set; }
 }

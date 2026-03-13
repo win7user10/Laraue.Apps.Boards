@@ -9,11 +9,15 @@ public interface IStatusesService
     Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken);
+
+    Task Delete(
+        DeleteStatusRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class StatusesService(
     ICoreCategoryService categoriesService,
-    IMessageStatusService statusService) : IStatusesService
+    ICoreStatusService statusService) : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
@@ -33,6 +37,20 @@ public class StatusesService(
             },
             cancellationToken);
     }
+
+    public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
+    {
+        if (!await statusService.UserHasAccessToStatus(
+            request.UserId, request.Id, cancellationToken))
+            throw new NotFoundException("Status is not found");
+
+        await statusService.Delete(
+            new Services.DeleteStatusRequest
+            {
+                Id = request.Id,
+            },
+            cancellationToken);
+    }
 }
 
 public record CreateStatusRequest
@@ -46,4 +64,10 @@ public record CreateStatusRequest
     public required string Color { get; set; }
     
     public required long CategoryId { get; set; }
+}
+
+public record DeleteStatusRequest
+{
+    public Guid UserId { get; set; }
+    public required long Id { get; set; }
 }
