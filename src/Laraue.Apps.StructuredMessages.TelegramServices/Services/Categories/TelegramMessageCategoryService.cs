@@ -17,7 +17,7 @@ public class TelegramMessageCategoryService(
         ReplyData reply,
         CancellationToken cancellationToken)
     {
-        var categories = await coreCategoryService.GetMessageCategories(
+        var categories = await coreCategoryService.GetList(
             reply.UserId,
             cancellationToken);
 

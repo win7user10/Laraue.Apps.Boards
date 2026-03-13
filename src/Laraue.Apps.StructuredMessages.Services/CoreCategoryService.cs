@@ -1,13 +1,15 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreCategoryService
 {
-    Task<MessageCategoryListDto[]> GetMessageCategories(
+    Task<MessageCategoryListDto[]> GetList(
         Guid userId,
         CancellationToken cancellationToken);
     
@@ -23,6 +25,10 @@ public interface ICoreCategoryService
     Task ChangeStatusesOrder(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken);
+    
+    Task Delete(
+        DeleteRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class CoreCategoryService(DatabaseContext context)
@@ -32,7 +38,7 @@ public class CoreCategoryService(DatabaseContext context)
     private const string DefaultStatusColor = "#dda61b";
     private const string DefaultStatusName = "New";
 
-    public Task<MessageCategoryListDto[]> GetMessageCategories(
+    public Task<MessageCategoryListDto[]> GetList(
         Guid userId,
         CancellationToken cancellationToken)
     {
@@ -119,6 +125,28 @@ public class CoreCategoryService(DatabaseContext context)
         
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task Delete(DeleteRequest request, CancellationToken cancellationToken)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        await context.Messages
+            .Where(x => x.CategoryId == request.Id)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(p => p.CategoryId, (long?)null)
+                .SetProperty(p => p.StatusId, (long?)null),
+                cancellationToken);
+        
+        await context.MessageStatuses
+            .Where(x => x.MessageCategoryId == request.Id)
+            .DeleteAsync(cancellationToken);
+        
+        await context.MessageCategories
+            .Where(c => c.Id == request.Id)
+            .DeleteAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
+    }
 }
 
 public class MessageCategoryListDto
@@ -149,4 +177,9 @@ public class Status
 {
     public required string Name { get; set; }
     public required string Color { get; set; }
+}
+
+public record DeleteRequest
+{
+    public required long Id { get; set; }
 }
