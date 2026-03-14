@@ -55,24 +55,40 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         SaveMessageRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.CategoryId is null && request.StatusId is not null)
-            throw new BadRequestException(
-                nameof(request.StatusId),
-                "To set the status need to specify category");
-        
-        var statusesAvailable = await context.MessageStatuses
-            .Where(x => x.MessageCategoryId == request.CategoryId)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => x.Id)
-            .ToArrayAsyncEF(cancellationToken);
-
         var statusId = request.StatusId;
-        if (statusId is not null && !statusesAvailable.Contains(statusId.Value))
-            throw new BadRequestException(
-                nameof(request.StatusId),
-                "Status is not found in the category");
-         
-        statusId ??= statusesAvailable.FirstOrDefault();
+        
+        if (request.CategoryId is null)
+        {
+            // If status is set, but category is not set it's wrong
+            if (statusId is not null)
+            {
+                throw new BadRequestException(
+                    nameof(statusId),
+                    "To set the status need to specify category");
+            }
+        }
+        else
+        {
+            var statusesAvailable = await context.MessageStatuses
+                .Where(x => x.MessageCategoryId == request.CategoryId)
+                .OrderBy(x => x.SortOrder)
+                .Select(x => x.Id)
+                .ToArrayAsyncEF(cancellationToken);
+            
+            // If status is passed, check that is correct
+            if (statusId is not null)
+            {
+                if (!statusesAvailable.Contains(statusId.Value))
+                    throw new BadRequestException(
+                        nameof(request.StatusId),
+                        "Status is not found in the category");
+            }
+            // If status is not passed, select the default available status
+            else
+            {
+                statusId ??= statusesAvailable.FirstOrDefault();
+            }
+        }
         
         var entity = new Message
         {
