@@ -3,6 +3,7 @@ using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -23,6 +24,11 @@ public interface ICoreStatusService
     
     Task Delete(
         DeleteStatusRequest request,
+        CancellationToken cancellationToken);
+    
+    Task Update(
+        long messageId,
+        Action<UpdateSettersBuilder<MessageStatus>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -101,6 +107,16 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
             .ExecuteDeleteAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public Task Update(
+        long messageId,
+        Action<UpdateSettersBuilder<MessageStatus>> setters,
+        CancellationToken cancellationToken)
+    {
+        return context.MessageStatuses
+            .Where(x => x.Id == messageId)
+            .ExecuteUpdateAsync(setters, cancellationToken);
     }
 }
 

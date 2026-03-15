@@ -13,6 +13,10 @@ public interface IStatusesService
     Task Delete(
         DeleteStatusRequest request,
         CancellationToken cancellationToken);
+    
+    Task Edit(
+        EditStatusRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class StatusesService(
@@ -52,6 +56,20 @@ public class StatusesService(
             },
             cancellationToken);
     }
+
+    public async Task Edit(EditStatusRequest request, CancellationToken cancellationToken)
+    {
+        if (!await statusService.UserHasAccessToStatus(
+                request.UserId, request.Id, cancellationToken))
+            throw new NotFoundException("Status is not found");
+
+        await statusService.Update(
+            request.Id,
+            upd => upd
+                .SetProperty(x => x.Color, request.Color)
+                .SetProperty(x => x.Name, request.Name),
+            cancellationToken);
+    }
 }
 
 public record CreateStatusRequest
@@ -71,4 +89,14 @@ public record DeleteStatusRequest
 {
     public Guid UserId { get; set; }
     public required long Id { get; set; }
+}
+
+public record EditStatusRequest
+{
+    public Guid UserId { get; set; }
+    public long Id { get; set; }
+    
+    [MaxLength(7)]
+    public required string Color { get; set; }
+    public required string Name { get; set; }
 }

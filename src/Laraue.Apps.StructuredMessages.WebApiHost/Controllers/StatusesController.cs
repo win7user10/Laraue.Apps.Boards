@@ -36,4 +36,19 @@ public class StatusesController(IStatusesService statusesService)
             },
             cancellationToken);
     }
+    
+    [HttpPut("{id:long}")]
+    public Task Edit(
+        long id,
+        [FromBody] EditStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        return statusesService.Edit(
+            request with
+            {
+                Id = id,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   
