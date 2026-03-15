@@ -24,6 +24,10 @@ public interface ICategoriesService
     Task ChangeStatusesOrder(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken);
+    
+    Task Edit(
+        EditCategoryRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class CategoriesService(
@@ -122,6 +126,20 @@ public class CategoriesService(
             },
             cancellationToken);
     }
+
+    public async Task Edit(EditCategoryRequest request, CancellationToken cancellationToken)
+    {
+        if (!await coreCategoryService
+            .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+            throw new NotFoundException();
+
+        await coreCategoryService.Update(
+            request.Id,
+            upd => upd
+                .SetProperty(x => x.Color, request.Color)
+                .SetProperty(x => x.Name, request.Name),
+            cancellationToken);
+    }
 }
 
 public record CategoryCountDto
@@ -170,4 +188,17 @@ public record ChangeStatusesOrderRequest
     public Guid UserId { get; set; }
     public required long CategoryId { get; set; }
     public required IReadOnlyDictionary<long, int> Order { get; set; }
+}
+
+public record EditCategoryRequest
+{
+    public Guid UserId { get; set; }
+    
+    public long Id { get; set; }
+    
+    [MaxLength(128)]
+    public required string Name { get; set; }
+    
+    [MaxLength(7)]
+    public required string Color { get; set; }
 }

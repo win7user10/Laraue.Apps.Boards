@@ -4,6 +4,7 @@ using Laraue.Core.Exceptions.Web;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -28,6 +29,11 @@ public interface ICoreCategoryService
     
     Task Delete(
         DeleteRequest request,
+        CancellationToken cancellationToken);
+    
+    Task Update(
+        long id,
+        Action<UpdateSettersBuilder<MessageCategory>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -142,6 +148,16 @@ public class CoreCategoryService(DatabaseContext context)
             .DeleteAsync(cancellationToken);
         
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public Task Update(
+        long id,
+        Action<UpdateSettersBuilder<MessageCategory>> setters,
+        CancellationToken cancellationToken)
+    {
+        return context.MessageCategories
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters, cancellationToken);
     }
 }
 

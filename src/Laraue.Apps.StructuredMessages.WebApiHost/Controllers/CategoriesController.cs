@@ -58,4 +58,18 @@ public class CategoriesController(ICategoriesService categoriesService)
             cancellationToken);
     }
     
+    [HttpPut("{id:long}")]
+    public Task Edit(
+        long id,
+        [FromBody] EditCategoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        return categoriesService.Edit(
+            request with
+            {
+                Id = id,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

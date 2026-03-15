@@ -27,7 +27,7 @@ public interface ICoreStatusService
         CancellationToken cancellationToken);
     
     Task Update(
-        long messageId,
+        long id,
         Action<UpdateSettersBuilder<MessageStatus>> setters,
         CancellationToken cancellationToken);
 }
@@ -110,12 +110,12 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     }
 
     public Task Update(
-        long messageId,
+        long id,
         Action<UpdateSettersBuilder<MessageStatus>> setters,
         CancellationToken cancellationToken)
     {
         return context.MessageStatuses
-            .Where(x => x.Id == messageId)
+            .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters, cancellationToken);
     }
 }
