@@ -1,7 +1,9 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -31,6 +33,10 @@ public interface IMessagesService
     Task EditMessage(
         EditMessageRequest request,
         CancellationToken ct);
+    
+    Task<MessageListDto[]> Search(
+        SearchRequest request,
+        CancellationToken ct);
 }
 
 public class MessagesService(
@@ -48,20 +54,11 @@ public class MessagesService(
             ? null
             : request.CategoryId;
         
-        return context
+        return Project(context
             .Messages
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.CategoryId == categoryId)
-            .OrderByDescending(x => x.Id)
-            .Select(x => new MessageListDto
-            {
-                Id = x.Id,
-                Sender = x.Sender,
-                Content = x.Content,
-                Time = x.CreatedAt,
-                CategoryId = x.CategoryId ?? CoreMessageService.NullId,
-                StatusId = x.StatusId ?? CoreMessageService.NullId,
-            })
+            .OrderByDescending(x => x.Id))
             .ToArrayAsync(cancellationToken);
     }
 
@@ -130,6 +127,46 @@ public class MessagesService(
                 .SetProperty(x => x.Content, request.Content),
             ct);
     }
+
+    public Task<MessageListDto[]> Search(SearchRequest request, CancellationToken ct)
+    {
+        var query = context.Messages
+            .Where(x => x.UserId == request.UserId);
+        
+        if (request.CategoryId.HasValue)
+        {
+            var categoryId = request.CategoryId == CoreMessageService.NullId
+                ? null
+                : request.CategoryId;
+
+            query = query.Where(x => x.CategoryId == categoryId);
+        }
+        
+        if (!string.IsNullOrEmpty(request.SearchString))
+        {
+            query = query
+                .Where(x => EF.Functions.TrigramsAreNotWordSimilar(
+                    x.Content,
+                    request.SearchString));
+        }
+
+        return Project(query)
+            .ToArrayAsyncEF(ct);
+    }
+
+    private static IQueryable<MessageListDto> Project(
+        IQueryable<Message> queryable)
+    {
+        return queryable.Select(x => new MessageListDto
+        {
+            Id = x.Id,
+            Sender = x.Sender,
+            Content = x.Content,
+            Time = x.CreatedAt,
+            CategoryId = x.CategoryId ?? CoreMessageService.NullId,
+            StatusId = x.StatusId ?? CoreMessageService.NullId,
+        });
+    }
 }
 
 public record UpdateStatusRequest
@@ -183,4 +220,11 @@ public record EditMessageRequest
     public Guid UserId { get; set; }
     public long MessageId { get; set; }
     public required string Content { get; set; }
+}
+
+public record SearchRequest
+{
+    public Guid UserId { get; set; }
+    public long? CategoryId { get; set; }
+    public string? SearchString { get; set; }
 }

@@ -96,4 +96,17 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             },
             cancellationToken);
     }
+    
+    [HttpPost("search")]
+    public Task<MessageListDto[]> Search(
+        [FromBody] SearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.Search(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

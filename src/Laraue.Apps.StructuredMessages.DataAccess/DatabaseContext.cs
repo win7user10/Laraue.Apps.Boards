@@ -25,5 +25,14 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("uuid-ossp");
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        
+        modelBuilder.Entity<Message>(entity =>
+        {
+            entity
+                .HasIndex(x => x.Content)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+        });
     }
 }
