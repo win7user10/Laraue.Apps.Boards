@@ -27,6 +27,10 @@ public interface IMessagesService
     Task<long> CreateMessage(
         CreateMessageRequest request,
         CancellationToken ct);
+    
+    Task EditMessage(
+        EditMessageRequest request,
+        CancellationToken ct);
 }
 
 public class MessagesService(
@@ -53,7 +57,7 @@ public class MessagesService(
             {
                 Id = x.Id,
                 Sender = x.Sender,
-                Text = x.Content,
+                Content = x.Content,
                 Time = x.CreatedAt,
                 CategoryId = x.CategoryId ?? CoreMessageService.NullId,
                 StatusId = x.StatusId ?? CoreMessageService.NullId,
@@ -107,11 +111,23 @@ public class MessagesService(
             {
                 CreatedAt = dateTimeProvider.UtcNow,
                 Sender = request.Sender,
-                Text = request.Text,
+                Text = request.Content,
                 UserId = request.UserId,
                 CategoryId = categoryId,
                 StatusId = statusId,
             },
+            ct);
+    }
+
+    public async Task EditMessage(EditMessageRequest request, CancellationToken ct)
+    {
+        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
+            throw new NotFoundException();
+        
+        await messageService.UpdateMessage(
+            request.MessageId,
+            upd => upd
+                .SetProperty(x => x.Content, request.Content),
             ct);
     }
 }
@@ -142,7 +158,7 @@ public class MessageListDto
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial => Sender?[..2];
-    public required string Text { get; set; }
+    public required string Content { get; set; }
     public required long CategoryId { get; set; }
     public required long StatusId { get; set; }
 }
@@ -159,5 +175,12 @@ public record CreateMessageRequest
     public long CategoryId { get; set; }
     public long StatusId { get; set; }
     public string? Sender { get; set; }
-    public required string Text { get; set; }
+    public required string Content { get; set; }
+}
+
+public record EditMessageRequest
+{
+    public Guid UserId { get; set; }
+    public long MessageId { get; set; }
+    public required string Content { get; set; }
 }

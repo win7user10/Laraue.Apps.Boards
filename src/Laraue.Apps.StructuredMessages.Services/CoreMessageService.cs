@@ -204,21 +204,3 @@ public class SaveMessageRequest
     public long? CategoryId { get; set; }
     public long? StatusId { get; set; }
 }
-
-public class UpdateMessageCategoryRequest
-{
-    public required long Id { get; set; }
-    public required long CategoryId { get; set; }
-}
-
-public class UpdateMessageStatusRequest
-{
-    public required long Id { get; set; }
-    public required long StatusId { get; set; }
-}
-
-public class UpdateMessageTextRequest
-{
-    public required long Id { get; set; }
-    public required string Content { get; set; }
-}

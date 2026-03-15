@@ -81,4 +81,19 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             },
             cancellationToken);
     }
+    
+    [HttpPut("{id:long}")]
+    public Task Update(
+        [FromRoute] long id,
+        [FromBody] EditMessageRequest request,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.EditMessage(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+                MessageId = id,
+            },
+            cancellationToken);
+    }
 }   
