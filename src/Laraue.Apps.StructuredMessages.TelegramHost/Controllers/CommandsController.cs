@@ -1,9 +1,10 @@
-﻿using Laraue.Apps.StructuredMessages.TelegramServices;
-using Laraue.Telegram.NET.Core.Extensions;
+﻿using System.Text;
+using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Routing.Attributes;
-using Laraue.Telegram.NET.Core.Utils;
 using Telegram.Bot;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Laraue.Apps.StructuredMessages.TelegramHost.Controllers;
 
@@ -15,18 +16,28 @@ public class CommandsController(ITelegramBotClient client) : TelegramController
         CancellationToken cancellationToken)
     {
         var replyData = ReplyData.FromMessageRequest(requestContext);
+
+        var tmb = new StringBuilder()
+            .AppendLine("👋 Hey! I'm Message Board.")
+            .AppendLine()
+            .AppendLine("I help you turn important Telegram messages into organized Kanban boards — with statuses, filters, and custom attributes.")
+            .AppendLine()
+            .AppendLine("All messages you send to me will be appeared on your board.")
+            .AppendLine()
+            .Append("Tap the button below to open your board 👇");
+
+        var markup = new InlineKeyboardMarkup()
+            .AddButton(InlineKeyboardButton
+            .WithWebApp(
+                "📋 Open MessageBoard", new WebAppInfo
+                {
+                    Url = "https://laraue.com/note-board-app/"
+                }));
         
-        return client.SendTextMessageAsync(
+        return client.SendMessage(
             replyData.TelegramId,
-            new TelegramMessageBuilder()
-                .AppendRow("Welcome to the Bot that helps organize messages in the Board")
-                .AppendRow()
-                .AppendRow("Any message you send or forward will be saved by the Bot.")
-                .AppendRow("This message can be assigned to category and the status for it can be chosen")
-                .AppendRow()
-                .AppendRow("All messages then will be available in Mini App with user-friendly interface")
-                .AppendRow()
-                .AppendRow("The Bot in the active development phase. It can work not as excepted yet."),
+            tmb.ToString(),
+            replyMarkup: markup,
             cancellationToken: cancellationToken);
     }
 }

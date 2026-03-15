@@ -36,6 +36,10 @@ public static class WebApplicationBuilderExtensions
         {
             builder.AddCoreServices();
             
+            builder.Services.AddOptions<MiniAppOptions>();
+            builder.Services.Configure<MiniAppOptions>(
+                builder.Configuration.GetSection(nameof(MiniAppOptions)));
+            
             builder.Services
                 .AddTelegramCore()
                 .AddTelegramRequestEfCoreInterceptors<Guid, DatabaseContext>(
