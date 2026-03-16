@@ -46,7 +46,7 @@ public class MessagesService(
     IDateTimeProvider dateTimeProvider)
     : IMessagesService
 {
-    public Task<MessageListDto[]> GetMessages(
+    public async Task<MessageListDto[]> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
@@ -54,12 +54,14 @@ public class MessagesService(
             ? null
             : request.CategoryId;
         
-        return Project(context
+        var result = await ProjectToTemporaryDto(context
             .Messages
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.CategoryId == categoryId)
             .OrderByDescending(x => x.Id))
             .ToArrayAsync(cancellationToken);
+
+        return Project(result);
     }
 
     public async Task UpdateStatus(UpdateStatusRequest request, CancellationToken ct)
@@ -107,7 +109,6 @@ public class MessagesService(
             new SaveMessageRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
-                Sender = request.Sender,
                 Text = request.Content,
                 UserId = request.UserId,
                 CategoryId = categoryId,
@@ -128,7 +129,7 @@ public class MessagesService(
             ct);
     }
 
-    public Task<MessageListDto[]> Search(SearchRequest request, CancellationToken ct)
+    public async Task<MessageListDto[]> Search(SearchRequest request, CancellationToken ct)
     {
         var query = context.Messages
             .Where(x => x.UserId == request.UserId);
@@ -150,22 +151,72 @@ public class MessagesService(
                     request.SearchString));
         }
 
-        return Project(query)
-            .ToArrayAsyncEF(ct);
+        var result = await ProjectToTemporaryDto(query).ToArrayAsyncEF(ct);
+        return Project(result);
     }
 
-    private static IQueryable<MessageListDto> Project(
+    private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
         IQueryable<Message> queryable)
     {
-        return queryable.Select(x => new MessageListDto
+        return queryable.Select(x => new MessageListDtoData
         {
             Id = x.Id,
-            Sender = x.Sender,
             Content = x.Content,
             Time = x.CreatedAt,
             CategoryId = x.CategoryId ?? CoreMessageService.NullId,
             StatusId = x.StatusId ?? CoreMessageService.NullId,
+            TelegramFirstName = x.User!.TelegramFirstName,
+            TelegramLastName = x.User!.TelegramLastName,
+            TelegramId = x.User.TelegramId,
+            TelegramUsername = x.User.TelegramUserName,
         });
+    }
+
+    private static MessageListDto[] Project(
+        IEnumerable<MessageListDtoData> source)
+    {
+        return source
+            .Select(x =>
+            {
+                var sender = x.TelegramUsername;
+                var initial = sender?[..2];
+
+                if (sender is null)
+                {
+                    if (x.TelegramFirstName is not null && x.TelegramLastName is not null)
+                    {
+                        sender = $"{x.TelegramFirstName} {x.TelegramLastName}";
+                        initial = $"{x.TelegramFirstName[..1]}{x.TelegramLastName[..1]}";
+                    }
+                    else if (x.TelegramFirstName is not null)
+                    {
+                        sender = x.TelegramFirstName;
+                        initial = x.TelegramFirstName[..2];
+                    }
+                    else if (x.TelegramLastName is not null)
+                    {
+                        sender = x.TelegramLastName;
+                        initial = x.TelegramLastName[..2];
+                    }
+                    else
+                    {
+                        sender = x.TelegramId.ToString();
+                        initial = "ID";
+                    }
+                }
+
+                return new MessageListDto
+                {
+                    Id = x.Id,
+                    StatusId = x.StatusId,
+                    Content = x.Content,
+                    CategoryId = x.CategoryId,
+                    Sender = sender,
+                    SenderInitial = initial,
+                    Time = x.Time
+                };
+            })
+            .ToArray();
     }
 }
 
@@ -189,12 +240,25 @@ public record GetMessagesRequest
     public long? CategoryId { get; set; }
 }
 
+public class MessageListDtoData
+{
+    public required long Id { get; set; }
+    public required DateTime Time { get; set; }
+    public required long TelegramId { get; set; }
+    public required string? TelegramUsername { get; set; }
+    public required string? TelegramFirstName { get; set; }
+    public required string? TelegramLastName { get; set; }
+    public required string Content { get; set; }
+    public required long CategoryId { get; set; }
+    public required long StatusId { get; set; }
+}
+
 public class MessageListDto
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
-    public string? SenderInitial => Sender?[..2];
+    public string? SenderInitial { get; set; }
     public required string Content { get; set; }
     public required long CategoryId { get; set; }
     public required long StatusId { get; set; }
@@ -211,7 +275,6 @@ public record CreateMessageRequest
     public Guid UserId { get; set; }
     public long CategoryId { get; set; }
     public long StatusId { get; set; }
-    public string? Sender { get; set; }
     public required string Content { get; set; }
 }
 

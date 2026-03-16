@@ -32,7 +32,5 @@ public class Message
     public long? StatusId { get; set; }
     public MessageStatus? Status { get; set; }
     
-    [MaxLength(32)]
-    public string? Sender { get; set; }
     public int? TelegramMessageId { get; set; }
 }

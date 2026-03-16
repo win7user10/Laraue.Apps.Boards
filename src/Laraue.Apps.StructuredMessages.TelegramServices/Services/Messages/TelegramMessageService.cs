@@ -29,7 +29,6 @@ public class TelegramMessageService(
                 UserId = request.UserId,
                 Text = request.Text,
                 CreatedAt = request.SentAt,
-                Sender = request.From,
                 TelegramMessageId = request.TelegramMessageId,
             },
             cancellationToken);

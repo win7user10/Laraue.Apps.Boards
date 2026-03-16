@@ -8,5 +8,7 @@ public class User : ITelegramUser<Guid>
     public long TelegramId { get; init; }
     public string? TelegramUserName { get; init; }
     public string? TelegramLanguageCode { get; init; }
+    public string? TelegramLastName { get; init; }
+    public string? TelegramFirstName { get; init; }
     public DateTime CreatedAt { get; init; }
 }

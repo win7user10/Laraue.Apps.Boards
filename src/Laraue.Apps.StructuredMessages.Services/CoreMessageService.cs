@@ -95,7 +95,6 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             Content = request.Text,
             UserId = request.UserId,
             CreatedAt = request.CreatedAt,
-            Sender = request.Sender,
             TelegramMessageId = request.TelegramMessageId,
             CategoryId = request.CategoryId,
             StatusId = statusId,
@@ -198,7 +197,6 @@ public class SaveMessageRequest
 {
     public Guid UserId { get; set; }
     public required string Text { get; set; }
-    public required string? Sender { get; set; }
     public required DateTime CreatedAt { get; set; }
     public int? TelegramMessageId { get; set; }
     public long? CategoryId { get; set; }

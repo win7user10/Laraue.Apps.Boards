@@ -58,6 +58,8 @@ public class TelegramAuthController(
             TelegramId = user.Id,
             TelegramLanguageCode = user.LanguageCode,
             TelegramUserName = user.Username,
+            TelegramFirstName = user.FirstName,
+            TelegramLastName = user.LastName,
         };
         
         context.Users.Add(newUser);
@@ -113,4 +115,6 @@ public class WebAppUser
     public long Id { get; set; }
     public string? Username { get; set; }
     public required string LanguageCode { get; set; }
+    public required string? FirstName { get; set; }
+    public required string? LastName { get; set; }
 }

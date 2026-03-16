@@ -24,7 +24,6 @@ public class TelegramMessageServiceRepository(DatabaseContext databaseContext)
                 UserId = x.UserId,
                 CategoryId = x.CategoryId,
                 CategoryName = x.Category!.Name,
-                Sender = x.Sender,
                 Id = x.Id,
                 StatusId = x.StatusId,
                 StatusName = x.Status!.Name,
@@ -40,7 +39,6 @@ public class MessageDto
 {
     public required long Id { get; set; }
     public required Guid UserId { get; set; }
-    public required string? Sender { get; set; }
     public long? CategoryId { get; set; }
     public string? CategoryName { get; set; }
     public long? StatusId { get; set; }
