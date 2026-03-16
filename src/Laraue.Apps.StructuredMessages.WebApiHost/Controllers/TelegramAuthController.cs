@@ -4,10 +4,13 @@ using System.Text;
 using System.Text.Json;
 using System.Web;
 using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
@@ -16,7 +19,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class TelegramAuthController(
     IOptions<TelegramOptions> options,
     DatabaseContext context,
-    IAuthService authService)
+    IAuthService authService,
+    IDateTimeProvider dateTimeProvider)
     : ControllerBase
 {
     [HttpPost("validate")]
@@ -24,20 +28,42 @@ public class TelegramAuthController(
         ValidateRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryValidateUserId(request.InitData, out var telegramUserId))
+        if (!TryValidateUserId(request.InitData, out var userData))
         {
             throw new ForbiddenException("Authorization Failed");
         }
 
         var data = await context.Users
-            .Where(x => x.TelegramId == telegramUserId)
+            .Where(x => x.TelegramId == userData.Id)
             .Select(x => new
             {
                 x.Id
             })
-            .FirstAsyncEF(cancellationToken);
+            .FirstOrDefaultAsyncEF(cancellationToken);
 
-        return authService.CreateToken(data.Id);
+        if (data is not null)
+            return authService.CreateToken(data.Id);
+
+        var newUserId = await RegisterUserFromWebApp(userData, cancellationToken);
+        return authService.CreateToken(newUserId);
+    }
+
+    private async Task<Guid> RegisterUserFromWebApp(
+        WebAppUser user,
+        CancellationToken cancellationToken)
+    {
+        var newUser = new User
+        {
+            CreatedAt = dateTimeProvider.UtcNow,
+            TelegramId = user.Id,
+            TelegramLanguageCode = user.LanguageCode,
+            TelegramUserName = user.Username,
+        };
+        
+        context.Users.Add(newUser);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return newUser.Id;
     }
 
     public class ValidateRequest
@@ -47,9 +73,9 @@ public class TelegramAuthController(
 
     public bool TryValidateUserId(
         string initData,
-        [NotNullWhen(true)] out long? telegramUserId)
+        [NotNullWhen(true)] out WebAppUser? webAppUser)
     {
-        telegramUserId = null;
+        webAppUser = null;
         
         var parsedData = HttpUtility.ParseQueryString(initData);
         var receivedHash = parsedData["hash"];
@@ -75,8 +101,7 @@ public class TelegramAuthController(
         if (result)
         {
             var user = parsedData["user"];
-            var userParsed = JsonSerializer.Deserialize<WebAppUser>(user!, JsonSerializerOptions.Web);
-            telegramUserId = userParsed!.Id;
+            webAppUser = JsonSerializer.Deserialize<WebAppUser>(user!, JsonBotAPI.Options);
         }
         
         return result;
@@ -86,17 +111,6 @@ public class TelegramAuthController(
 public class WebAppUser
 {
     public long Id { get; set; }
+    public string? Username { get; set; }
+    public required string LanguageCode { get; set; }
 }
-
-/*
-export interface WebAppUser {
-    id: number;
-    is_bot?: boolean;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-    language_code?: string;
-    is_premium?: boolean;
-    photo_url?: string;
-}
-*/
