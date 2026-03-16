@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.TelegramServices;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Routing.Attributes;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -13,7 +14,8 @@ public class CommandsController(ITelegramBotClient client) : TelegramController
     [TelegramMessageRoute("/start")]
     public Task HandleGetCategories(
         RequestContext requestContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IOptions<MiniAppOptions> options)
     {
         var replyData = ReplyData.FromMessageRequest(requestContext);
 
@@ -31,7 +33,7 @@ public class CommandsController(ITelegramBotClient client) : TelegramController
             .WithWebApp(
                 "📋 Open MessageBoard", new WebAppInfo
                 {
-                    Url = "https://laraue.com/note-board-app/"
+                    Url = options.Value.Url
                 }));
         
         return client.SendMessage(
