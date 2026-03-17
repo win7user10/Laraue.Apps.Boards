@@ -63,4 +63,16 @@
     <data name="Delete" xml:space="preserve">
         <value>Delete</value>
     </data>
+    <data name="Start" xml:space="preserve">
+        <value>👋 Hey! I'm Message Board Bot.
+
+I help you turn important Telegram messages into organized Kanban boards. Message me or forward a message and I'll add it to your Board.
+
+You can create boards, use full-text search, and much more. And never get lost in your notes again.
+
+Tap the button below to open your board 👇</value>
+    </data>
+    <data name="OpenMiniApp" xml:space="preserve">
+        <value>Open Message Board</value>
+    </data>
 </root>

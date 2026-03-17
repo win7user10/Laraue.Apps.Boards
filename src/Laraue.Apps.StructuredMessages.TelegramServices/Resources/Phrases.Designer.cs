@@ -150,6 +150,15 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Open Message Board.
+        /// </summary>
+        internal static string OpenMiniApp {
+            get {
+                return ResourceManager.GetString("OpenMiniApp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Send category name.
         /// </summary>
         internal static string SendCategoryName {
@@ -173,6 +182,21 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         internal static string SendStatusName {
             get {
                 return ResourceManager.GetString("SendStatusName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to 👋 Hey! I&apos;m Message Board Bot.
+        ///
+        ///I help you turn important Telegram messages into organized Kanban boards. Message me or forward a message and I&apos;ll add it to your Board.
+        ///
+        ///You can create boards, use full-text search, and much more. And never get lost in your notes again.
+        ///
+        ///Tap the button below to open your board 👇.
+        /// </summary>
+        internal static string Start {
+            get {
+                return ResourceManager.GetString("Start", resourceCulture);
             }
         }
         

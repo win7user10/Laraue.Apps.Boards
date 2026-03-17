@@ -150,6 +150,15 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Запустить приложение.
+        /// </summary>
+        internal static string OpenMiniApp {
+            get {
+                return ResourceManager.GetString("OpenMiniApp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Введите название категории.
         /// </summary>
         internal static string SendCategoryName {
@@ -173,6 +182,21 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         internal static string SendStatusName {
             get {
                 return ResourceManager.GetString("SendStatusName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to 👋 Привет!
+        ///
+        ///Я помогу превратить твои сообщения из Telegram в настоящие Kanban доски. Напиши мне или перешли соощение и я добавлю его на твою доску.
+        ///
+        ///Ты сможешь создать разные доски, пользоваться полнотекстовым поиском и многое другое. Но главное - никогда больше не запутаешься в своих заметках.
+        ///
+        ///Нажми кнопку ниже, чтобы открыть свою доску 👇.
+        /// </summary>
+        internal static string Start {
+            get {
+                return ResourceManager.GetString("Start", resourceCulture);
             }
         }
         

@@ -59,7 +59,8 @@ public static class WebApplicationBuilderExtensions
             builder.Services
                 .AddScoped<ITelegramMessageService, TelegramMessageService>()
                 .AddScoped<ITelegramMessageServiceRepository, TelegramMessageServiceRepository>()
-                .AddScoped<ITelegramMessageCategoryService, TelegramMessageCategoryService>();
+                .AddScoped<ITelegramMessageCategoryService, TelegramMessageCategoryService>()
+                .AddScoped<ITelegramCommandsService, TelegramCommandsService>();
 
             builder.Services
                 .AddScoped<ICoreMessageService, CoreMessageService>()

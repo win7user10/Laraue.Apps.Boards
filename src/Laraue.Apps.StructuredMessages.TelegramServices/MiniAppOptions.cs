@@ -1,4 +1,4 @@
-﻿namespace Laraue.Apps.StructuredMessages.TelegramHost;
+﻿namespace Laraue.Apps.StructuredMessages.TelegramServices;
 
 public class MiniAppOptions
 {
