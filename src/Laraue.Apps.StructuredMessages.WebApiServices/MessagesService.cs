@@ -175,48 +175,50 @@ public class MessagesService(
     private static MessageListDto[] Project(
         IEnumerable<MessageListDtoData> source)
     {
-        return source
-            .Select(x =>
+        var list = new List<MessageListDto>();
+
+        foreach (var item in source)
+        {
+            var sender = item.TelegramUsername;
+            var initial = sender is not null ? sender[..2] : "";
+
+            if (sender is null)
             {
-                var sender = x.TelegramUsername;
-                var initial = sender?[..2];
-
-                if (sender is null)
+                if (item.TelegramFirstName is not null && item.TelegramLastName is not null)
                 {
-                    if (x.TelegramFirstName is not null && x.TelegramLastName is not null)
-                    {
-                        sender = $"{x.TelegramFirstName} {x.TelegramLastName}";
-                        initial = $"{x.TelegramFirstName[..1]}{x.TelegramLastName[..1]}";
-                    }
-                    else if (x.TelegramFirstName is not null)
-                    {
-                        sender = x.TelegramFirstName;
-                        initial = x.TelegramFirstName[..2];
-                    }
-                    else if (x.TelegramLastName is not null)
-                    {
-                        sender = x.TelegramLastName;
-                        initial = x.TelegramLastName[..2];
-                    }
-                    else
-                    {
-                        sender = x.TelegramId.ToString();
-                        initial = "ID";
-                    }
+                    sender = $"{item.TelegramFirstName} {item.TelegramLastName}";
+                    initial = $"{item.TelegramFirstName[..1]}{item.TelegramLastName[..1]}";
                 }
-
-                return new MessageListDto
+                else if (item.TelegramFirstName is not null)
                 {
-                    Id = x.Id,
-                    StatusId = x.StatusId,
-                    Content = x.Content,
-                    CategoryId = x.CategoryId,
-                    Sender = sender,
-                    SenderInitial = initial,
-                    Time = x.Time
-                };
-            })
-            .ToArray();
+                    sender = item.TelegramFirstName;
+                    initial = item.TelegramFirstName[..2];
+                }
+                else if (item.TelegramLastName is not null)
+                {
+                    sender = item.TelegramLastName;
+                    initial = item.TelegramLastName[..2];
+                }
+                else
+                {
+                    sender = item.TelegramId.ToString();
+                    initial = "ID";
+                }
+            }
+
+            list.Add(new MessageListDto
+            {
+                Id = item.Id,
+                StatusId = item.StatusId,
+                Content = item.Content,
+                CategoryId = item.CategoryId,
+                Sender = sender,
+                SenderInitial = initial,
+                Time = item.Time
+            });
+        }
+
+        return list.ToArray();
     }
 }
 
