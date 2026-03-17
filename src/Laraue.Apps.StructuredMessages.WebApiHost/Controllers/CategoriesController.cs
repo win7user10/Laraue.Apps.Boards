@@ -11,7 +11,7 @@ public class CategoriesController(ICategoriesService categoriesService)
     : ControllerBase
 {
     [HttpGet("categories-with-count")]
-    public Task<CategoryCountDto[]> GetCategoriesWithCount(CancellationToken cancellationToken) => 
+    public Task<CategoryCountResult> GetCategoriesWithCount(CancellationToken cancellationToken) => 
         categoriesService.GetCategoriesWithCount(
             HttpContext.User.GetId(),
             cancellationToken);

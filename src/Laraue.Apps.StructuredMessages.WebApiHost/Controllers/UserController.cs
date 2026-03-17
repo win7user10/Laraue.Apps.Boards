@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,7 @@ public class UserController(DatabaseContext context) : ControllerBase
             .Select(x => new UserDto
             {
                 Username = x.TelegramUserName,
+                LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
             })
             .FirstOrThrowNotFoundEFAsync(ct);
     }
@@ -26,4 +28,5 @@ public class UserController(DatabaseContext context) : ControllerBase
 public class UserDto
 {
     public string? Username { get; set; }
+    public required string LanguageCode { get; set; }
 }

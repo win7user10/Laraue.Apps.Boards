@@ -9,7 +9,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface ICategoriesService
 {
-    Task<CategoryCountDto[]> GetCategoriesWithCount(
+    Task<CategoryCountResult> GetCategoriesWithCount(
         Guid userId,
         CancellationToken cancellationToken);
     
@@ -35,7 +35,7 @@ public class CategoriesService(
     ICoreCategoryService coreCategoryService)
     : ICategoriesService
 {
-    public async Task<CategoryCountDto[]> GetCategoriesWithCount(
+    public async Task<CategoryCountResult> GetCategoriesWithCount(
         Guid userId,
         CancellationToken cancellationToken)
     {
@@ -51,25 +51,19 @@ public class CategoriesService(
                 StatusesCount = x.Statuses!.Count,
             })
             .OrderBy(x => x.Name)
-            .ToListAsyncEF(cancellationToken);
+            .ToArrayAsyncEF(cancellationToken);
 
         var backlogCount = await context
             .Messages
             .Where(x => x.UserId == userId)
             .Where(x => x.CategoryId == null)
             .CountAsyncEF(cancellationToken);
-        
-        
-        return result
-            .Prepend(new CategoryCountDto
-            {
-                Id = CoreMessageService.NullId,
-                Count = backlogCount,
-                Name = "Backlog",
-                Color = "#000000",
-                StatusesCount = 0,
-            })
-            .ToArray();
+
+        return new CategoryCountResult
+        {
+            Categories = result,
+            BacklogCount = backlogCount
+        };
     }
 
     public Task<CategoryDto> GetCategory(
@@ -140,6 +134,12 @@ public class CategoriesService(
                 .SetProperty(x => x.Name, request.Name),
             cancellationToken);
     }
+}
+
+public class CategoryCountResult
+{
+    public int BacklogCount { get; set; }
+    public required CategoryCountDto[] Categories { get; set; }
 }
 
 public record CategoryCountDto
