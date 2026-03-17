@@ -180,24 +180,24 @@ public class MessagesService(
         foreach (var item in source)
         {
             var sender = item.TelegramUsername;
-            var initial = sender is not null ? sender[..2] : "";
+            var initial = sender?.Length > 1 ? sender[..2] : "";
 
             if (sender is null)
             {
-                if (item.TelegramFirstName is not null && item.TelegramLastName is not null)
+                if (item.TelegramFirstName?.Length > 0 && item.TelegramLastName?.Length > 0)
                 {
                     sender = $"{item.TelegramFirstName} {item.TelegramLastName}";
-                    initial = $"{item.TelegramFirstName[..1]}{item.TelegramLastName[..1]}";
+                    initial = $"{item.TelegramFirstName[0]}{item.TelegramLastName[0]}";
                 }
-                else if (item.TelegramFirstName is not null)
+                else if (item.TelegramFirstName?.Length > 1)
                 {
                     sender = item.TelegramFirstName;
-                    initial = item.TelegramFirstName[..2];
+                    initial = item.TelegramFirstName[..1];
                 }
-                else if (item.TelegramLastName is not null)
+                else if (item.TelegramLastName?.Length > 1)
                 {
                     sender = item.TelegramLastName;
-                    initial = item.TelegramLastName[..2];
+                    initial = item.TelegramLastName[..1];
                 }
                 else
                 {
