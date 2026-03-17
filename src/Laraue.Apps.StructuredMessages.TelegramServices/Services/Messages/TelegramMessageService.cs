@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
+using Laraue.Apps.StructuredMessages.TelegramServices.Resources;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Utils;
@@ -82,7 +83,7 @@ public class TelegramMessageService(
             cancellationToken);
 
         var tmb = new TelegramMessageBuilder()
-            .AppendRow("Choose category:");
+            .AppendRow($"{Phrases.ChooseCategory}:");
 
         if (categories.Length > 0)
         {
@@ -105,7 +106,7 @@ public class TelegramMessageService(
         tmb.AddInlineKeyboardButtons([
             new CallbackRoutePath(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)
                 .WithQueryParameter(ParameterNames.MessageId, message.Id)
-                .ToInlineKeyboardButton("➕ New Category")
+                .ToInlineKeyboardButton($"➕ {Phrases.NewCategory}")
         ]);
 
         await SendOrEditMessage(
@@ -121,7 +122,7 @@ public class TelegramMessageService(
         CancellationToken cancellationToken)
     {
         var tmb = new TelegramMessageBuilder()
-            .Append("Send category name:");
+            .Append($"{Phrases.SendCategoryName}:");
 
         await client.SendTextMessageAsync(
             request.ReplyData.TelegramId,
@@ -162,7 +163,7 @@ public class TelegramMessageService(
             cancellationToken);
                 
         var tmb = new TelegramMessageBuilder()
-            .AppendRow("Choose status:");
+            .AppendRow($"{Phrases.ChooseStatus}:");
         
         foreach (var typesChunked in statuses.Chunk(2))
         {
@@ -186,7 +187,7 @@ public class TelegramMessageService(
                     MessageId = message.Id,
                     MessageCategoryId = message.CategoryId.GetValueOrDefault(),
                 })
-                .ToInlineKeyboardButton("➕ New Status")
+                .ToInlineKeyboardButton($"➕ {Phrases.NewStatus}")
         ]);
 
         await SendOrEditMessage(
@@ -209,7 +210,7 @@ public class TelegramMessageService(
             async _ =>
             {
                 var tmb = new TelegramMessageBuilder()
-                    .Append("Send new text. The previous text can be copied from the previous message:");
+                    .Append($"{Phrases.SendNewText}:");
 
                 await client.SendTextMessageAsync(
                     replyData.TelegramId,
@@ -245,7 +246,7 @@ public class TelegramMessageService(
         await messageService.DeleteMessage(request.MessageId, cancellationToken);
 
         var tmb = new TelegramMessageBuilder()
-            .Append("Deleted");
+            .Append(Phrases.Deleted);
 
         await client.EditMessageTextAsync(
             replyData,
@@ -276,7 +277,7 @@ public class TelegramMessageService(
         CancellationToken cancellationToken)
     {
         var tmb = new TelegramMessageBuilder()
-            .Append("Send status name:");
+            .Append($"{Phrases.SendStatusName}:");
 
         await client.SendTextMessageAsync(
             request.ReplyData.TelegramId,
@@ -352,7 +353,7 @@ public class TelegramMessageService(
                 {
                     MessageId = message.Id
                 })
-                .ToInlineKeyboardButton($"Category: {message.CategoryName ?? "Not set"}")
+                .ToInlineKeyboardButton($"{Phrases.Category}: {message.CategoryName ?? Phrases.NotSet}")
         ]);
         
         if (message.CategoryId is not null)
@@ -362,19 +363,19 @@ public class TelegramMessageService(
                     {
                         MessageId = message.Id
                     })
-                    .ToInlineKeyboardButton($"Status: {message.StatusName ?? "Not set"}")
+                    .ToInlineKeyboardButton($"{Phrases.Status}: {message.StatusName ?? Phrases.NotSet}")
             ]);
 
         tmb.AddInlineKeyboardButtons([
             InlineKeyboardButton.WithCopyText(
-                "Copy",
+                Phrases.Copy,
                 message.Content),
             new CallbackRoutePath(TelegramRoutes.UpdateMessageText, RouteMethod.Post)
                 .WithQueryParameters(new HandleChangeContentTelegramRequest
                 {
                     MessageId = message.Id
                 })
-                .ToInlineKeyboardButton("Edit")
+                .ToInlineKeyboardButton(Phrases.Edit)
         ]);
         
         tmb.AddInlineKeyboardButtons([
@@ -383,7 +384,7 @@ public class TelegramMessageService(
                 {
                     MessageId = message.Id
                 })
-                .ToInlineKeyboardButton("Delete")
+                .ToInlineKeyboardButton(Phrases.Delete)
         ]);
 
         await SendOrEditMessage(

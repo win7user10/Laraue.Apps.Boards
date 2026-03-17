@@ -32,7 +32,8 @@ public class HandleAllMessagesMiddleware(
                 },
                 ct);
             
-            context.SetExecutedRoute(new ExecutedRouteInfo("HandleAllMessagesMiddleware", text));
+            context.SetExecutedRoute(
+                new ExecutedRouteInfo("HandleAllMessagesMiddleware", text));
         }
     }
 }

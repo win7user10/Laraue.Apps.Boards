@@ -1,16 +1,15 @@
 ﻿using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.TelegramServices.Resources;
 using Laraue.Telegram.NET.Core.Extensions;
 using Laraue.Telegram.NET.Core.Routing;
 using Laraue.Telegram.NET.Core.Utils;
-using Laraue.Telegram.NET.Interceptors.Services;
 using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
 
 public class TelegramMessageCategoryService(
     ICoreCategoryService coreCategoryService,
-    ITelegramBotClient client,
-    IInterceptorState<Guid> interceptorState)
+    ITelegramBotClient client)
     : ITelegramMessageCategoryService
 {
     public async Task HandleGetCategories(
@@ -22,7 +21,7 @@ public class TelegramMessageCategoryService(
             cancellationToken);
 
         var tmb = new TelegramMessageBuilder()
-            .Append("📋 Your Categories:");
+            .Append($"📋 {Phrases.YourCategories}:");
         
         foreach (var typesChunked in categories.Chunk(2))
         {
@@ -37,7 +36,7 @@ public class TelegramMessageCategoryService(
 
         tmb.AddInlineKeyboardButtons([
             new CallbackRoutePath(TelegramRoutes.CreateCategoryFromMessage, RouteMethod.Post)
-                .ToInlineKeyboardButton("➕ New")
+                .ToInlineKeyboardButton($"➕ {Phrases.NewCategory}")
         ]);
 
         await client.SendTextMessageAsync(
