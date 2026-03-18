@@ -87,15 +87,6 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Копировать.
-        /// </summary>
-        internal static string Copy {
-            get {
-                return ResourceManager.GetString("Copy", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Удалить.
         /// </summary>
         internal static string Delete {
@@ -168,7 +159,7 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Введите новый текст. Старый можно скопировать из предыдущего сообщения.
+        ///   Looks up a localized string similar to Введите новый текст.
         /// </summary>
         internal static string SendNewText {
             get {

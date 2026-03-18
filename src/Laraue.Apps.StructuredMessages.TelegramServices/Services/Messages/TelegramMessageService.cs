@@ -367,9 +367,6 @@ public class TelegramMessageService(
             ]);
 
         tmb.AddInlineKeyboardButtons([
-            InlineKeyboardButton.WithCopyText(
-                Phrases.Copy,
-                message.Content),
             new CallbackRoutePath(TelegramRoutes.UpdateMessageText, RouteMethod.Post)
                 .WithQueryParameters(new HandleChangeContentTelegramRequest
                 {

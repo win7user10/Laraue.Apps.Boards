@@ -37,7 +37,7 @@
         <value>New Status</value>
     </data>
     <data name="SendNewText" xml:space="preserve">
-        <value>Send new text. The previous text can be copied from the previous message</value>
+        <value>Send new text</value>
     </data>
     <data name="Deleted" xml:space="preserve">
         <value>Deleted</value>
@@ -53,9 +53,6 @@
     </data>
     <data name="Status" xml:space="preserve">
         <value>Status</value>
-    </data>
-    <data name="Copy" xml:space="preserve">
-        <value>Copy</value>
     </data>
     <data name="Edit" xml:space="preserve">
         <value>Edit</value>

@@ -30,9 +30,6 @@
     <data name="ChooseStatus" xml:space="preserve">
         <value>Выберите статус</value>
     </data>
-    <data name="Copy" xml:space="preserve">
-        <value>Копировать</value>
-    </data>
     <data name="Delete" xml:space="preserve">
         <value>Удалить</value>
     </data>
@@ -55,7 +52,7 @@
         <value>Введите название категории</value>
     </data>
     <data name="SendNewText" xml:space="preserve">
-        <value>Введите новый текст. Старый можно скопировать из предыдущего сообщения</value>
+        <value>Введите новый текст</value>
     </data>
     <data name="SendStatusName" xml:space="preserve">
         <value>Введите название статуса</value>
