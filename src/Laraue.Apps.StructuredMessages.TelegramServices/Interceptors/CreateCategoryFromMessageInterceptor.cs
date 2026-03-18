@@ -9,7 +9,8 @@ public class CreateCategoryFromMessageInterceptor(
     TelegramRequestContext<Guid> requestContext,
     IInterceptorState<Guid> interceptorState,
     ICoreCategoryService coreCategoryService,
-    ITelegramMessageService telegramMessageService)
+    ITelegramMessageService telegramMessageService,
+    ICoreMessageService coreMessageService)
     : BaseRequestInterceptor<Guid, string, CreateCategoryFromMessageInterceptorContext>(
         requestContext,
         interceptorState)
@@ -47,21 +48,22 @@ public class CreateCategoryFromMessageInterceptor(
         CreateCategoryFromMessageInterceptorContext interceptorContext,
         CancellationToken cancellationToken = default)
     {
-        await coreCategoryService.Create(
+        var categoryId = await coreCategoryService.Create(
             new CreateMessageCategoryRequest
             {
                 Name = model,
                 UserId = requestContext.UserId,
             }, cancellationToken);
 
+        await coreMessageService.UpdateCategory(
+            interceptorContext.MessageId,
+            categoryId,
+            cancellationToken);
+
         await telegramMessageService
-            .OpenChangeCategoryWindow(
-                requestContext.UserId,
+            .UpdateMessageInChat(
+                interceptorContext.MessageId,
                 editMessageId: null,
-                new HandleOpenChangeCategoryWindowRequest
-                {
-                    MessageId = interceptorContext.MessageId,
-                },
                 cancellationToken);
 
         return ExecutionState.FullyExecuted;

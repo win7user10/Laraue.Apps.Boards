@@ -13,7 +13,8 @@ public class CreateStatusFromMessageInterceptor(
     ICoreStatusService coreStatusService,
     ICoreCategoryService categoryService,
     ITelegramMessageService telegramMessageService,
-    ITelegramBotClient client)
+    ITelegramBotClient client,
+    ICoreMessageService coreMessageService)
     : BaseRequestInterceptor<Guid, string, CreateStatusFromMessageInterceptorContext>(
         requestContext,
         interceptorState)
@@ -64,20 +65,22 @@ public class CreateStatusFromMessageInterceptor(
             return ExecutionState.FullyExecuted;
         }
             
-        await coreStatusService.Create(
+        var statusId = await coreStatusService.Create(
             new CreateMessageCategoryStatusRequest
             {
                 Name = model,
                 CategoryId = interceptorContext.MessageCategoryId,
             }, cancellationToken);
+        
+        
+        await coreMessageService.UpdateStatus(
+            interceptorContext.MessageId,
+            statusId,
+            cancellationToken);
 
-        await telegramMessageService.OpenChangeStatusWindow(
-            requestContext.UserId,
+        await telegramMessageService.UpdateMessageInChat(
+            interceptorContext.MessageId,
             editMessageId: null,
-            new HandleOpenChangeStatusWindowRequest
-            {
-                MessageId = interceptorContext.MessageId,
-            },
             cancellationToken);
 
         return ExecutionState.FullyExecuted;
