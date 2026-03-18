@@ -346,25 +346,27 @@ public class TelegramMessageService(
     {
         var tmb = new TelegramMessageBuilder()
             .Append(message.Content);
-        
-        tmb.AddInlineKeyboardButtons([
+
+        var categoryRow = new List<InlineKeyboardButton>()
+        {
             new CallbackRoutePath(TelegramRoutes.UpdateMessageCategory)
                 .WithQueryParameters(new HandleOpenChangeCategoryWindowRequest
                 {
                     MessageId = message.Id
                 })
                 .ToInlineKeyboardButton($"{Phrases.Category}: {message.CategoryName ?? Phrases.NotSet}")
-        ]);
+        };
         
         if (message.CategoryId is not null)
-            tmb.AddInlineKeyboardButtons([
+            categoryRow.Add(
                 new CallbackRoutePath(TelegramRoutes.UpdateMessageStatus)
                     .WithQueryParameters(new HandleOpenChangeStatusWindowRequest
                     {
                         MessageId = message.Id
                     })
-                    .ToInlineKeyboardButton($"{Phrases.Status}: {message.StatusName ?? Phrases.NotSet}")
-            ]);
+                    .ToInlineKeyboardButton($"{Phrases.Status}: {message.StatusName ?? Phrases.NotSet}"));
+        
+        tmb.AddInlineKeyboardButtons(categoryRow);
 
         tmb.AddInlineKeyboardButtons([
             new CallbackRoutePath(TelegramRoutes.UpdateMessageText, RouteMethod.Post)
