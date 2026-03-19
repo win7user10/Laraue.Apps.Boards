@@ -43,6 +43,10 @@ public interface IMessagesService
     Task<IShortPaginatedResult<MessageListDto>> Search(
         SearchRequest request,
         CancellationToken ct);
+    
+    Task<MessageDetailDto> GetMessage(
+        GetMessageRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class MessagesService(
@@ -52,7 +56,7 @@ public class MessagesService(
     IDateTimeProvider dateTimeProvider)
     : IMessagesService
 {
-    private const int MaxContentLength = 30;
+    private const int MaxContentLength = 100;
     
     public async Task<IShortPaginatedResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
@@ -209,6 +213,44 @@ public class MessagesService(
         return result.MapTo(Map);
     }
 
+    public async Task<MessageDetailDto> GetMessage(
+        GetMessageRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await messageService.UserHasAccessToMessage(
+            request.UserId, request.MessageId, cancellationToken))
+            throw new NotFoundException();
+
+        var result = await context.Messages
+            .Where(x => x.Id == request.MessageId)
+            .Select(x => new MessageDetailDtoData
+            {
+                Id = x.Id,
+                Content = x.Content,
+                Time = x.CreatedAt,
+                CategoryName = x.Category!.Name,
+                StatusName = x.Status!.Name,
+                TelegramFirstName = x.User!.TelegramFirstName,
+                TelegramLastName = x.User!.TelegramLastName,
+                TelegramId = x.User.TelegramId,
+                TelegramUsername = x.User.TelegramUserName,
+            })
+            .FirstAsyncEF(cancellationToken);
+
+        var sender = GetUserSender(result);
+
+        return new MessageDetailDto
+        {
+            Id = result.Id,
+            Content = result.Content,
+            Sender = sender.Sender,
+            SenderInitial = sender.Initial,
+            Time = result.Time,
+            CategoryName = result.CategoryName,
+            StatusName = result.StatusName,
+        };
+    }
+
     private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
         IQueryable<Message> queryable)
     {
@@ -226,7 +268,21 @@ public class MessagesService(
         });
     }
 
-    private static MessageListDto Map(MessageListDtoData source)
+    public interface IHasUserSender
+    {
+        public string? TelegramUsername { get; set; }
+        public string? TelegramFirstName { get; set; }
+        public string? TelegramLastName { get; set; }
+        public long TelegramId { get; set; }
+    }
+
+    public class UserSender
+    {
+        public required string Sender { get; set; }
+        public required string Initial { get; set; }
+    }
+
+    private static UserSender GetUserSender(IHasUserSender source)
     {
         var sender = source.TelegramUsername;
         var initial = sender?.Length > 1 ? sender[..2] : "";
@@ -255,14 +311,25 @@ public class MessagesService(
             }
         }
 
+        return new UserSender
+        {
+            Sender = sender,
+            Initial = initial
+        };
+    }
+    
+    private static MessageListDto Map(MessageListDtoData source)
+    {
+        var senderData = GetUserSender(source);
+
         return new MessageListDto
         {
             Id = source.Id,
             StatusId = source.StatusId,
             Content = source.Content,
             CategoryId = source.CategoryId,
-            Sender = sender,
-            SenderInitial = initial,
+            Sender = senderData.Sender,
+            SenderInitial = senderData.Initial,
             Time = source.Time
         };
     }
@@ -290,6 +357,12 @@ public record GetMessagesRequest : IPaginationData
     public int PerPage { get; init; }
 }
 
+public record GetMessageRequest
+{
+    public Guid UserId { get; set; }
+    public long MessageId { get; set; }
+}
+
 public record GetBoardRequest : IPaginationData
 {
     public Guid UserId { get; set; }
@@ -304,7 +377,7 @@ public record ColumnMessages
     public required IFullPaginatedResult<MessageListDto> Items { get; set; }
 }
 
-public class MessageListDtoData
+public class MessageListDtoData : MessagesService.IHasUserSender
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -356,4 +429,28 @@ public record SearchRequest : IPaginationData
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
+}
+
+public class MessageDetailDto
+{
+    public required long Id { get; set; }
+    public required DateTime Time { get; set; }
+    public required string? Sender { get; set; }
+    public string? SenderInitial { get; set; }
+    public required string Content { get; set; }
+    public required string? CategoryName { get; set; }
+    public required string? StatusName { get; set; }
+}
+
+public class MessageDetailDtoData : MessagesService.IHasUserSender
+{
+    public required long Id { get; set; }
+    public required DateTime Time { get; set; }
+    public required long TelegramId { get; set; }
+    public required string? TelegramUsername { get; set; }
+    public required string? TelegramFirstName { get; set; }
+    public required string? TelegramLastName { get; set; }
+    public required string Content { get; set; }
+    public required string? CategoryName { get; set; }
+    public required string? StatusName { get; set; }
 }

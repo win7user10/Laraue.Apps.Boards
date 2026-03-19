@@ -23,6 +23,21 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             cancellationToken);
     }
     
+    
+    [HttpGet("{id:long}")]
+    public Task<MessageDetailDto> GetMessage(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.GetMessage(
+            new GetMessageRequest
+            {
+                UserId = HttpContext.User.GetId(),
+                MessageId = id,
+            },
+            cancellationToken);
+    }
+    
     [HttpGet("board")]
     public Task<ColumnMessages[]> GetBoard(
         [FromQuery] GetBoardRequest request,
