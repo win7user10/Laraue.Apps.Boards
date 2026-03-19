@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.DataAccess.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,11 +11,24 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class MessagesController(IMessagesService messagesService) : ControllerBase
 {
     [HttpGet]
-    public Task<MessageListDto[]> GetMessages(
+    public Task<IShortPaginatedResult<MessageListDto>> GetMessages(
         [FromQuery] GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
         return messagesService.GetMessages(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
+    [HttpGet("board")]
+    public Task<ColumnMessages[]> GetBoard(
+        [FromQuery] GetBoardRequest request,
+        CancellationToken cancellationToken)
+    {
+        return messagesService.GetBoard(
             request with
             {
                 UserId = HttpContext.User.GetId(),
@@ -97,9 +111,9 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             cancellationToken);
     }
     
-    [HttpPost("search")]
-    public Task<MessageListDto[]> Search(
-        [FromBody] SearchRequest request,
+    [HttpGet("search")]
+    public Task<IShortPaginatedResult<MessageListDto>> Search(
+        [FromQuery] SearchRequest request,
         CancellationToken cancellationToken)
     {
         return messagesService.Search(
