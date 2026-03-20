@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -82,14 +83,17 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var newStatusId = await context.MessageStatuses
+        var categoryData = await context.MessageStatuses
             .Where(x => x.Id == request.Id)
-            .Select(x => x.MessageCategory!.Statuses!
-                .OrderBy(s => x.SortOrder)
-                .Where(s => s.Id != request.Id)
-                .Select(s => new { s.Id })
-                .FirstOrDefault())
-            .FirstOrDefaultAsync(cancellationToken);
+            .Select(x => new { x.MessageCategoryId })
+            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+        
+        var newStatusId = await context.MessageStatuses
+            .Where(x => x.MessageCategoryId == categoryData.MessageCategoryId)
+            .Where(x => x.Id != request.Id)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new { x.Id })
+            .FirstOrDefaultAsyncEF(cancellationToken);
 
         if (newStatusId is null)
             throw new BadRequestException(

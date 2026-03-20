@@ -1,12 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
-using Laraue.Telegram.NET.Authentication.Extensions;
-using Laraue.Telegram.NET.Core.Extensions;
-using Laraue.Telegram.NET.Core.Middleware;
-using Laraue.Telegram.NET.Core.Routing.Middleware;
-using Laraue.Telegram.NET.Interceptors.EFCore.Extensions;
-using Laraue.Telegram.NET.UpdatesQueue.EFCore.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
