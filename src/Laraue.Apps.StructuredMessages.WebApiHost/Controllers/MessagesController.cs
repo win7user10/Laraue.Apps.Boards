@@ -11,7 +11,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class MessagesController(IMessagesService messagesService) : ControllerBase
 {
     [HttpGet]
-    public Task<IShortPaginatedResult<MessageListDto>> GetMessages(
+    public Task<BatchResult<MessageListDto>> GetMessages(
         [FromQuery] GetMessagesRequest request,
         CancellationToken cancellationToken)
     {

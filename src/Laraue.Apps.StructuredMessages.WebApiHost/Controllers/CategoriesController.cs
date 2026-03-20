@@ -16,7 +16,6 @@ public class CategoriesController(ICategoriesService categoriesService)
             HttpContext.User.GetId(),
             cancellationToken);
     
-    
     [HttpGet("{id}")]
     public Task<CategoryDto> GetCategory(
         [FromRoute] long id,

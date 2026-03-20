@@ -12,7 +12,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IMessagesService
 {
-    Task<IShortPaginatedResult<MessageListDto>> GetMessages(
+    Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken);
     
@@ -56,24 +56,51 @@ public class MessagesService(
     IDateTimeProvider dateTimeProvider)
     : IMessagesService
 {
-    private const int MaxContentLength = 100;
-    
-    public async Task<IShortPaginatedResult<MessageListDto>> GetMessages(
+    public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
         var statusId = request.StatusId == CoreMessageService.NullId
             ? null
             : request.StatusId;
-        
-        var result = await ProjectToTemporaryDto(context
+
+        var query = context
             .Messages
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId)
-            .OrderByDescending(x => x.Id))
-            .ShortPaginateEFAsync(request, cancellationToken);
+            .OrderByDescending(x => x.Id);
 
-        return result.MapTo(Map);
+        var result = await ToBatchResult(ProjectToTemporaryDto(query), request);
+        var projected = result.Data
+            .Select(Map)
+            .ToArray();
+
+        return new BatchResult<MessageListDto>
+        {
+            HasNext = result.HasNext,
+            Data = projected,
+            Offset = result.Offset,
+        };
+    }
+
+    private static async Task<BatchResult<T>> ToBatchResult<T>(
+        IQueryable<T> queryable,
+        BatchRequest request)
+    {
+        var requested = await queryable
+            .Skip(request.Skip)
+            .Take(request.Take + 1)
+            .ToListAsyncEF();
+        
+        var hasNext = request.Take < requested.Count;
+        var result = requested.Take(request.Take).ToArray();
+        
+        return new BatchResult<T>
+        {
+            HasNext = hasNext,
+            Data = result,
+            Offset = request.Skip + result.Length
+        };
     }
 
     public async Task<ColumnMessages[]> GetBoard(
@@ -107,9 +134,22 @@ public class MessagesService(
                 .Where(x => x.UserId == request.UserId)
                 .Where(x => x.StatusId == statusId)
                 .OrderByDescending(x => x.Id))
-                .FullPaginateEFAsync(request, cancellationToken);
+                .FullPaginateEFAsync(
+                    new PaginationData
+                    {
+                        Page = 0,
+                        PerPage = request.Take,
+                    },
+                    cancellationToken);
 
-            var mappedStatusResult = statusResult.MapTo(Map);
+            var mappedStatusResult = new InitialBatchResult<MessageListDto>()
+            {
+                Data = statusResult.Data.Select(Map).ToArray(),
+                HasNext = statusResult.HasNextPage,
+                Offset = request.Take,
+                TotalCount = statusResult.Total,
+            };
+            
             result.Add(new ColumnMessages
             {
                 StatusId = statusId ?? CoreMessageService.NullId,
@@ -257,7 +297,7 @@ public class MessagesService(
         return queryable.Select(x => new MessageListDtoData
         {
             Id = x.Id,
-            Content = x.Content.Substring(0, MaxContentLength),
+            Content = x.Content,
             Time = x.CreatedAt,
             CategoryId = x.CategoryId ?? CoreMessageService.NullId,
             StatusId = x.StatusId ?? CoreMessageService.NullId,
@@ -349,12 +389,10 @@ public record UpdateCategoryRequest
     public long CategoryId { get; set; }
 }
 
-public record GetMessagesRequest : IPaginationData
+public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
     public long? StatusId { get; set; }
-    public int Page { get; init; }
-    public int PerPage { get; init; }
 }
 
 public record GetMessageRequest
@@ -363,18 +401,17 @@ public record GetMessageRequest
     public long MessageId { get; set; }
 }
 
-public record GetBoardRequest : IPaginationData
+public record GetBoardRequest
 {
     public Guid UserId { get; set; }
     public long? CategoryId { get; set; }
-    public int Page { get; init; }
-    public int PerPage { get; init; }
+    public int Take { get; init; }
 }
 
 public record ColumnMessages
 {
     public required long StatusId { get; set; }
-    public required IFullPaginatedResult<MessageListDto> Items { get; set; }
+    public required InitialBatchResult<MessageListDto> Items { get; set; }
 }
 
 public class MessageListDtoData : MessagesService.IHasUserSender
@@ -453,4 +490,22 @@ public class MessageDetailDtoData : MessagesService.IHasUserSender
     public required string Content { get; set; }
     public required string? CategoryName { get; set; }
     public required string? StatusName { get; set; }
+}
+
+public record BatchRequest
+{
+    public int Skip { get; set; }
+    public int Take { get; set; }
+}
+
+public class BatchResult<T>
+{
+    public long Offset { get; set; }
+    public bool HasNext { get; set; }
+    public required IReadOnlyCollection<T> Data { get; set; }
+}
+
+public class InitialBatchResult<T> : BatchResult<T>
+{
+    public long TotalCount { get; set; }
 }
