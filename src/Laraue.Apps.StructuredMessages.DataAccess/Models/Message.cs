@@ -10,7 +10,7 @@ public class Message
     /// Message content.
     /// </summary>
     [MaxLength(4096)]
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
     
     public DateTime CreatedAt { get; set; }
     
