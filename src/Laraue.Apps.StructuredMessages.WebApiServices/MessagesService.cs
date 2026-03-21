@@ -326,7 +326,7 @@ public class MessagesService(
                 element.Media
                     .AddRange(data.PhotoIds.Select(fileId => new MediaInfo
                     {
-                        MediaType = MediaType.Photo,
+                        Type = MediaType.Photo,
                         PreviewFileId = fileId
                     }));
             
@@ -334,7 +334,7 @@ public class MessagesService(
                 element.Media
                     .AddRange(data.VideoIds.Select(fileId => new MediaInfo
                     {
-                        MediaType = MediaType.Video,
+                        Type = MediaType.Video,
                         PreviewFileId = fileId
                     }));
         }
@@ -497,7 +497,7 @@ public class MessageListDto : ICanContainMedia
 public class MediaInfo
 {
     public Guid PreviewFileId { get; set; }
-    public MediaType MediaType { get; set; }
+    public MediaType Type { get; set; }
 }
 
 public enum MediaType
