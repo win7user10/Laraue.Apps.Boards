@@ -78,8 +78,8 @@ public class TelegramSaveMessageService(
         if (request.Photos.Length == 0)
             return getOrCreateResult;
         
-        var thumbnailPhoto = request.Photos.MinBy(p => p.FileSize);
-        var originalPhoto = request.Photos.MaxBy(p => p.FileSize);
+        var thumbnailPhoto = request.Photos[0];
+        var originalPhoto = request.Photos.Last();
         var photos = new List<(PhotoSize, PhotoType)>
         {
             (thumbnailPhoto!, PhotoType.Thumbnail)
