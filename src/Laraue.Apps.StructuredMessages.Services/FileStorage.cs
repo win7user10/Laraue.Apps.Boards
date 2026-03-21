@@ -4,7 +4,11 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface IFileStorage
 {
-    Task<Stream> ReadFileAsync(
+    Task<bool> FileExists(
+        string path,
+        CancellationToken cancellationToken = default);
+    
+    Task<Stream> ReadFile(
         string path,
         CancellationToken cancellationToken = default);
     
@@ -17,7 +21,16 @@ public interface IFileStorage
 
 public class FileStorage(IOptions<FileStorageOptions> options) : IFileStorage
 {
-    public Task<Stream> ReadFileAsync(
+    public Task<bool> FileExists(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var physicalPath = Path.Combine(options.Value.FilesDirectory, path);
+
+        return Task.FromResult(File.Exists(physicalPath));
+    }
+
+    public Task<Stream> ReadFile(
         string path,
         CancellationToken cancellationToken = default)
     {

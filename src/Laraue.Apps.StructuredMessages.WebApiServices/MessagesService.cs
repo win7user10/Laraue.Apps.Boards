@@ -303,40 +303,62 @@ public class MessagesService(
         where T : class, ICanContainMedia
     {
         var ids = elements.Select(x => x.Id).ToList();
-        
-        var photos = (await context.Messages
-            .Where(x => ids.Contains(x.Id))
+
+        var photosByMessageId = (await context.TelegramPhotos
+            .Where(x => ids.Contains(x.MessageId))
             .Select(x => new
             {
-                x.Id,
-                PhotoIds = x.Photos!.Select(p => p.TelegramFileId).ToArray(),
-                VideoIds = x.Videos!
-                    .Where(p => p.ThumbnailFileId != null)
-                    .Select(p => p.ThumbnailFileId!.Value).ToArray(),
+                x.MessageId,
+                x.TelegramFileId,
+                x.PhotoType,
+                x.GroupId,
             })
             .ToArrayAsyncEF(ct))
-            .ToDictionary(x => x.Id, x => new { x.PhotoIds, x.VideoIds });
-
+            .GroupBy(x => x.MessageId)
+            .ToDictionary(
+                x => x.Key,
+                x => x
+                    .GroupBy(y => y.GroupId)
+                    .ToDictionary(
+                        y => y.Key,
+                        y => y
+                            .Select(z => new { z.PhotoType, z.TelegramFileId })));
+        
+        var videosByMessageId = (await context.TelegramVideos
+            .Where(x => ids.Contains(x.MessageId))
+            .Select(x => new { x.MessageId, x.ThumbnailFileId, x.FileId })
+            .ToArrayAsyncEF(ct))
+            .GroupBy(x => x.MessageId)
+            .ToDictionary(
+                x => x.Key);
+        
         foreach (var element in elements)
         {
-            if (!photos.TryGetValue(element.Id, out var data))
-                continue;
-            
-            if (data.PhotoIds.Length > 0)
-                element.Media
-                    .AddRange(data.PhotoIds.Select(fileId => new MediaInfo
+            if (photosByMessageId.TryGetValue(element.Id, out var photos))
+                foreach (var photoGroup in photos)
+                    element.Media.Add(new MediaInfo
                     {
                         Type = MediaType.Photo,
-                        PreviewFileId = fileId
-                    }));
+                        PreviewFileId = photoGroup.Value
+                            .FirstOrDefault(x => x.PhotoType == PhotoType.Thumbnail)
+                            ?.TelegramFileId,
+                        OriginalFileId = photoGroup.Value
+                            .FirstOrDefault(x => x.PhotoType == PhotoType.Original)
+                            ?.TelegramFileId,
+                    });
             
-            if (data.VideoIds.Length > 0)
-                element.Media
-                    .AddRange(data.VideoIds.Select(fileId => new MediaInfo
+            if (videosByMessageId.TryGetValue(element.Id, out var videos))
+            {
+                foreach (var video in videos)
+                {
+                    element.Media.Add(new MediaInfo
                     {
                         Type = MediaType.Video,
-                        PreviewFileId = fileId
-                    }));
+                        PreviewFileId = video.ThumbnailFileId,
+                        OriginalFileId = video.FileId,
+                    });
+                }
+            }
         }
     }
 
@@ -496,7 +518,8 @@ public class MessageListDto : ICanContainMedia
 
 public class MediaInfo
 {
-    public Guid PreviewFileId { get; set; }
+    public Guid? PreviewFileId { get; set; }
+    public Guid? OriginalFileId { get; set; }
     public MediaType Type { get; set; }
 }
 

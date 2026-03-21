@@ -75,20 +75,40 @@ public class TelegramSaveMessageService(
         CancellationToken cancellationToken)
     {
         var getOrCreateResult = await GetOrCreateMessageEntityId(request, cancellationToken);
-        var fileId = await GetOrCreateMessageFileId(
-            request.Photo,
-            saveFileToStorage: true,
-            cancellationToken);
-
-        var messageFile = new MessageTelegramPhoto
+        if (request.Photos.Length == 0)
+            return getOrCreateResult;
+        
+        var thumbnailPhoto = request.Photos.MinBy(p => p.FileSize);
+        var originalPhoto = request.Photos.MaxBy(p => p.FileSize);
+        var photos = new List<(PhotoSize, PhotoType)>
         {
-            MessageId = getOrCreateResult.MessageId,
-            TelegramFileId = fileId,
-            Height = request.Photo.Height,
-            Width = request.Photo.Width,
+            (thumbnailPhoto!, PhotoType.Thumbnail)
         };
         
-        context.Add(messageFile);
+        if (originalPhoto != thumbnailPhoto)
+            photos.Add((originalPhoto!, PhotoType.Original));
+
+        var groupId = Guid.NewGuid();
+        foreach (var (photo, type) in photos)
+        {
+            var fileId = await GetOrCreateMessageFileId(
+                photo,
+                saveFileToStorage: type == PhotoType.Thumbnail,
+                cancellationToken);
+
+            var messageFile = new MessageTelegramPhoto
+            {
+                MessageId = getOrCreateResult.MessageId,
+                TelegramFileId = fileId,
+                Height = photo.Height,
+                Width = photo.Width,
+                PhotoType = type,
+                GroupId = groupId,
+            };
+        
+            context.Add(messageFile);
+        }
+        
         await context.SaveChangesAsync(cancellationToken);
         return getOrCreateResult;
     }

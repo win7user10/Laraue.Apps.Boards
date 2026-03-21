@@ -72,8 +72,6 @@ public class HandleAllMessagesMiddleware(
     private SaveImageMessageTelegramRequest GetPhotoRequest(Message message)
     {
         var text = message.Caption;
-        var photo = message.Photo![0];
-        
         return new SaveImageMessageTelegramRequest
         {
             Text = text,
@@ -83,16 +81,18 @@ public class HandleAllMessagesMiddleware(
             SentAt = message.Date,
             From = message.From?.Username,
             MediaGroupId = message.MediaGroupId,
-            Photo = new PhotoSize
-            {
-                FileId = photo.FileId,
-                FileUniqueId = photo.FileUniqueId,
-                Height = photo.Height,
-                Width = photo.Width,
-                FileSize = photo.FileSize,
-                FileName = null,
-                MimeType = ThumbnailMimeType,
-            },
+            Photos = message.Photo!
+                .Select(photo => new PhotoSize
+                {
+                    FileId = photo.FileId,
+                    FileUniqueId = photo.FileUniqueId,
+                    Height = photo.Height,
+                    Width = photo.Width,
+                    FileSize = photo.FileSize,
+                    FileName = null,
+                    MimeType = ThumbnailMimeType,
+                })
+                .ToArray(),
         };
     }
     

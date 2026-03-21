@@ -17,6 +17,7 @@ public static class WebApplicationBuilderExtensions
         public WebApplicationBuilder AddApplicationServices()
         {
             builder.AddCoreServices();
+            builder.Services.AddHttpClient();
 
             builder.Services
                 .AddSingleton<ITelegramBotClient, TelegramBotClient>(

@@ -16,7 +16,7 @@ public class SaveTextMessageTelegramRequest : SaveMessageTelegramRequest
 
 public class SaveImageMessageTelegramRequest : SaveMessageTelegramRequest
 {
-    public required PhotoSize Photo { get; set; }
+    public required PhotoSize[] Photos { get; set; }
 }
 
 public class SaveVideoMessageTelegramRequest : SaveMessageTelegramRequest
