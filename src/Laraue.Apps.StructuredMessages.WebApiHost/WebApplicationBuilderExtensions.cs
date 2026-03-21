@@ -4,7 +4,9 @@ using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.DateTime.Services.Impl;
 using Laraue.Core.Exceptions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost;
 
@@ -15,6 +17,10 @@ public static class WebApplicationBuilderExtensions
         public WebApplicationBuilder AddApplicationServices()
         {
             builder.AddCoreServices();
+
+            builder.Services
+                .AddSingleton<ITelegramBotClient, TelegramBotClient>(
+                    sp => new TelegramBotClient(sp.GetRequiredService<IOptions<TelegramOptions>>().Value.Token));
 
             builder.Services
                 .AddScoped<IMessagesService, MessagesService>()

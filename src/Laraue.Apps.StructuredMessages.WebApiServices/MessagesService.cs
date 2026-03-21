@@ -74,6 +74,8 @@ public class MessagesService(
         var projected = result.Data
             .Select(Map)
             .ToArray();
+        
+        await Enrich(projected, cancellationToken);
 
         return new BatchResult<MessageListDto>
         {
@@ -156,6 +158,12 @@ public class MessagesService(
                 Items = mappedStatusResult,
             });
         }
+
+        var allData = result
+            .SelectMany(x => x.Items.Data)
+            .ToList();
+        
+        await Enrich(allData, cancellationToken);
 
         return result.ToArray();
     }
@@ -244,7 +252,7 @@ public class MessagesService(
         if (!string.IsNullOrEmpty(request.SearchString))
         {
             query = query
-                .Where(x => x.Content.Contains(request.SearchString));
+                .Where(x => x.Content!.Contains(request.SearchString));
         }
 
         var result = await ProjectToTemporaryDto(query)
@@ -289,6 +297,47 @@ public class MessagesService(
             CategoryName = result.CategoryName,
             StatusName = result.StatusName,
         };
+    }
+
+    private async Task Enrich<T>(IList<T> elements, CancellationToken ct)
+        where T : class, ICanContainMedia
+    {
+        var ids = elements.Select(x => x.Id).ToList();
+        
+        var photos = (await context.Messages
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new
+            {
+                x.Id,
+                PhotoIds = x.Photos!.Select(p => p.TelegramFileId).ToArray(),
+                VideoIds = x.Videos!
+                    .Where(p => p.ThumbnailFileId != null)
+                    .Select(p => p.ThumbnailFileId!.Value).ToArray(),
+            })
+            .ToArrayAsyncEF(ct))
+            .ToDictionary(x => x.Id, x => new { x.PhotoIds, x.VideoIds });
+
+        foreach (var element in elements)
+        {
+            if (!photos.TryGetValue(element.Id, out var data))
+                continue;
+            
+            if (data.PhotoIds.Length > 0)
+                element.Media
+                    .AddRange(data.PhotoIds.Select(fileId => new MediaInfo
+                    {
+                        MediaType = MediaType.Photo,
+                        PreviewFileId = fileId
+                    }));
+            
+            if (data.VideoIds.Length > 0)
+                element.Media
+                    .AddRange(data.VideoIds.Select(fileId => new MediaInfo
+                    {
+                        MediaType = MediaType.Video,
+                        PreviewFileId = fileId
+                    }));
+        }
     }
 
     private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
@@ -422,20 +471,39 @@ public class MessageListDtoData : MessagesService.IHasUserSender
     public required string? TelegramUsername { get; set; }
     public required string? TelegramFirstName { get; set; }
     public required string? TelegramLastName { get; set; }
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
     public required long CategoryId { get; set; }
     public required long StatusId { get; set; }
 }
 
-public class MessageListDto
+public interface ICanContainMedia
+{
+    public long Id { get; set; }
+    public List<MediaInfo> Media { get; set; }
+}
+
+public class MessageListDto : ICanContainMedia
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
     public required long CategoryId { get; set; }
     public required long StatusId { get; set; }
+    public List<MediaInfo> Media { get; set; } = [];
+}
+
+public class MediaInfo
+{
+    public Guid PreviewFileId { get; set; }
+    public MediaType MediaType { get; set; }
+}
+
+public enum MediaType
+{
+    Photo,
+    Video,
 }
 
 public record DeleteMessageRequest
@@ -474,7 +542,7 @@ public class MessageDetailDto
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
     public required string? CategoryName { get; set; }
     public required string? StatusName { get; set; }
 }
@@ -487,7 +555,7 @@ public class MessageDetailDtoData : MessagesService.IHasUserSender
     public required string? TelegramUsername { get; set; }
     public required string? TelegramFirstName { get; set; }
     public required string? TelegramLastName { get; set; }
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
     public required string? CategoryName { get; set; }
     public required string? StatusName { get; set; }
 }

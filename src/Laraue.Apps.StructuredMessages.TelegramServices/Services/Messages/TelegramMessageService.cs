@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.Services;
+﻿using System.Text;
+using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 using Laraue.Apps.StructuredMessages.TelegramServices.Resources;
 using Laraue.Telegram.NET.Core.Extensions;
@@ -17,31 +18,40 @@ public class TelegramMessageService(
     ICoreStatusService coreStatusService,
     ITelegramBotClient client,
     IInterceptorState<Guid> interceptorState,
-    ITelegramMessageServiceRepository repository)
+    ITelegramMessageServiceRepository repository,
+    ITelegramSaveMessageService saveMessageService)
     : ITelegramMessageService
 {
     public async Task HandleSaveMessage(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var id = await messageService.SaveMessage(
-            new SaveMessageRequest
-            {
-                UserId = request.UserId,
-                Text = request.Text,
-                CreatedAt = request.SentAt,
-                TelegramMessageId = request.TelegramMessageId,
-            },
+        var result = await saveMessageService.Save(
+            request,
             cancellationToken);
 
-        await OpenChangeCategoryWindow(
-            request.UserId,
-            editMessageId: null,
-            new HandleOpenChangeCategoryWindowRequest
-            {
-                MessageId = id
-            },
-            cancellationToken);
+        // If message was created with that request than response,
+        // otherwise it is the second, third etc. parts of message
+        if (result.WasCreated)
+            await OpenChangeCategoryWindow(
+                request.UserId,
+                editMessageId: null,
+                new HandleOpenChangeCategoryWindowRequest
+                {
+                    MessageId = result.MessageId
+                },
+                cancellationToken);
+
+        if (result.Errors.Count > 0)
+        {
+            var sb = new StringBuilder();
+            sb.AppendJoin(Environment.NewLine, result.Errors);
+
+            await client.SendMessage(
+                request.TelegramUserId,
+                sb.ToString(),
+                cancellationToken: cancellationToken);
+        }
     }
 
     public Task HandleUpdateMessageCategory(

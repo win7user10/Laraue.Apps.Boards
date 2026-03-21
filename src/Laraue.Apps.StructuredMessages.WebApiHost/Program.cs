@@ -4,11 +4,11 @@ using Laraue.Apps.StructuredMessages.WebApiHost;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOptions<TelegramOptions>();
-builder.Services.Configure<TelegramOptions>(builder.Configuration.GetSection("Telegram"));
+builder.Services.Configure<TelegramOptions>(
+    builder.Configuration.GetSection("Telegram"));
 
 const string dbConnectionStringName = "Postgre";
 
