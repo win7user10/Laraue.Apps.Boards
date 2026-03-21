@@ -20,8 +20,6 @@ public class TelegramSaveMessageService(
     ITelegramBotClient botClient)
     : ITelegramSaveMessageService
 {
-    private const long MaxNonPremiumFileSize = 5_000_000; // 5 MB is max size
-    
     public Task<GetOrCreateMessageResult> Save(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
@@ -56,20 +54,16 @@ public class TelegramSaveMessageService(
         {
             videoFile.ThumbnailFileId = await GetOrCreateMessageFileId(
                 request.Thumbnail,
+                saveFileToStorage: true,
                 cancellationToken);
             videoFile.ThumbnailHeight = request.Thumbnail.Height;
             videoFile.ThumbnailWidth = request.Thumbnail.Width;
         }
-
-        try
-        {
-            videoFile.FileId = await GetOrCreateMessageFileId(request.Video, cancellationToken);
-        }
-        catch (PremiumRequiredException)
-        {
-            getOrCreateResult.Errors.Add(
-                "Files more than 5MB uploading is not available");
-        }
+        
+        videoFile.FileId = await GetOrCreateMessageFileId(
+            request.Video,
+            saveFileToStorage: false,
+            cancellationToken);
         
         context.Add(videoFile);
         await context.SaveChangesAsync(cancellationToken);
@@ -81,7 +75,10 @@ public class TelegramSaveMessageService(
         CancellationToken cancellationToken)
     {
         var getOrCreateResult = await GetOrCreateMessageEntityId(request, cancellationToken);
-        var fileId = await GetOrCreateMessageFileId(request.Photo, cancellationToken);
+        var fileId = await GetOrCreateMessageFileId(
+            request.Photo,
+            saveFileToStorage: true,
+            cancellationToken);
 
         var messageFile = new MessageTelegramPhoto
         {
@@ -96,13 +93,23 @@ public class TelegramSaveMessageService(
         return getOrCreateResult;
     }
 
+    /// <summary>
+    /// Store file entity and upload it to storage if required.
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="saveFileToStorage">
+    /// Store the file directly to storage.
+    /// If false - then when requesting the file it will be requesting directly from TG.
+    /// We can't request always from tg - static content will make too many calls.
+    /// And we can't store content always - it takes too much space.
+    /// </param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     private async Task<Guid> GetOrCreateMessageFileId(
         File file,
+        bool saveFileToStorage,
         CancellationToken cancellationToken)
     {
-        if (file.FileSize > MaxNonPremiumFileSize)
-            throw new PremiumRequiredException(file.FileSize.Value);
-        
         var oldFileData = await context.TelegramFiles
             .Where(x => x.FileUniqueId == file.FileUniqueId)
             .Select(x => new { x.Id })
@@ -111,28 +118,30 @@ public class TelegramSaveMessageService(
         if (oldFileData is not null)
             return oldFileData.Id;
         
-        // Uploading file to storage
-        var botFile = await botClient.GetFile(
-            file.FileId,
-            cancellationToken);
+        if (saveFileToStorage)
+        {
+            var botFile = await botClient.GetFile(
+                file.FileId,
+                cancellationToken);
+
+            var stream = new MemoryStream();
+            await botClient.DownloadFile(
+                botFile,
+                stream,
+                cancellationToken);
         
-        var stream = new MemoryStream();
-        await botClient.DownloadFile(
-            botFile,
-            stream,
-            cancellationToken);
+            var extension = ExtensionUtility.GetExtension(file.MimeType);
+            var filePath = ShardedPathStrategy.GetPath(
+                botFile.FileUniqueId,
+                extension);
         
-        var extension = ExtensionUtility.GetExtension(file.MimeType);
-        var filePath = ShardedPathStrategy.GetPath(
-            botFile.FileUniqueId,
-            extension);
-        
-        stream.Position = 0;
-        await fileStorage.WriteFile(
-            filePath,
-            stream,
-            null,
-            cancellationToken);
+            stream.Position = 0;
+            await fileStorage.WriteFile(
+                filePath,
+                stream,
+                null,
+                cancellationToken);
+        }
         
         var telegramFile = new TelegramFile
         {
@@ -153,6 +162,9 @@ public class TelegramSaveMessageService(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.MediaGroupId is null)
+            return await SaveMessageEntity(request, cancellationToken);
+        
         var oldMessageData = await context.Messages
             .Where(x => x.TelegramMediaGroupId == request.MediaGroupId)
             .Select(x => new { x.Id, x.UserId })
@@ -199,10 +211,4 @@ public class GetOrCreateMessageResult
 {
     public long MessageId { get; set; }
     public bool WasCreated { get; set; }
-    public List<string> Errors { get; set; } = [];
-}
-
-public class PremiumRequiredException(long size) : Exception
-{
-    public long Size { get; } = size;
 }

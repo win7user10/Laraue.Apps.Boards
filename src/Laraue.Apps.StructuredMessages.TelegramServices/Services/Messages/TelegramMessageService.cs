@@ -41,17 +41,6 @@ public class TelegramMessageService(
                     MessageId = result.MessageId
                 },
                 cancellationToken);
-
-        if (result.Errors.Count > 0)
-        {
-            var sb = new StringBuilder();
-            sb.AppendJoin(Environment.NewLine, result.Errors);
-
-            await client.SendMessage(
-                request.TelegramUserId,
-                sb.ToString(),
-                cancellationToken: cancellationToken);
-        }
     }
 
     public Task HandleUpdateMessageCategory(
