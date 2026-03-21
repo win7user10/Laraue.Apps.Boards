@@ -33,4 +33,20 @@ public class Message
     public MessageStatus? Status { get; set; }
     
     public int? TelegramMessageId { get; set; }
+    
+    /// <summary>
+    /// When the file contains messages this field allow to attachments in one message.
+    /// </summary>
+    [MaxLength(64)]
+    public string? TelegramMediaGroupId { get; set; }
+    
+    /// <summary>
+    /// Photos associated with a message.
+    /// </summary>
+    public IList<MessageTelegramPhoto>? Photos { get; set; }
+    
+    /// <summary>
+    /// Videos associated with a message.
+    /// </summary>
+    public IList<MessageTelegramVideo>? Videos { get; set; }
 }

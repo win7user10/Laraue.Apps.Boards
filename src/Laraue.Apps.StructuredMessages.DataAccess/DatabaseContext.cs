@@ -17,6 +17,9 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<Message> Messages { get; init; }
     public DbSet<MessageCategory> MessageCategories { get; init; }
     public DbSet<MessageStatus> MessageStatuses { get; init; }
+    public DbSet<TelegramFile> TelegramFiles { get; init; }
+    public DbSet<MessageTelegramPhoto> TelegramPhotos { get; init; }
+    public DbSet<MessageTelegramVideo> TelegramVideos { get; init; }
 
     public DbSet<Update> Updates { get; set; }
     public DbSet<FailedUpdate> FailedUpdates { get; set; }
@@ -33,6 +36,17 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.Content)
                 .HasMethod("gin")
                 .HasOperators("gin_trgm_ops");
+            
+            entity
+                .HasIndex(x => x.TelegramMediaGroupId)
+                .IsUnique();
+        });
+        
+        modelBuilder.Entity<TelegramFile>(entity =>
+        {
+            entity
+                .HasIndex(x => x.FileUniqueId)
+                .IsUnique();
         });
     }
 }
