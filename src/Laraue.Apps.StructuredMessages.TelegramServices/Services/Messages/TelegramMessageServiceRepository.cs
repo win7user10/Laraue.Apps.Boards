@@ -45,5 +45,5 @@ public class MessageDto
     public string? StatusName { get; set; }
     public required long UserTelegramId { get; set; }
     public required int? TelegramMessageId { get; set; }
-    public required string Content { get; set; }
+    public required string? Content { get; set; }
 }

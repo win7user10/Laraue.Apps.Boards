@@ -344,7 +344,7 @@ public class TelegramMessageService(
         CancellationToken cancellationToken)
     {
         var tmb = new TelegramMessageBuilder()
-            .Append(message.Content);
+            .Append(message.Content ?? ".");
 
         var categoryRow = new List<InlineKeyboardButton>()
         {
