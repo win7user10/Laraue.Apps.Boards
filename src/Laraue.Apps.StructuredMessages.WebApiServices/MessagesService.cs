@@ -257,8 +257,11 @@ public class MessagesService(
 
         var result = await ProjectToTemporaryDto(query)
             .ShortPaginateEFAsync(request, ct);
+
+        var mapped = result.MapTo(Map);
+        await Enrich(mapped.Data, ct);
         
-        return result.MapTo(Map);
+        return mapped;
     }
 
     public async Task<MessageDetailDto> GetMessage(
