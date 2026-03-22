@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 
@@ -14,7 +15,8 @@ public class TelegramFilesController(
     IFileStorage fileStorage,
     ITelegramBotClient botClient,
     IHttpClientFactory httpClientFactory,
-    IOptions<TelegramOptions> options)
+    IOptions<TelegramOptions> options,
+    IMemoryCache memoryCache)
     : ControllerBase
 {
     [HttpGet("{id:guid}")]
@@ -29,26 +31,57 @@ public class TelegramFilesController(
 
         var fileExtension = ExtensionUtility.GetExtension(fileData.MimeType);
         var physicalPath = ShardedPathStrategy.GetPath(fileData.FileUniqueId, fileExtension);
-        
-        if (await fileStorage.FileExists(physicalPath, cancellationToken))
-            return File(
-                await fileStorage.ReadFile(physicalPath, cancellationToken),
-                fileData.MimeType ?? "application/octet-stream");
+        var mimeType = fileData.MimeType ?? "application/octet-stream";
 
-        var tgFile = await botClient.GetFile(fileData.FileId, cancellationToken);
+        // Serve from local cache — seekable stream, ASP.NET Core handles ranges
+        if (await fileStorage.FileExists(physicalPath, cancellationToken))
+        {
+            var cachedStream = await fileStorage.ReadFile(physicalPath, cancellationToken);
+            return File(cachedStream, mimeType, enableRangeProcessing: true);
+        }
+
+        // Resolve and cache the Telegram download URL (valid 60 min)
         var botToken = options.Value.Token;
-        var downloadUrl = $"https://api.telegram.org/file/bot{botToken}/{tgFile.FilePath}";
-        
+        var cacheKey = $"tg_file_url_{fileData.FileId}";
+        if (!memoryCache.TryGetValue(cacheKey, out string? downloadUrl))
+        {
+            var tgFile = await botClient.GetFile(fileData.FileId, cancellationToken);
+            if (string.IsNullOrEmpty(tgFile.FilePath))
+                return NotFound("Telegram file path is unavailable.");
+
+            downloadUrl = $"https://api.telegram.org/file/bot{botToken}/{tgFile.FilePath}";
+            memoryCache.Set(cacheKey, downloadUrl, TimeSpan.FromMinutes(55));
+        }
+
+        // Forward the request to Telegram, proxying the Range header if present
         var httpClient = httpClientFactory.CreateClient();
-        var response = await httpClient.GetAsync(
-            downloadUrl, 
-            HttpCompletionOption.ResponseHeadersRead, 
+        var rangeHeader = Request.Headers.Range.ToString();
+        if (!string.IsNullOrEmpty(rangeHeader))
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Range", rangeHeader);
+
+        var telegramResponse = await httpClient.GetAsync(
+            downloadUrl,
+            HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
-        
-        response.EnsureSuccessStatusCode();
-        
-        // Return the stream directly - it will be disposed by ASP.NET Core after response
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        return File(stream, fileData.MimeType ?? "application/octet-stream");
+
+        telegramResponse.EnsureSuccessStatusCode();
+
+        // Mirror status code first, before writing any headers
+        Response.StatusCode = (int)telegramResponse.StatusCode;
+        Response.Headers.Append("Accept-Ranges", "bytes");
+
+        // Content-Length comes from content headers
+        if (telegramResponse.Content.Headers.ContentLength is { } contentLength)
+            Response.Headers.ContentLength = contentLength;
+
+        // Content-Range is also a content header on 206 responses
+        if (telegramResponse.Content.Headers.ContentRange is { } contentRange)
+            Response.Headers.Append("Content-Range", contentRange.ToString());
+
+        var stream = await telegramResponse.Content.ReadAsStreamAsync(cancellationToken);
+
+        // enableRangeProcessing: false — we've already handled the range manually
+        // by forwarding it to Telegram. ASP.NET Core must not try to slice again.
+        return File(stream, mimeType, enableRangeProcessing: false);
     }
 }

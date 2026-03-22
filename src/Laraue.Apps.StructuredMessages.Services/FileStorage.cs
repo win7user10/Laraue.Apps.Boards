@@ -8,7 +8,7 @@ public interface IFileStorage
         string path,
         CancellationToken cancellationToken = default);
     
-    Task<Stream> ReadFile(
+    Task<FileStream> ReadFile(
         string path,
         CancellationToken cancellationToken = default);
     
@@ -30,13 +30,13 @@ public class FileStorage(IOptions<FileStorageOptions> options) : IFileStorage
         return Task.FromResult(File.Exists(physicalPath));
     }
 
-    public Task<Stream> ReadFile(
+    public Task<FileStream> ReadFile(
         string path,
         CancellationToken cancellationToken = default)
     {
         var physicalPath = Path.Combine(options.Value.FilesDirectory, path);
 
-        return Task.FromResult<Stream>(File.OpenRead(physicalPath));
+        return Task.FromResult(File.OpenRead(physicalPath));
     }
 
     public async Task WriteFile(
