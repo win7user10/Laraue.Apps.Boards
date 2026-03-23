@@ -1,0 +1,50 @@
+﻿namespace Laraue.Apps.StructuredMessages.Services;
+
+public static class UserInitialsUtility
+{
+    public static UserInitials GetInitials(
+        string? username,
+        string? firstName,
+        string? lastName,
+        long telegramId)
+    {
+        var sender = username;
+        var initial = sender?.Length > 1 ? sender[..2] : "";
+
+        if (sender is null)
+        {
+            if (firstName?.Length > 0 && lastName?.Length > 0)
+            {
+                sender = $"{firstName} {lastName}";
+                initial = $"{firstName[0]}{lastName[0]}";
+            }
+            else if (firstName?.Length > 1)
+            {
+                sender = firstName;
+                initial = firstName[..1];
+            }
+            else if (lastName?.Length > 1)
+            {
+                sender = lastName;
+                initial = lastName[..1];
+            }
+            else
+            {
+                sender = telegramId.ToString();
+                initial = "ID";
+            }
+        }
+
+        return new UserInitials
+        {
+            Sender = sender,
+            Initial = initial
+        };
+    }
+}
+
+public class UserInitials
+{
+    public required string Sender { get; set; }
+    public required string Initial { get; set; }
+}

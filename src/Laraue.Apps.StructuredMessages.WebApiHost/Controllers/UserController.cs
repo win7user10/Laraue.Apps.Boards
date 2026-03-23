@@ -12,21 +12,36 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class UserController(DatabaseContext context) : ControllerBase
 {
     [HttpGet]
-    public Task<UserDto> GetAsync(CancellationToken ct)
+    public async Task<UserDto> GetAsync(CancellationToken ct)
     {
-        return context.Users
+        var user = await context.Users
             .Where(x => x.Id == HttpContext.User.GetId())
             .Select(x => new UserDto
             {
                 Username = x.TelegramUserName,
                 LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
+                Color = "#3fb950",
             })
             .FirstOrThrowNotFoundEFAsync(ct);
+
+        var initials = UserInitialsUtility.GetInitials(
+            user.Username,
+            user.FirstName,
+            user.SecondName,
+            user.TelegramId);
+
+        user.Initials = initials.Initial;
+        return user;
     }
 }
 
 public class UserDto
 {
+    public long TelegramId { get; set; }
     public string? Username { get; set; }
+    public string? FirstName { get; set; }
+    public string? SecondName { get; set; }
     public required string LanguageCode { get; set; }
+    public required string Color { get; set; }
+    public string? Initials { get; set; }
 }
