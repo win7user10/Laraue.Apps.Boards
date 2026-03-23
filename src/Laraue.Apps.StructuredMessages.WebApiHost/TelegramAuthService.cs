@@ -8,6 +8,7 @@ using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Telegram.Bot;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost;
 
@@ -135,7 +136,7 @@ public class TelegramAuthService(
             throw new ForbiddenException("Auth is expired");
         
         var user = parsedData["user"];
-        return JsonSerializer.Deserialize<MiniAppUser>(user!)!;
+        return JsonSerializer.Deserialize<MiniAppUser>(user!, JsonBotAPI.Options)!;
     }
     
     private async Task<Guid> RegisterUser(

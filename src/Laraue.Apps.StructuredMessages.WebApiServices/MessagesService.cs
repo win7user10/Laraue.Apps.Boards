@@ -288,7 +288,11 @@ public class MessagesService(
             })
             .FirstAsyncEF(cancellationToken);
 
-        var sender = GetUserSender(result);
+        var sender = UserInitialsUtility.GetInitials(
+            result.TelegramUsername,
+            result.TelegramFirstName,
+            result.TelegramLastName,
+            result.TelegramId);;
 
         return new MessageDetailDto
         {
@@ -389,52 +393,14 @@ public class MessagesService(
         public string? TelegramLastName { get; set; }
         public long TelegramId { get; set; }
     }
-
-    public class UserSender
-    {
-        public required string Sender { get; set; }
-        public required string Initial { get; set; }
-    }
-
-    private static UserSender GetUserSender(IHasUserSender source)
-    {
-        var sender = source.TelegramUsername;
-        var initial = sender?.Length > 1 ? sender[..2] : "";
-
-        if (sender is null)
-        {
-            if (source.TelegramFirstName?.Length > 0 && source.TelegramLastName?.Length > 0)
-            {
-                sender = $"{source.TelegramFirstName} {source.TelegramLastName}";
-                initial = $"{source.TelegramFirstName[0]}{source.TelegramLastName[0]}";
-            }
-            else if (source.TelegramFirstName?.Length > 1)
-            {
-                sender = source.TelegramFirstName;
-                initial = source.TelegramFirstName[..1];
-            }
-            else if (source.TelegramLastName?.Length > 1)
-            {
-                sender = source.TelegramLastName;
-                initial = source.TelegramLastName[..1];
-            }
-            else
-            {
-                sender = source.TelegramId.ToString();
-                initial = "ID";
-            }
-        }
-
-        return new UserSender
-        {
-            Sender = sender,
-            Initial = initial
-        };
-    }
     
     private static MessageListDto Map(MessageListDtoData source)
     {
-        var senderData = GetUserSender(source);
+        var senderData = UserInitialsUtility.GetInitials(
+            source.TelegramUsername,
+            source.TelegramFirstName,
+            source.TelegramLastName,
+            source.TelegramId);
 
         return new MessageListDto
         {
