@@ -20,6 +20,7 @@ public static class WebApplicationBuilderExtensions
             builder.Services.AddHttpClient();
 
             builder.Services
+                .AddScoped<ITelegramAuthService, TelegramAuthService>()
                 .AddSingleton<ITelegramBotClient, TelegramBotClient>(
                     sp => new TelegramBotClient(sp.GetRequiredService<IOptions<TelegramOptions>>().Value.Token));
 
