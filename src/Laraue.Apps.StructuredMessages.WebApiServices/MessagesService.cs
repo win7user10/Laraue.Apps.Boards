@@ -176,68 +176,59 @@ public class MessagesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var counts = await context.Messages
+        var categoryById = (await context.MessageCategories
             .Where(x => x.UserId == request.UserId)
-            .OrderBy(x => x.Status!.SortOrder)
-            .Select(x => x)
-            .GroupBy(x => new
-            {
-                StatusId = x.Status!.Id,
-                CategoryId = x.Category!.Id
-            })
             .Select(x => new
             {
-                x.Key,
+                x.Id,
+                x.Color,
+                x.Name,
+            })
+            .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.Id);
+        
+        var statusByCategoryId = (await context.MessageStatuses
+            .Where(x => categoryById.Keys.Contains(x.MessageCategoryId))
+            .Select(x => new
+            {
+                x.Id,
+                x.Color,
+                x.Name,
+                x.SortOrder,
+                x.MessageCategoryId,
+            })
+            .ToArrayAsyncEF(cancellationToken))
+         .ToLookup(x => x.MessageCategoryId);
+        
+        var counts = (await context.Messages
+            .Where(x => x.UserId == request.UserId)
+            .Select(x => x)
+            .GroupBy(x => x.StatusId)
+            .Select(x => new
+            {
+                Id = x.Key ?? CoreMessageService.NullId,
                 Count = x.Count(),
             })
-            .ToArrayAsyncEF(cancellationToken);
+            .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.Id, x => x.Count);
 
-        var statusIds = counts
-            .Select(x => x.Key.StatusId)
-            .Distinct();
-
-        var statusesData = (await context.MessageStatuses
-                .Where(x => statusIds.Contains(x.Id))
-                .Select(x => new
-                {
-                    x.Id,
-                    x.Color,
-                    x.Name,
-                })
-                .ToArrayAsyncEF(cancellationToken))
-            .ToDictionary(x => x.Id);
-        
-        var categoryIds = counts
-            .Select(x => x.Key.CategoryId)
-            .Distinct();
-        
-        var categoriesData = (await context.MessageCategories
-                .Where(x => categoryIds.Contains(x.Id))
-                .Select(x => new
-                {
-                    x.Id,
-                    x.Color,
-                    x.Name,
-                })
-                .ToArrayAsyncEF(cancellationToken))
-            .ToDictionary(x => x.Id);
-
-        var result = counts
-            .GroupBy(x => x.Key.CategoryId)
-            .Select(x => new CategorySummary
+        var result = categoryById
+            .Select(category => new CategorySummary
             {
-                Id = x.Key,
-                Color = categoriesData[x.Key].Color,
-                Name = categoriesData[x.Key].Name,
-                Columns = x
-                    .Select(y => new ColumnSummary
+                Id = category.Key,
+                Color = category.Value.Color,
+                Name = category.Value.Name,
+                Columns = statusByCategoryId[category.Key]
+                    .Select(s => new ColumnSummary
                     {
-                        Id = statusesData[y.Key.StatusId].Id,
-                        Color = statusesData[y.Key.StatusId].Color,
-                        Name = statusesData[y.Key.StatusId].Name,
-                        Count = y.Count,
+                        Id = s.Id,
+                        Color = s.Color,
+                        Name = s.Name,
+                        Count = counts.GetValueOrDefault(s.Id, 0),
+                        SortOrder = s.SortOrder,
                     })
-                    .ToArray(),
+                    .OrderBy(s => s.SortOrder)
+                    .ToArray()
             })
             .ToArray();
 
@@ -657,6 +648,7 @@ public class ColumnSummary
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int Count { get; set; }
+    public required int SortOrder { get; set; }
 }
 
 public record CategorySummary
