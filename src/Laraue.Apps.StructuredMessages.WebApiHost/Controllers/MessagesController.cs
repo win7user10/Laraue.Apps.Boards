@@ -138,4 +138,16 @@ public class MessagesController(IMessagesService messagesService) : ControllerBa
             },
             cancellationToken);
     }
+
+    [HttpGet("summary")]
+    public Task<CategorySummary[]> GetBoardSummary(
+        CancellationToken cancellationToken)
+    {
+        return messagesService.GetBoardSummary(
+            new GetBoardSummaryRequest
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

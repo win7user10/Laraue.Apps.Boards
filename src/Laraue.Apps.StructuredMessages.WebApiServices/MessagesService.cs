@@ -19,6 +19,10 @@ public interface IMessagesService
     Task<ColumnMessages[]> GetBoard(
         GetBoardRequest request,
         CancellationToken cancellationToken);
+    
+    Task<CategorySummary[]> GetBoardSummary(
+        GetBoardSummaryRequest request,
+        CancellationToken cancellationToken);
 
     Task UpdateStatus(
         UpdateStatusRequest request,
@@ -166,6 +170,78 @@ public class MessagesService(
         await Enrich(allData, cancellationToken);
 
         return result.ToArray();
+    }
+
+    public async Task<CategorySummary[]> GetBoardSummary(
+        GetBoardSummaryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var counts = await context.Messages
+            .Where(x => x.UserId == request.UserId)
+            .OrderBy(x => x.Status!.SortOrder)
+            .Select(x => x)
+            .GroupBy(x => new
+            {
+                StatusId = x.Status!.Id,
+                CategoryId = x.Category!.Id
+            })
+            .Select(x => new
+            {
+                x.Key,
+                Count = x.Count(),
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var statusIds = counts
+            .Select(x => x.Key.StatusId)
+            .Distinct();
+
+        var statusesData = (await context.MessageStatuses
+                .Where(x => statusIds.Contains(x.Id))
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Color,
+                    x.Name,
+                })
+                .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.Id);
+        
+        var categoryIds = counts
+            .Select(x => x.Key.CategoryId)
+            .Distinct();
+        
+        var categoriesData = (await context.MessageCategories
+                .Where(x => categoryIds.Contains(x.Id))
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Color,
+                    x.Name,
+                })
+                .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.Id);
+
+        var result = counts
+            .GroupBy(x => x.Key.CategoryId)
+            .Select(x => new CategorySummary
+            {
+                Id = x.Key,
+                Color = categoriesData[x.Key].Color,
+                Name = categoriesData[x.Key].Name,
+                Columns = x
+                    .Select(y => new ColumnSummary
+                    {
+                        Id = statusesData[y.Key.StatusId].Id,
+                        Color = statusesData[y.Key.StatusId].Color,
+                        Name = statusesData[y.Key.StatusId].Name,
+                        Count = y.Count,
+                    })
+                    .ToArray(),
+            })
+            .ToArray();
+
+        return result;
     }
 
     public async Task UpdateStatus(UpdateStatusRequest request, CancellationToken ct)
@@ -448,6 +524,11 @@ public record GetBoardRequest
     public int Take { get; init; }
 }
 
+public record GetBoardSummaryRequest
+{
+    public Guid UserId { get; set; }
+}
+
 public record ColumnMessages
 {
     public required long StatusId { get; set; }
@@ -568,4 +649,20 @@ public class BatchResult<T>
 public class InitialBatchResult<T> : BatchResult<T>
 {
     public long TotalCount { get; set; }
+}
+
+public class ColumnSummary
+{
+    public required long Id { get; set; }
+    public required string Name { get; set; }
+    public required string? Color { get; set; }
+    public required int Count { get; set; }
+}
+
+public record CategorySummary
+{
+    public required long Id { get; set; }
+    public required string Name { get; set; }
+    public required string? Color { get; set; }
+    public required ColumnSummary[] Columns { get; set; }
 }
