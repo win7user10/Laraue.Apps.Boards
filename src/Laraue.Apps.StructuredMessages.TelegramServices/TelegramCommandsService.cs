@@ -20,17 +20,19 @@ public class TelegramCommandsService(
 {
     public Task HandleStart(ReplyData replyData, CancellationToken cancellationToken)
     {
+        var appUrl = options.Value.Url;
+        
         var markup = new InlineKeyboardMarkup()
             .AddButton(InlineKeyboardButton
                 .WithWebApp(
-                    $"📋 {Phrases.OpenMiniApp}", new WebAppInfo
+                    $"📋 {string.Format(Phrases.OpenMiniApp)}", new WebAppInfo
                     {
-                        Url = options.Value.Url
+                        Url = appUrl
                     }));
         
         return client.SendMessage(
             replyData.TelegramId,
-            Phrases.Start,
+            string.Format(Phrases.Start, appUrl),
             replyMarkup: markup,
             cancellationToken: cancellationToken);
     }
