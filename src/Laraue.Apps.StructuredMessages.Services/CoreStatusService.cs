@@ -48,7 +48,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
             Name = request.Name,
             MessageCategoryId = request.CategoryId,
             SortOrder = ++previousMaxOrder,
-            Color = request.Color ?? CardsDefaults.DefaultStatusColor,
+            Color = request.Color ?? Palette.DefaultStatusColor,
         };
         
         context.MessageStatuses.Add(status);

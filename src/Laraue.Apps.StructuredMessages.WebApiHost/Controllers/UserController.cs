@@ -20,10 +20,11 @@ public class UserController(DatabaseContext context) : ControllerBase
             {
                 Username = x.TelegramUserName,
                 LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
-                Color = "#3fb950",
+                Color = Palette.DefaultUserColor,
                 FirstName = x.TelegramFirstName,
                 LastName = x.TelegramLastName,
                 TelegramId = x.TelegramId,
+                Palette = Palette.Colors
             })
             .FirstOrThrowNotFoundEFAsync(ct);
 
@@ -47,4 +48,5 @@ public class UserDto
     public required string LanguageCode { get; set; }
     public required string Color { get; set; }
     public string? Initials { get; set; }
+    public required string[] Palette { get; set; }
 }

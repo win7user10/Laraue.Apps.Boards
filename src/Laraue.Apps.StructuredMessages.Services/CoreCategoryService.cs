@@ -62,14 +62,14 @@ public class CoreCategoryService(DatabaseContext context)
         {
             Name = request.Name,
             UserId = request.UserId,
-            Color = request.Color ?? CardsDefaults.DefaultCategoryColor,
+            Color = request.Color ?? Palette.RandomColor(),
         };
         
         var statuses = request.Statuses ?? [
             new Status
             {
                 Name = CardsDefaults.DefaultStatusName,
-                Color = CardsDefaults.DefaultStatusColor
+                Color = Palette.DefaultStatusColor
             }];
 
         category.Statuses = statuses
