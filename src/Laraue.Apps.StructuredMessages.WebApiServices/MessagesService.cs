@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Extensions;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.Contracts;
@@ -7,6 +8,7 @@ using Laraue.Core.DataAccess.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
@@ -71,10 +73,16 @@ public class MessagesService(
         var query = context
             .Messages
             .Where(x => x.UserId == request.UserId)
-            .Where(x => x.StatusId == statusId)
-            .OrderByDescending(x => x.Id);
+            .Where(x => x.StatusId == statusId);
+        
+        if (!string.IsNullOrEmpty(request.SearchString))
+            query = query
+                .Where(x => EF.Functions.ILike(
+                    x.Content!,
+                    request.SearchString.AsSearchable()));
 
-        var result = await ToBatchResult(ProjectToTemporaryDto(query), request);
+        var result = await ToBatchResult(ProjectToTemporaryDto(query
+            .OrderByDescending(x => x.Id)), request);
         var projected = result.Data
             .Select(Map)
             .ToArray();
@@ -135,10 +143,18 @@ public class MessagesService(
         var result = new List<ColumnMessages>();
         foreach (var statusId in statusIds)
         {
-            var statusResult = await ProjectToTemporaryDto(context
+            var query = context
                 .Messages
                 .Where(x => x.UserId == request.UserId)
-                .Where(x => x.StatusId == statusId)
+                .Where(x => x.StatusId == statusId);
+            
+            if (!string.IsNullOrEmpty(request.SearchString))
+                query = query
+                    .Where(x => EF.Functions.ILike(
+                        x.Content!,
+                        request.SearchString.AsSearchable()));
+            
+            var statusResult = await ProjectToTemporaryDto(query
                 .OrderByDescending(x => x.Id))
                 .FullPaginateEFAsync(
                     new PaginationData
@@ -317,10 +333,10 @@ public class MessagesService(
         }
         
         if (!string.IsNullOrEmpty(request.SearchString))
-        {
             query = query
-                .Where(x => x.Content!.Contains(request.SearchString));
-        }
+                .Where(x => EF.Functions.ILike(
+                    x.Content!,
+                    request.SearchString.AsSearchable()));
 
         var result = await ProjectToTemporaryDto(query)
             .ShortPaginateEFAsync(request, ct);
@@ -352,6 +368,8 @@ public class MessagesService(
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
+                CategoryColor = x.Category.Color,
+                StatusColor = x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
 
@@ -370,6 +388,8 @@ public class MessagesService(
             Time = result.Time,
             CategoryName = result.CategoryName,
             StatusName = result.StatusName,
+            CategoryColor = result.CategoryColor,
+            StatusColor = result.StatusColor,
         };
     }
 
@@ -452,14 +472,6 @@ public class MessagesService(
             TelegramUsername = x.User.TelegramUserName,
         });
     }
-
-    public interface IHasUserSender
-    {
-        public string? TelegramUsername { get; set; }
-        public string? TelegramFirstName { get; set; }
-        public string? TelegramLastName { get; set; }
-        public long TelegramId { get; set; }
-    }
     
     private static MessageListDto Map(MessageListDtoData source)
     {
@@ -500,6 +512,7 @@ public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
     public long? StatusId { get; set; }
+    public string? SearchString { get; set; }
 }
 
 public record GetMessageRequest
@@ -513,6 +526,7 @@ public record GetBoardRequest
     public Guid UserId { get; set; }
     public long? CategoryId { get; set; }
     public int Take { get; init; }
+    public string? SearchString { get; init; }
 }
 
 public record GetBoardSummaryRequest
@@ -526,7 +540,7 @@ public record ColumnMessages
     public required InitialBatchResult<MessageListDto> Items { get; set; }
 }
 
-public class MessageListDtoData : MessagesService.IHasUserSender
+public class MessageListDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -608,10 +622,12 @@ public class MessageDetailDto
     public string? SenderInitial { get; set; }
     public required string? Content { get; set; }
     public required string? CategoryName { get; set; }
+    public required string? CategoryColor { get; set; }
     public required string? StatusName { get; set; }
+    public required string? StatusColor { get; set; }
 }
 
-public class MessageDetailDtoData : MessagesService.IHasUserSender
+public class MessageDetailDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -621,7 +637,9 @@ public class MessageDetailDtoData : MessagesService.IHasUserSender
     public required string? TelegramLastName { get; set; }
     public required string? Content { get; set; }
     public required string? CategoryName { get; set; }
+    public required string? CategoryColor { get; set; }
     public required string? StatusName { get; set; }
+    public required string? StatusColor { get; set; }
 }
 
 public record BatchRequest
