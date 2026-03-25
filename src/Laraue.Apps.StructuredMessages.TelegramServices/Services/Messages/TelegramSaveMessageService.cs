@@ -98,7 +98,7 @@ public class TelegramSaveMessageService(
 
             var messageFile = new MessageTelegramPhoto
             {
-                MessageId = getOrCreateResult.MessageId,
+                CardId = getOrCreateResult.MessageId,
                 TelegramFileId = fileId,
                 Height = photo.Height,
                 Width = photo.Width,
@@ -185,7 +185,7 @@ public class TelegramSaveMessageService(
         if (request.MediaGroupId is null)
             return await SaveMessageEntity(request, cancellationToken);
         
-        var oldMessageData = await context.Messages
+        var oldMessageData = await context.Cards
             .Where(x => x.TelegramMediaGroupId == request.MediaGroupId)
             .Select(x => new { x.Id, x.UserId })
             .FirstOrDefaultAsync(cancellationToken);
@@ -208,7 +208,7 @@ public class TelegramSaveMessageService(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var message = new Message
+        var message = new Card
         {
             Content = request.Text,
             TelegramMediaGroupId = request.MediaGroupId,

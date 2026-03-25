@@ -71,7 +71,7 @@ public class MessagesService(
             : request.StatusId;
 
         var query = context
-            .Messages
+            .Cards
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -130,9 +130,9 @@ public class MessagesService(
             statusIds.Add(null);
         else
         {
-            statusIds = await context.MessageStatuses
-                .Where(x => x.MessageCategoryId == categoryId.Value)
-                .Where(x => x.MessageCategory!.UserId == request.UserId)
+            statusIds = await context.CardStatuses
+                .Where(x => x.CardCategoryId == categoryId.Value)
+                .Where(x => x.CardCategory!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
                 .ToListAsyncEF(cancellationToken);
         }
@@ -144,7 +144,7 @@ public class MessagesService(
         foreach (var statusId in statusIds)
         {
             var query = context
-                .Messages
+                .Cards
                 .Where(x => x.UserId == request.UserId)
                 .Where(x => x.StatusId == statusId);
             
@@ -192,7 +192,7 @@ public class MessagesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryById = (await context.MessageCategories
+        var categoryById = (await context.CardCategories
             .Where(x => x.UserId == request.UserId)
             .Select(x => new
             {
@@ -203,20 +203,20 @@ public class MessagesService(
             .ToArrayAsyncEF(cancellationToken))
             .ToDictionary(x => x.Id);
         
-        var statusByCategoryId = (await context.MessageStatuses
-            .Where(x => categoryById.Keys.Contains(x.MessageCategoryId))
+        var statusByCategoryId = (await context.CardStatuses
+            .Where(x => categoryById.Keys.Contains(x.CardCategoryId))
             .Select(x => new
             {
                 x.Id,
                 x.Color,
                 x.Name,
                 x.SortOrder,
-                x.MessageCategoryId,
+                MessageCategoryId = x.CardCategoryId,
             })
             .ToArrayAsyncEF(cancellationToken))
          .ToLookup(x => x.MessageCategoryId);
         
-        var counts = (await context.Messages
+        var counts = (await context.Cards
             .Where(x => x.UserId == request.UserId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
@@ -320,7 +320,7 @@ public class MessagesService(
         SearchRequest request,
         CancellationToken ct)
     {
-        var query = context.Messages
+        var query = context.Cards
             .Where(x => x.UserId == request.UserId);
         
         if (request.CategoryId.HasValue)
@@ -355,7 +355,7 @@ public class MessagesService(
             request.UserId, request.MessageId, cancellationToken))
             throw new NotFoundException();
 
-        var result = await context.Messages
+        var result = await context.Cards
             .Where(x => x.Id == request.MessageId)
             .Select(x => new MessageDetailDtoData
             {
@@ -399,10 +399,10 @@ public class MessagesService(
         var ids = elements.Select(x => x.Id).ToList();
 
         var photosByMessageId = (await context.TelegramPhotos
-            .Where(x => ids.Contains(x.MessageId))
+            .Where(x => ids.Contains(x.CardId))
             .Select(x => new
             {
-                x.MessageId,
+                MessageId = x.CardId,
                 x.TelegramFileId,
                 x.PhotoType,
                 x.GroupId,
@@ -457,7 +457,7 @@ public class MessagesService(
     }
 
     private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
-        IQueryable<Message> queryable)
+        IQueryable<Card> queryable)
     {
         return queryable.Select(x => new MessageListDtoData
         {

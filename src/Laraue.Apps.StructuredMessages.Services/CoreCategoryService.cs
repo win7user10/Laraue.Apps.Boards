@@ -33,7 +33,7 @@ public interface ICoreCategoryService
     
     Task Update(
         long id,
-        Action<UpdateSettersBuilder<MessageCategory>> setters,
+        Action<UpdateSettersBuilder<CardCategory>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -44,7 +44,7 @@ public class CoreCategoryService(DatabaseContext context)
         Guid userId,
         CancellationToken cancellationToken)
     {
-        return context.MessageCategories
+        return context.CardCategories
             .Where(x => x.UserId == userId)
             .Select(x => new MessageCategoryListDto
             {
@@ -58,7 +58,7 @@ public class CoreCategoryService(DatabaseContext context)
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var category = new MessageCategory
+        var category = new CardCategory
         {
             Name = request.Name,
             UserId = request.UserId,
@@ -73,7 +73,7 @@ public class CoreCategoryService(DatabaseContext context)
             }];
 
         category.Statuses = statuses
-            .Select((s, i) => new MessageStatus
+            .Select((s, i) => new CardStatus
             {
                 SortOrder = i,
                 Color = s.Color,
@@ -81,7 +81,7 @@ public class CoreCategoryService(DatabaseContext context)
             })
             .ToList();
         
-        context.MessageCategories.Add(category);
+        context.CardCategories.Add(category);
         await context.SaveChangesAsync(cancellationToken);
 
         return category.Id;
@@ -89,7 +89,7 @@ public class CoreCategoryService(DatabaseContext context)
 
     public Task<bool> UserHasAccessToCategory(Guid userId, long id, CancellationToken cancellationToken)
     {
-        return context.MessageCategories
+        return context.CardCategories
             .Where(x => x.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
@@ -99,12 +99,12 @@ public class CoreCategoryService(DatabaseContext context)
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken)
     {
-        var existsStatuses = await context.MessageStatuses
-            .Where(x => x.MessageCategoryId == request.CategoryId)
-            .Select(x => new MessageStatus
+        var existsStatuses = await context.CardStatuses
+            .Where(x => x.CardCategoryId == request.CategoryId)
+            .Select(x => new CardStatus
             {
                 Id = x.Id,
-                MessageCategoryId = x.MessageCategoryId,
+                CardCategoryId = x.CardCategoryId,
                 SortOrder = x.SortOrder,
             })
             .ToArrayAsyncEF(cancellationToken);
@@ -132,18 +132,18 @@ public class CoreCategoryService(DatabaseContext context)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        await context.Messages
+        await context.Cards
             .Where(x => x.CategoryId == request.Id)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(p => p.CategoryId, (long?)null)
                 .SetProperty(p => p.StatusId, (long?)null),
                 cancellationToken);
         
-        await context.MessageStatuses
-            .Where(x => x.MessageCategoryId == request.Id)
+        await context.CardStatuses
+            .Where(x => x.CardCategoryId == request.Id)
             .DeleteAsync(cancellationToken);
         
-        await context.MessageCategories
+        await context.CardCategories
             .Where(c => c.Id == request.Id)
             .DeleteAsync(cancellationToken);
         
@@ -152,10 +152,10 @@ public class CoreCategoryService(DatabaseContext context)
 
     public Task Update(
         long id,
-        Action<UpdateSettersBuilder<MessageCategory>> setters,
+        Action<UpdateSettersBuilder<CardCategory>> setters,
         CancellationToken cancellationToken)
     {
-        return context.MessageCategories
+        return context.CardCategories
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters, cancellationToken);
     }

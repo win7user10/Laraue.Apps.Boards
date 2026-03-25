@@ -4,8 +4,8 @@ public class MessageTelegramPhoto
 {
     public long Id { get; set; }
     
-    public Message? Message { get; set; }
-    public long MessageId { get; set; }
+    public Card? Card { get; set; }
+    public long CardId { get; set; }
     
     public int Width { get; set; }
     public int Height { get; set; }

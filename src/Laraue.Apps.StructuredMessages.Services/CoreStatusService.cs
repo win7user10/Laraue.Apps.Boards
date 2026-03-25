@@ -29,7 +29,7 @@ public interface ICoreStatusService
     
     Task Update(
         long id,
-        Action<UpdateSettersBuilder<MessageStatus>> setters,
+        Action<UpdateSettersBuilder<CardStatus>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -39,19 +39,19 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         CreateMessageCategoryStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var previousMaxOrder = await context.MessageStatuses
-            .Where(x => x.MessageCategoryId == request.CategoryId)
+        var previousMaxOrder = await context.CardStatuses
+            .Where(x => x.CardCategoryId == request.CategoryId)
             .MaxAsyncEF(x => x.SortOrder, cancellationToken);
         
-        var status = new MessageStatus
+        var status = new CardStatus
         {
             Name = request.Name,
-            MessageCategoryId = request.CategoryId,
+            CardCategoryId = request.CategoryId,
             SortOrder = ++previousMaxOrder,
             Color = request.Color ?? Palette.DefaultStatusColor,
         };
         
-        context.MessageStatuses.Add(status);
+        context.CardStatuses.Add(status);
         await context.SaveChangesAsync(cancellationToken);
 
         return status.Id;
@@ -61,8 +61,8 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         long categoryId,
         CancellationToken cancellationToken)
     {
-        return context.MessageStatuses
-            .Where(x => x.MessageCategoryId == categoryId)
+        return context.CardStatuses
+            .Where(x => x.CardCategoryId == categoryId)
             .Select(x => new MessageStatusDto
             {
                 Id = x.Id,
@@ -73,8 +73,8 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
 
     public Task<bool> UserHasAccessToStatus(Guid userId, long id, CancellationToken cancellationToken)
     {
-        return context.MessageStatuses
-            .Where(x => x.MessageCategory!.UserId == userId)
+        return context.CardStatuses
+            .Where(x => x.CardCategory!.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
     }
@@ -83,13 +83,13 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var categoryData = await context.MessageStatuses
+        var categoryData = await context.CardStatuses
             .Where(x => x.Id == request.Id)
-            .Select(x => new { x.MessageCategoryId })
+            .Select(x => new { MessageCategoryId = x.CardCategoryId })
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
         
-        var newStatusId = await context.MessageStatuses
-            .Where(x => x.MessageCategoryId == categoryData.MessageCategoryId)
+        var newStatusId = await context.CardStatuses
+            .Where(x => x.CardCategoryId == categoryData.MessageCategoryId)
             .Where(x => x.Id != request.Id)
             .OrderBy(x => x.SortOrder)
             .Select(x => new { x.Id })
@@ -100,13 +100,13 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
                 nameof(request.Id),
                 "Deleting the single status in category is not allowed");
         
-        await context.Messages
+        await context.Cards
             .Where(x => x.StatusId == request.Id)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(p => p.StatusId, newStatusId.Id),
                 cancellationToken);
         
-        await context.MessageStatuses
+        await context.CardStatuses
             .Where(x => x.Id == request.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
@@ -115,10 +115,10 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
 
     public Task Update(
         long id,
-        Action<UpdateSettersBuilder<MessageStatus>> setters,
+        Action<UpdateSettersBuilder<CardStatus>> setters,
         CancellationToken cancellationToken)
     {
-        return context.MessageStatuses
+        return context.CardStatuses
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters, cancellationToken);
     }

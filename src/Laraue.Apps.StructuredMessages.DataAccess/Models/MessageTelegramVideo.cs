@@ -4,7 +4,7 @@ public class MessageTelegramVideo
 {
     public long Id { get; set; }
     
-    public Message? Message { get; set; }
+    public Card? Message { get; set; }
     public long MessageId { get; set; }
     
     public int Width { get; set; }
