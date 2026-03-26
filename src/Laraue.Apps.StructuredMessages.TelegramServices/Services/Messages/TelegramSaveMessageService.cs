@@ -91,11 +91,9 @@ public class TelegramSaveMessageService(
         if (originalPhoto != thumbnailPhoto)
             photos.Add((originalPhoto!, PhotoType.Original));
 
-        var existingPhotos = await context.TelegramPhotos
-            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
-            .Select(x => new { x.TelegramFileId, x.PhotoType })
-            .ToArrayAsyncEF(cancellationToken);
-
+        // Make resave of all attachments as the simplest way to sink them
+        await DeleteOldAttachments(request.TelegramMessageId, cancellationToken);
+        
         var groupId = Guid.NewGuid();
         foreach (var (photo, type) in photos)
         {
@@ -103,22 +101,6 @@ public class TelegramSaveMessageService(
                 photo,
                 saveFileToStorage: type == PhotoType.Thumbnail,
                 cancellationToken);
-
-            var existingPhotoOfThisType = existingPhotos.FirstOrDefault(
-                x => x.PhotoType == type);
-
-            if (existingPhotoOfThisType is not null)
-            {
-                // remove old file when it was different
-                if (existingPhotoOfThisType.TelegramFileId != fileId)
-                    await context.TelegramPhotos
-                        .Where(x => x.TelegramMessageId == request.TelegramMessageId)
-                        .Where(x => x.TelegramFileId == existingPhotoOfThisType.TelegramFileId)
-                        .ExecuteDeleteAsync(cancellationToken);
-                // skip when this file already saved
-                else
-                    continue;
-            }
 
             var messageFile = new TelegramMessagePhoto
             {
@@ -135,6 +117,13 @@ public class TelegramSaveMessageService(
         
         await context.SaveChangesAsync(cancellationToken);
         return getOrCreateResult;
+    }
+
+    public async Task DeleteOldAttachments(int messageId, CancellationToken cancellationToken)
+    {
+        await context.TelegramPhotos
+            .Where(x => x.TelegramMessageId == messageId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <summary>
@@ -327,12 +316,12 @@ public class TelegramSaveMessageService(
             .Where(x => x.Id == request.TelegramMessageId)
             .Select(x => new
             {
-                CardId = x.Card!.Id,
+                CardId = x.Card != null ? (long?)x.Card.Id : null,
             })
             .FirstOrDefaultAsync(cancellationToken);
         
         // Message is not stored, save it // TODO - store only if it is the first message
-        if (savedMessage is null)
+        if (savedMessage?.CardId is null)
         {
             var card = new Card
             {
@@ -340,10 +329,12 @@ public class TelegramSaveMessageService(
                 UserId = request.UserId,
                 CreatedAt = request.SentAt,
                 TelegramMessageId = request.TelegramMessageId,
-                TelegramMessage = new TelegramMessage
-                {
-                    Id = request.TelegramMessageId,
-                }
+                TelegramMessage = savedMessage is null
+                    ? new TelegramMessage
+                    {
+                        Id = request.TelegramMessageId,
+                    }
+                    : null
             };
 
             context.Add(card);
