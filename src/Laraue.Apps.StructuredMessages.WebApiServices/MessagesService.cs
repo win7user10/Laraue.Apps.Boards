@@ -398,43 +398,53 @@ public class MessagesService(
     {
         var cardIds = elements.Select(x => x.Id).ToList();
         
-        var mainTelegramMessages = await context
+        var directLinkedMessages = await context
             .TelegramMessages
             .Where(x => cardIds.Contains(x.Card!.Id))
-            .Select(x => new { x.Id, x.TelegramMediaGroupId })
+            .Select(x => new { x.Id, x.TelegramMediaGroupId, CardId = x.Card!.Id })
             .ToListAsyncEF(ct);
 
-        var mainTelegramMessagesIds = mainTelegramMessages
-            .Select(x => x.Id);
-
-        var groupIds = mainTelegramMessages
+        var groupIds = directLinkedMessages
             .Where(x => x.TelegramMediaGroupId.HasValue)
             .Select(x => x.TelegramMediaGroupId!.Value)
             .Distinct();
 
-        var additionalMessages = await context
+        var nonDirectLinkedMessages = await context
             .TelegramMessages
             .Where(x => groupIds.Contains(x.TelegramMediaGroupId!.Value))
-            .Where(x => !mainTelegramMessagesIds.Contains(x.Id))
+            .Where(x => !directLinkedMessages.Select(y => y.Id).Contains(x.Id))
             .Select(x => new { x.Id, x.TelegramMediaGroupId })
             .ToArrayAsyncEF(ct);
 
-        var allTelegramMessageIds = mainTelegramMessages
-            .Union(additionalMessages)
+        var allTelegramMessageIds = directLinkedMessages
             .Select(x => x.Id)
+            .Union(nonDirectLinkedMessages.Select(y => y.Id))
             .ToArray();
         
-        var photosByMainMessageId = (await context.TelegramPhotos
+        var photosData = await context.TelegramPhotos
             .Where(x => allTelegramMessageIds.Contains(x.TelegramMessageId))
             .Select(x => new
             {
-                CardId = x.TelegramMessage!.Card!.Id,
+                MessageId = x.TelegramMessageId,
+                MessageGroupId = x.TelegramMessage!.TelegramMediaGroupId,
                 x.TelegramFileId,
                 x.PhotoType,
                 x.GroupId,
             })
-            .ToArrayAsyncEF(ct))
-            .GroupBy(x => x.CardId)
+            .ToArrayAsyncEF(ct);
+
+        var cardIdByTelegramMessageId = directLinkedMessages
+            .ToDictionary(x => x.Id, x => x.CardId);
+        var cardIdByMediaGroupId = directLinkedMessages
+            .Where(x => x.TelegramMediaGroupId.HasValue)
+            .ToDictionary(x => x.TelegramMediaGroupId!.Value, x => x.CardId);
+        var photosByCardId = photosData
+            .GroupBy(x =>
+            {
+                if (x.MessageGroupId is not null)
+                    return cardIdByMediaGroupId[x.MessageGroupId.Value];
+                return cardIdByTelegramMessageId[x.MessageId];
+            })
             .ToDictionary(
                 x => x.Key,
                 x => x
@@ -444,22 +454,29 @@ public class MessagesService(
                         y => y
                             .Select(z => new { z.PhotoType, z.TelegramFileId })));
         
-        var videosByMessageId = (await context.TelegramVideos
+        var videosData = await context.TelegramVideos
             .Where(x => allTelegramMessageIds.Contains(x.TelegramMessageId))
             .Select(x => new
             {
-                CardId = x.TelegramMessage!.Card!.Id,
+                MessageId = x.TelegramMessageId,
+                MessageGroupId = x.TelegramMessage!.TelegramMediaGroupId,
                 x.ThumbnailFileId,
                 x.FileId
             })
-            .ToArrayAsyncEF(ct))
-            .GroupBy(x => x.CardId)
-            .ToDictionary(
-                x => x.Key);
+            .ToArrayAsyncEF(ct);
+
+        var videosByCardId = videosData
+            .GroupBy(x =>
+            {
+                if (x.MessageGroupId is not null)
+                    return cardIdByMediaGroupId[x.MessageGroupId.Value];
+                return cardIdByTelegramMessageId[x.MessageId];
+            })
+            .ToDictionary(x => x.Key);
         
         foreach (var element in elements)
         {
-            if (photosByMainMessageId.TryGetValue(element.Id, out var photos))
+            if (photosByCardId.TryGetValue(element.Id, out var photos))
                 foreach (var photoGroup in photos)
                     element.Media.Add(new MediaInfo
                     {
@@ -472,7 +489,7 @@ public class MessagesService(
                             ?.TelegramFileId,
                     });
             
-            if (videosByMessageId.TryGetValue(element.Id, out var videos))
+            if (videosByCardId.TryGetValue(element.Id, out var videos))
             {
                 foreach (var video in videos)
                 {

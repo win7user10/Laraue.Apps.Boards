@@ -78,6 +78,7 @@ public class TelegramSaveMessageService(
         if (request.Photos.Length == 0)
             return getOrCreateResult;
         
+        // TODO - Update photo only if it was changed.
         var thumbnailPhoto = request.Photos[0];
         var originalPhoto = request.Photos.Last();
         var photos = new List<(PhotoSize, PhotoType)>

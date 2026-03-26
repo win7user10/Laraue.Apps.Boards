@@ -18,15 +18,21 @@ public class HandleAllMessagesMiddleware(
     : ITelegramMiddleware
 {
     private const string ThumbnailMimeType = "image/jpg";
+
+    private static readonly UpdateType[] AllowedUpdates =
+    [
+        UpdateType.Message,
+        UpdateType.EditedMessage
+    ];
     
     public async Task InvokeAsync(Func<CancellationToken, Task> next, CancellationToken ct)
     {
         await next(ct);
         
-        if (context.GetExecutedRoute() is null && context.Update.Type == UpdateType.Message)
+        if (context.GetExecutedRoute() is null && AllowedUpdates.Contains(context.Update.Type))
         {
-            var message = context.Update.Message!;
-            var text = message.Text!;
+            var message = context.Update.Message ?? context.Update.EditedMessage;
+            var text = message!.Text;
 
             SaveMessageTelegramRequest? request = message.Type switch
             {
