@@ -5,7 +5,7 @@ public class TelegramMessagePhoto
     public long Id { get; set; }
     
     public TelegramMessage? TelegramMessage { get; set; }
-    public int TelegramMessageId { get; set; }
+    public long TelegramMessageId { get; set; }
     
     public int Width { get; set; }
     public int Height { get; set; }

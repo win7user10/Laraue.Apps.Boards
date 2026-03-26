@@ -11,6 +11,78 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "telegram_media_groups",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    external_id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_telegram_media_groups", x => x.id);
+                });
+            
+            migrationBuilder.Sql(@"
+insert into telegram_media_groups
+(external_id)
+select distinct telegram_media_group_id
+from cards c
+where telegram_media_group_id is not null");
+            
+            migrationBuilder.CreateTable(
+                name: "telegram_messages",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    telegram_message_id = table.Column<int>(type: "integer", nullable: true),
+                    telegram_media_group_id = table.Column<long>(type: "bigint", nullable: true),
+                    telegram_chat_id = table.Column<long>(type: "bigint", nullable: false),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_telegram_messages", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_telegram_messages_telegram_media_groups_telegram_media_grou",
+                        column: x => x.telegram_media_group_id,
+                        principalTable: "telegram_media_groups",
+                        principalColumn: "id");
+                });
+            
+            migrationBuilder.Sql(@"
+insert into telegram_messages
+(telegram_message_id, telegram_media_group_id, telegram_chat_id)
+select c.telegram_message_id, tmg.id, u.telegram_id
+from cards c
+left join telegram_media_groups tmg on tmg.external_id = c.telegram_media_group_id
+inner join users u on u.id = c.user_id
+where c.telegram_message_id is not null");
+            
+            
+            migrationBuilder.Sql(@"
+WITH updated_data AS (
+    SELECT c.id as card_id, tm.id as message_id
+    FROM cards c
+    INNER JOIN users u ON u.id = c.user_id
+    INNER JOIN telegram_messages tm ON tm.telegram_message_id = c.telegram_message_id
+    WHERE tm.telegram_chat_id = u.telegram_id
+)
+UPDATE cards c
+SET telegram_message_id = ud.message_id
+FROM updated_data ud
+WHERE c.id = ud.card_id;");
+            
+            migrationBuilder.AlterColumn<long>(
+                name: "telegram_message_id",
+                table: "cards",
+                type: "bigint",
+                nullable: true,
+                oldClrType: typeof(int),
+                oldType: "integer",
+                oldNullable: true);
+            
             migrationBuilder.DropForeignKey(
                 name: "fk_telegram_photos_cards_card_id",
                 table: "telegram_photos");
@@ -31,7 +103,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                 name: "ix_cards_telegram_media_group_id",
                 table: "cards");
             
-            migrationBuilder.AddColumn<int>(
+            migrationBuilder.AddColumn<long>(
                 name: "telegram_message_id",
                 table: "telegram_videos",
                 type: "integer",
@@ -48,7 +120,7 @@ where tv.message_id = c.id");
                 name: "message_id",
                 table: "telegram_videos");
 
-            migrationBuilder.AddColumn<int>(
+            migrationBuilder.AddColumn<long>(
                 name: "telegram_message_id",
                 table: "telegram_photos",
                 type: "integer",
@@ -64,52 +136,6 @@ where tp.card_id = c.id");
             migrationBuilder.DropColumn(
                 name: "card_id",
                 table: "telegram_photos");
-
-            migrationBuilder.CreateTable(
-                name: "telegram_media_groups",
-                columns: table => new
-                {
-                    id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    external_id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_telegram_media_groups", x => x.id);
-                });
-            
-            migrationBuilder.Sql(@"
-insert into telegram_media_groups
-(external_id)
-select distinct telegram_media_group_id
-from cards c
-where telegram_media_group_id is not null");
-
-            migrationBuilder.CreateTable(
-                name: "telegram_messages",
-                columns: table => new
-                {
-                    id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    telegram_media_group_id = table.Column<long>(type: "bigint", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_telegram_messages", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_telegram_messages_telegram_media_groups_telegram_media_grou",
-                        column: x => x.telegram_media_group_id,
-                        principalTable: "telegram_media_groups",
-                        principalColumn: "id");
-                });
-            
-            migrationBuilder.Sql(@"
-insert into telegram_messages
-(id, telegram_media_group_id)
-select c.telegram_message_id, tmg.id
-from cards c
-left join telegram_media_groups tmg on tmg.external_id = c.telegram_media_group_id
-where c.telegram_message_id is not null");
 
             migrationBuilder.DropColumn(
                 name: "telegram_media_group_id",

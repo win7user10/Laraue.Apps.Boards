@@ -50,8 +50,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
 
-                    b.Property<int?>("TelegramMessageId")
-                        .HasColumnType("integer")
+                    b.Property<long?>("TelegramMessageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("telegram_message_id");
 
                     b.Property<Guid>("UserId")
@@ -222,22 +222,34 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("bigint")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("TelegramChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_chat_id");
 
                     b.Property<long?>("TelegramMediaGroupId")
                         .HasColumnType("bigint")
                         .HasColumnName("telegram_media_group_id");
+
+                    b.Property<int>("TelegramMessageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("telegram_message_id");
 
                     b.HasKey("Id")
                         .HasName("pk_telegram_messages");
 
                     b.HasIndex("TelegramMediaGroupId")
                         .HasDatabaseName("ix_telegram_messages_telegram_media_group_id");
+
+                    b.HasIndex("TelegramMessageId", "TelegramChatId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_telegram_messages_telegram_message_id_telegram_chat_id");
 
                     b.ToTable("telegram_messages", (string)null);
                 });
@@ -267,8 +279,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("telegram_file_id");
 
-                    b.Property<int>("TelegramMessageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("TelegramMessageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("telegram_message_id");
 
                     b.Property<int>("Width")
@@ -304,8 +316,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("height");
 
-                    b.Property<int>("TelegramMessageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("TelegramMessageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("telegram_message_id");
 
                     b.Property<Guid?>("ThumbnailFileId")

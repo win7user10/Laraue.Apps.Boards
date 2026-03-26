@@ -53,5 +53,12 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.ExternalId)
                 .IsUnique();
         });
+        
+        modelBuilder.Entity<TelegramMessage>(entity =>
+        {
+            entity
+                .HasIndex(x => new { x.TelegramMessageId, x.TelegramChatId })
+                .IsUnique();
+        });
     }
 }

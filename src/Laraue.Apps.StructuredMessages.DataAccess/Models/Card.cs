@@ -33,5 +33,5 @@ public class Card
     public CardStatus? Status { get; set; }
     
     public TelegramMessage? TelegramMessage { get; set; }
-    public int? TelegramMessageId { get; set; }
+    public long? TelegramMessageId { get; set; }
 }

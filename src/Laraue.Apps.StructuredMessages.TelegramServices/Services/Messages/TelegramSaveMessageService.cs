@@ -47,8 +47,10 @@ public class TelegramSaveMessageService(
         {
             Height = request.Height,
             Width = request.Width,
-            TelegramMessageId = request.TelegramMessageId,
+            TelegramMessageId = getOrCreateResult.TelegramMessageId,
         };
+        
+        await DeleteOldAttachments(getOrCreateResult.TelegramMessageId, cancellationToken);
         
         if (request.Thumbnail is not null)
         {
@@ -91,8 +93,7 @@ public class TelegramSaveMessageService(
         if (originalPhoto != thumbnailPhoto)
             photos.Add((originalPhoto!, PhotoType.Original));
 
-        // Make resave of all attachments as the simplest way to sink them
-        await DeleteOldAttachments(request.TelegramMessageId, cancellationToken);
+        await DeleteOldAttachments(getOrCreateResult.TelegramMessageId, cancellationToken);
         
         var groupId = Guid.NewGuid();
         foreach (var (photo, type) in photos)
@@ -104,7 +105,7 @@ public class TelegramSaveMessageService(
 
             var messageFile = new TelegramMessagePhoto
             {
-                TelegramMessageId = request.TelegramMessageId,
+                TelegramMessageId = getOrCreateResult.TelegramMessageId,
                 TelegramFileId = fileId,
                 Height = photo.Height,
                 Width = photo.Width,
@@ -119,10 +120,14 @@ public class TelegramSaveMessageService(
         return getOrCreateResult;
     }
 
-    public async Task DeleteOldAttachments(int messageId, CancellationToken cancellationToken)
+    private async Task DeleteOldAttachments(long telegramMessageId, CancellationToken cancellationToken)
     {
         await context.TelegramPhotos
-            .Where(x => x.TelegramMessageId == messageId)
+            .Where(x => x.TelegramMessageId == telegramMessageId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await context.TelegramVideos
+            .Where(x => x.TelegramMessageId == telegramMessageId)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
@@ -212,7 +217,8 @@ public class TelegramSaveMessageService(
     {
         // Try to find the message
         var savedMessage = await context.TelegramMessages
-            .Where(x => x.Id == request.TelegramMessageId)
+            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+            .Where(x => x.TelegramChatId == request.TelegramUserId)
             .FirstOrDefaultAsync(cancellationToken);
         
         // When group id already stored in message - remain it as is. It can't change
@@ -238,7 +244,8 @@ public class TelegramSaveMessageService(
         {
             var telegramMessage = new TelegramMessage
             {
-                Id = request.TelegramMessageId,
+                TelegramMessageId = request.TelegramMessageId,
+                TelegramChatId = request.TelegramUserId,
                 TelegramMediaGroupId = groupId,
             };
 
@@ -265,6 +272,7 @@ public class TelegramSaveMessageService(
             return new GetOrCreateMessageResult
             {
                 Result = isFirstMessageInGroup ? Result.MainMessageCreated : null,
+                TelegramMessageId = telegramMessage.Id,
             };
         }
             
@@ -280,6 +288,7 @@ public class TelegramSaveMessageService(
             return new GetOrCreateMessageResult
             {
                 Result = Result.MainMessageUpdated,
+                TelegramMessageId = savedMessage.Id,
             };
         }
         // The case when first message was deleted and text added to the second
@@ -295,12 +304,14 @@ public class TelegramSaveMessageService(
             return new GetOrCreateMessageResult
             {
                 Result = Result.MainMessageUpdated,
+                TelegramMessageId = savedMessage.Id,
             };
         }
         
         return new GetOrCreateMessageResult
         {
             Result = null,
+            TelegramMessageId = savedMessage.Id,
         };
     }
     
@@ -313,10 +324,12 @@ public class TelegramSaveMessageService(
     {
         // Try to find the message
         var savedMessage = await context.TelegramMessages
-            .Where(x => x.Id == request.TelegramMessageId)
+            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+            .Where(x => x.TelegramChatId == request.TelegramUserId)
             .Select(x => new
             {
                 CardId = x.Card != null ? (long?)x.Card.Id : null,
+                x.Id,
             })
             .FirstOrDefaultAsync(cancellationToken);
         
@@ -332,7 +345,8 @@ public class TelegramSaveMessageService(
                 TelegramMessage = savedMessage is null
                     ? new TelegramMessage
                     {
-                        Id = request.TelegramMessageId,
+                        TelegramMessageId = request.TelegramMessageId,
+                        TelegramChatId = request.TelegramUserId,
                     }
                     : null
             };
@@ -342,11 +356,12 @@ public class TelegramSaveMessageService(
             return new GetOrCreateMessageResult
             {
                 Result = Result.MainMessageCreated,
+                TelegramMessageId = savedMessage?.Id ?? card.TelegramMessage?.Id ?? 0
             };
         }
         
         await context.Cards
-            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+            .Where(x => x.TelegramMessageId == savedMessage.Id)
             .ExecuteUpdateAsync(upd => upd
                 .SetProperty(x => x.Content, request.Text),
                 cancellationToken);
@@ -354,6 +369,7 @@ public class TelegramSaveMessageService(
         return new GetOrCreateMessageResult
         {
             Result = Result.MainMessageUpdated,
+            TelegramMessageId = savedMessage.Id,
         };
     }
 
@@ -383,6 +399,7 @@ public class TelegramSaveMessageService(
 
 public class GetOrCreateMessageResult
 {
+    public required long TelegramMessageId { get; set; }
     public required Result? Result { get; set; }
 }
 

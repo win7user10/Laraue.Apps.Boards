@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Laraue.Apps.StructuredMessages.Services;
+﻿using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices.Interceptors;
 using Laraue.Apps.StructuredMessages.TelegramServices.Resources;
 using Laraue.Telegram.NET.Core.Extensions;
@@ -402,35 +401,41 @@ public class TelegramMessageService(
             cancellationToken);
     }
 
-    private Task SendOrEditMessage(
+    private async Task SendOrEditMessage(
         int? editMessageId,
-        int? replyMessageId,
+        long? replyMessageId,
         long userTelegramId,
         TelegramMessageBuilder tmb,
         CancellationToken cancellationToken)
     {
+        var replyMessageExternalId = replyMessageId.HasValue
+            ? await repository.GetExternalTelegramMessageId(
+                replyMessageId.Value,
+                cancellationToken)
+            : (int?)null;
+        
         if (editMessageId is not null)
         {
-            return client.EditMessageTextAsync(
+            await client.EditMessageTextAsync(
                 userTelegramId,
                 editMessageId.Value,
                 tmb,
                 cancellationToken: cancellationToken);
+
+            return;
         }
 
-        if (replyMessageId is not null)
+        if (replyMessageExternalId is not null)
         {
-            return client.SendTextMessageAsync(
+            await client.SendTextMessageAsync(
                 userTelegramId,
                 tmb,
                 replyParameters: new ReplyParameters
                 {
-                    MessageId = replyMessageId.Value,
+                    MessageId = replyMessageExternalId.Value,
                     AllowSendingWithoutReply = true,
                 },
                 cancellationToken: cancellationToken);
         }
-        
-        return Task.CompletedTask;
     }
 }
