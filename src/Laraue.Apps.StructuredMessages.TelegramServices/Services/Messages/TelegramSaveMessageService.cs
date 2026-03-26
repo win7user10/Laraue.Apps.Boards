@@ -233,7 +233,11 @@ public class TelegramSaveMessageService(
         var firstGroupMessageData = await context.TelegramMessages
             .Where(x => x.TelegramMediaGroupId == groupId)
             .OrderBy(x => x.Id)
-            .Select(x => new { x.Id, CardId = x.Card!.Id })
+            .Select(x => new
+            {
+                x.Id,
+                CardId = x.Card == null ? (long?)null : x.Card.Id
+            })
             .FirstOrDefaultAsyncEF(cancellationToken);
         
         // Skip the card creating
@@ -242,48 +246,31 @@ public class TelegramSaveMessageService(
 
         if (savedMessage is null)
         {
-            var telegramMessage = new TelegramMessage
+            savedMessage = new TelegramMessage
             {
                 TelegramMessageId = request.TelegramMessageId,
                 TelegramChatId = request.TelegramUserId,
                 TelegramMediaGroupId = groupId,
             };
 
-            if (isFirstMessageInGroup)
-            {
-                var card = new Card
-                {
-                    Content = request.Text,
-                    UserId = request.UserId,
-                    CreatedAt = request.SentAt,
-                    TelegramMessageId = request.TelegramMessageId,
-                    TelegramMessage = telegramMessage
-                };
-                
-                context.Add(card);
-            }
-            else
-            {
-                context.Add(telegramMessage);
-            }
-
+            context.Add(savedMessage);
             await context.SaveChangesAsync(cancellationToken);
-
-            return new GetOrCreateMessageResult
-            {
-                Result = isFirstMessageInGroup ? Result.MainMessageCreated : null,
-                TelegramMessageId = telegramMessage.Id,
-            };
         }
             
         // If a card is based on this message it will be updated
-        if (isFirstMessageInGroup)
+        if (isFirstMessageInGroup || !(firstGroupMessageData?.CardId).HasValue)
         {
-            await context.Cards
-                .Where(x => x.TelegramMessageId == request.TelegramMessageId)
-                .ExecuteUpdateAsync(upd => upd
-                        .SetProperty(x => x.Content, request.Text),
-                    cancellationToken);
+            var card = new Card
+            {
+                Content = request.Text,
+                UserId = request.UserId,
+                CreatedAt = request.SentAt,
+                TelegramMessageId = request.TelegramMessageId,
+                TelegramMessage = savedMessage
+            };
+                
+            context.Add(card);
+            await context.SaveChangesAsync(cancellationToken);
             
             return new GetOrCreateMessageResult
             {
@@ -291,6 +278,7 @@ public class TelegramSaveMessageService(
                 TelegramMessageId = savedMessage.Id,
             };
         }
+        
         // The case when first message was deleted and text added to the second
         if (request.Text is not null && firstGroupMessageData is not null)
         {
