@@ -396,19 +396,45 @@ public class MessagesService(
     private async Task Enrich<T>(IList<T> elements, CancellationToken ct)
         where T : class, ICanContainMedia
     {
-        var ids = elements.Select(x => x.Id).ToList();
+        var cardIds = elements.Select(x => x.Id).ToList();
+        
+        var mainTelegramMessages = await context
+            .TelegramMessages
+            .Where(x => cardIds.Contains(x.Card!.Id))
+            .Select(x => new { x.Id, x.TelegramMediaGroupId })
+            .ToListAsyncEF(ct);
 
-        var photosByMessageId = (await context.TelegramPhotos
-            .Where(x => ids.Contains(x.CardId))
+        var mainTelegramMessagesIds = mainTelegramMessages
+            .Select(x => x.Id);
+
+        var groupIds = mainTelegramMessages
+            .Where(x => x.TelegramMediaGroupId.HasValue)
+            .Select(x => x.TelegramMediaGroupId!.Value)
+            .Distinct();
+
+        var additionalMessages = await context
+            .TelegramMessages
+            .Where(x => groupIds.Contains(x.TelegramMediaGroupId!.Value))
+            .Where(x => !mainTelegramMessagesIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.TelegramMediaGroupId })
+            .ToArrayAsyncEF(ct);
+
+        var allTelegramMessageIds = mainTelegramMessages
+            .Union(additionalMessages)
+            .Select(x => x.Id)
+            .ToArray();
+        
+        var photosByMainMessageId = (await context.TelegramPhotos
+            .Where(x => allTelegramMessageIds.Contains(x.TelegramMessageId))
             .Select(x => new
             {
-                MessageId = x.CardId,
+                CardId = x.TelegramMessage!.Card!.Id,
                 x.TelegramFileId,
                 x.PhotoType,
                 x.GroupId,
             })
             .ToArrayAsyncEF(ct))
-            .GroupBy(x => x.MessageId)
+            .GroupBy(x => x.CardId)
             .ToDictionary(
                 x => x.Key,
                 x => x
@@ -419,16 +445,21 @@ public class MessagesService(
                             .Select(z => new { z.PhotoType, z.TelegramFileId })));
         
         var videosByMessageId = (await context.TelegramVideos
-            .Where(x => ids.Contains(x.MessageId))
-            .Select(x => new { x.MessageId, x.ThumbnailFileId, x.FileId })
+            .Where(x => allTelegramMessageIds.Contains(x.TelegramMessageId))
+            .Select(x => new
+            {
+                CardId = x.TelegramMessage!.Card!.Id,
+                x.ThumbnailFileId,
+                x.FileId
+            })
             .ToArrayAsyncEF(ct))
-            .GroupBy(x => x.MessageId)
+            .GroupBy(x => x.CardId)
             .ToDictionary(
                 x => x.Key);
         
         foreach (var element in elements)
         {
-            if (photosByMessageId.TryGetValue(element.Id, out var photos))
+            if (photosByMainMessageId.TryGetValue(element.Id, out var photos))
                 foreach (var photoGroup in photos)
                     element.Media.Add(new MediaInfo
                     {

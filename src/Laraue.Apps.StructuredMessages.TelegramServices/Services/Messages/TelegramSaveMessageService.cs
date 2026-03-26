@@ -1,7 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Core.Exceptions.Web;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot;
 
@@ -41,13 +41,13 @@ public class TelegramSaveMessageService(
         SaveVideoMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var getOrCreateResult = await GetOrCreateMessageEntityId(request, cancellationToken);
+        var getOrCreateResult = await SaveMessageEntity(request, cancellationToken);
 
-        var videoFile = new MessageTelegramVideo
+        var videoFile = new TelegramMessageVideo
         {
             Height = request.Height,
             Width = request.Width,
-            MessageId = getOrCreateResult.MessageId,
+            TelegramMessageId = request.TelegramMessageId,
         };
         
         if (request.Thumbnail is not null)
@@ -74,7 +74,7 @@ public class TelegramSaveMessageService(
         SaveImageMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var getOrCreateResult = await GetOrCreateMessageEntityId(request, cancellationToken);
+        var getOrCreateResult = await SaveMessageEntity(request, cancellationToken);
         if (request.Photos.Length == 0)
             return getOrCreateResult;
         
@@ -96,9 +96,9 @@ public class TelegramSaveMessageService(
                 saveFileToStorage: type == PhotoType.Thumbnail,
                 cancellationToken);
 
-            var messageFile = new MessageTelegramPhoto
+            var messageFile = new TelegramMessagePhoto
             {
-                CardId = getOrCreateResult.MessageId,
+                TelegramMessageId = request.TelegramMessageId,
                 TelegramFileId = fileId,
                 Height = photo.Height,
                 Width = photo.Width,
@@ -177,58 +177,179 @@ public class TelegramSaveMessageService(
 
         return telegramFile.Id;
     }
-
-    private async Task<GetOrCreateMessageResult> GetOrCreateMessageEntityId(
+        
+    // New msg, old group
+    // Old msg, old group
+    // if first msg in group then update content
+    private Task<GetOrCreateMessageResult> SaveMessageEntity(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.MediaGroupId is null)
-            return await SaveMessageEntity(request, cancellationToken);
-        
-        var oldMessageData = await context.Cards
-            .Where(x => x.TelegramMediaGroupId == request.MediaGroupId)
-            .Select(x => new { x.Id, x.UserId })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (oldMessageData is not null && oldMessageData.UserId != request.UserId)
-            throw new ForbiddenException(
-                $"Media group id {request.MediaGroupId} belongs to other person");
-
-        if (oldMessageData is not null)
-            return new GetOrCreateMessageResult
-            {
-                MessageId = oldMessageData.Id,
-                WasCreated = false,
-            };
-        
-        return await SaveMessageEntity(request, cancellationToken);
+        return request.MediaGroupId == null
+            ? SaveSingleMessageEntity(request, cancellationToken)
+            : SaveGroupMessageEntity(request, cancellationToken);
     }
 
-    private async Task<GetOrCreateMessageResult> SaveMessageEntity(
+    /// <summary>
+    /// Difficult case. Message is one message of the group.
+    /// </summary>
+    private async Task<GetOrCreateMessageResult> SaveGroupMessageEntity(
         SaveMessageTelegramRequest request,
         CancellationToken cancellationToken)
     {
-        var message = new Card
-        {
-            Content = request.Text,
-            TelegramMediaGroupId = request.MediaGroupId,
-            UserId = request.UserId,
-            CreatedAt = request.SentAt,
-            TelegramMessageId = request.TelegramMessageId,
-        };
+        // Try to find the message
+        var savedMessage = await context.TelegramMessages
+            .Where(x => x.Id == request.TelegramMessageId)
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        // When group id already stored in message - remain it as is. It can't change
+        // Otherwise, save it if it was presented.
+        var groupId = savedMessage?.TelegramMediaGroupId;
+        if (groupId is null && request.MediaGroupId is not null)
+            groupId = await GetOrCreateTelegramMediaGroupId(
+                request.MediaGroupId,
+                cancellationToken);
 
-        context.Add(message);
-        await context.SaveChangesAsync(cancellationToken);
+        // When it is the message group, only the first message content is stored to card
+        var firstGroupMessageData = await context.TelegramMessages
+            .Where(x => x.TelegramMediaGroupId == groupId)
+            .Select(x => new { x.Id, CardId = x.Card!.Id })
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        // Skip the card creating
+        var isFirstMessageInGroup = firstGroupMessageData is null
+            || firstGroupMessageData.Id == request.TelegramMessageId;
+
+        if (savedMessage is null)
+        {
+            var telegramMessage = new TelegramMessage
+            {
+                Id = request.TelegramMessageId,
+                TelegramMediaGroupId = groupId,
+            };
+
+            if (isFirstMessageInGroup)
+            {
+                var card = new Card
+                {
+                    Content = request.Text,
+                    UserId = request.UserId,
+                    CreatedAt = request.SentAt,
+                    TelegramMessageId = request.TelegramMessageId,
+                    TelegramMessage = telegramMessage
+                };
+                
+                context.Add(card);
+            }
+            else
+            {
+                context.Add(telegramMessage);
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            return new GetOrCreateMessageResult
+            {
+                Result = isFirstMessageInGroup ? Result.MainMessageCreated : null,
+            };
+        }
+            
+        if (isFirstMessageInGroup)
+            // If a card is based on this message it will be updated
+            await context.Cards
+                .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+                .ExecuteUpdateAsync(upd => upd
+                        .SetProperty(x => x.Content, request.Text),
+                    cancellationToken);
+
         return new GetOrCreateMessageResult
         {
-            MessageId = message.Id,
-            WasCreated = true,
+            Result = isFirstMessageInGroup ? Result.MainMessageUpdated : null,
         };
+    }
+    
+    /// <summary>
+    /// Simple case. One message without groups.
+    /// </summary>
+    private async Task<GetOrCreateMessageResult> SaveSingleMessageEntity(
+        SaveMessageTelegramRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Try to find the message
+        var savedMessage = await context.TelegramMessages
+            .Where(x => x.Id == request.TelegramMessageId)
+            .Select(x => new
+            {
+                CardId = x.Card!.Id,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        // Message is not stored, save it // TODO - store only if it is the first message
+        if (savedMessage is null)
+        {
+            var card = new Card
+            {
+                Content = request.Text,
+                UserId = request.UserId,
+                CreatedAt = request.SentAt,
+                TelegramMessageId = request.TelegramMessageId,
+                TelegramMessage = new TelegramMessage
+                {
+                    Id = request.TelegramMessageId,
+                }
+            };
+
+            context.Add(card);
+            await context.SaveChangesAsync(cancellationToken);
+            return new GetOrCreateMessageResult
+            {
+                Result = Result.MainMessageCreated,
+            };
+        }
+        
+        await context.Cards
+            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+            .ExecuteUpdateAsync(upd => upd
+                .SetProperty(x => x.Content, request.Text),
+                cancellationToken);
+        
+        return new GetOrCreateMessageResult
+        {
+            Result = Result.MainMessageUpdated,
+        };
+    }
+
+    private async Task<long> GetOrCreateTelegramMediaGroupId(
+        string groupId,
+        CancellationToken cancellationToken)
+    {
+        var data = await context.TelegramMediaGroups
+            .Where(x => x.ExternalId == groupId)
+            .Select(x => new { x.Id })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (data is not null)
+            return data.Id;
+
+        var group = new TelegramMediaGroup
+        {
+            ExternalId = groupId,
+        };
+        
+        context.Add(group);
+        await context.SaveChangesAsync(cancellationToken);
+        
+        return group.Id;
     }
 }
 
 public class GetOrCreateMessageResult
 {
-    public long MessageId { get; set; }
-    public bool WasCreated { get; set; }
+    public required Result? Result { get; set; }
+}
+
+public enum Result
+{
+    MainMessageCreated,
+    MainMessageUpdated,
 }

@@ -30,17 +30,19 @@ public class TelegramMessageService(
             request,
             cancellationToken);
 
-        // If message was created with that request than response,
+        // If message was created with that request then response,
         // otherwise it is the second, third etc. parts of message
-        if (result.WasCreated)
-            await OpenChangeCategoryWindow(
-                request.UserId,
-                editMessageId: null,
-                new HandleOpenChangeCategoryWindowRequest
-                {
-                    MessageId = result.MessageId
-                },
-                cancellationToken);
+        if (result.Result == Result.MainMessageCreated)
+            await client.SetMessageReaction(
+                request.TelegramUserId,
+                request.TelegramMessageId,
+                [
+                    new ReactionTypeEmoji
+                    {
+                        Emoji = "👍"
+                    }
+                ],
+                cancellationToken: cancellationToken);
     }
 
     public Task HandleUpdateMessageCategory(
