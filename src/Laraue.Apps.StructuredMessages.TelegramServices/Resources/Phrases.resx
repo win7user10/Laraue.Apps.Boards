@@ -65,11 +65,16 @@
 
 I help you turn important Telegram messages into organized Kanban boards. Message me or forward a message and I'll add it to your Board.
 
-You can create boards, use full-text search, and much more. And never get lost in your notes again.
+You can use full-text search, sorting and filtering, and much more.
 
-You can see you boards then in web application {0}
+How to work with me:
+1. Write me or forward a message.
+2. I will react with 👍 when message is processed.
+3. That's all, the message is in your Board!
 
-Or tap the button below to open your board as Mini-App 👇</value>
+You can edit the message, I will react with ❤ and update the Board card.
+            
+You boards are available in Web-App {0} and in Mini-App 👇</value>
     </data>
     <data name="OpenMiniApp" xml:space="preserve">
         <value>Open Message Board</value>
