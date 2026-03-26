@@ -32,17 +32,24 @@ public class TelegramMessageService(
 
         // If message was created with that request then response,
         // otherwise it is the second, third etc. parts of message
-        if (result.Result == Result.MainMessageCreated)
-            await client.SetMessageReaction(
-                request.TelegramUserId,
-                request.TelegramMessageId,
-                [
-                    new ReactionTypeEmoji
-                    {
-                        Emoji = "👍"
-                    }
-                ],
-                cancellationToken: cancellationToken);
+        if (result.Result is Result.MainMessageCreated)
+            await SetReaction(request, "👍", cancellationToken);
+        else if (result.Result is Result.MainMessageUpdated)
+            await SetReaction(request, "❤", cancellationToken);
+    }
+
+    private async Task SetReaction(
+        SaveMessageTelegramRequest request,
+        string? reaction,
+        CancellationToken ct)
+    {
+        await client.SetMessageReaction(
+            request.TelegramUserId,
+            request.TelegramMessageId,
+            reaction is not null
+                ? [new ReactionTypeEmoji { Emoji = reaction }]
+                : [],
+            cancellationToken: ct);
     }
 
     public Task HandleUpdateMessageCategory(

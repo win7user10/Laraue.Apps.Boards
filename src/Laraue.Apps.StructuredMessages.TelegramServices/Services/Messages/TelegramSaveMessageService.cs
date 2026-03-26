@@ -79,6 +79,8 @@ public class TelegramSaveMessageService(
             return getOrCreateResult;
         
         // TODO - Update photo only if it was changed.
+        // If this unique file id already stored for file then skip
+        // If not stored, then remove previous and store
         var thumbnailPhoto = request.Photos[0];
         var originalPhoto = request.Photos.Last();
         var photos = new List<(PhotoSize, PhotoType)>
@@ -89,6 +91,11 @@ public class TelegramSaveMessageService(
         if (originalPhoto != thumbnailPhoto)
             photos.Add((originalPhoto!, PhotoType.Original));
 
+        var existingPhotos = await context.TelegramPhotos
+            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+            .Select(x => new { x.TelegramFileId, x.PhotoType })
+            .ToArrayAsyncEF(cancellationToken);
+
         var groupId = Guid.NewGuid();
         foreach (var (photo, type) in photos)
         {
@@ -96,6 +103,22 @@ public class TelegramSaveMessageService(
                 photo,
                 saveFileToStorage: type == PhotoType.Thumbnail,
                 cancellationToken);
+
+            var existingPhotoOfThisType = existingPhotos.FirstOrDefault(
+                x => x.PhotoType == type);
+
+            if (existingPhotoOfThisType is not null)
+            {
+                // remove old file when it was different
+                if (existingPhotoOfThisType.TelegramFileId != fileId)
+                    await context.TelegramPhotos
+                        .Where(x => x.TelegramMessageId == request.TelegramMessageId)
+                        .Where(x => x.TelegramFileId == existingPhotoOfThisType.TelegramFileId)
+                        .ExecuteDeleteAsync(cancellationToken);
+                // skip when this file already saved
+                else
+                    continue;
+            }
 
             var messageFile = new TelegramMessagePhoto
             {
@@ -214,12 +237,13 @@ public class TelegramSaveMessageService(
         // When it is the message group, only the first message content is stored to card
         var firstGroupMessageData = await context.TelegramMessages
             .Where(x => x.TelegramMediaGroupId == groupId)
+            .OrderBy(x => x.Id)
             .Select(x => new { x.Id, CardId = x.Card!.Id })
             .FirstOrDefaultAsyncEF(cancellationToken);
         
         // Skip the card creating
         var isFirstMessageInGroup = firstGroupMessageData is null
-            || firstGroupMessageData.Id == request.TelegramMessageId;
+            || firstGroupMessageData.Id == request.TelegramMessageId; // When exists, it's first message. The case with deleting previous first msg
 
         if (savedMessage is null)
         {
@@ -255,17 +279,39 @@ public class TelegramSaveMessageService(
             };
         }
             
+        // If a card is based on this message it will be updated
         if (isFirstMessageInGroup)
-            // If a card is based on this message it will be updated
+        {
             await context.Cards
                 .Where(x => x.TelegramMessageId == request.TelegramMessageId)
                 .ExecuteUpdateAsync(upd => upd
                         .SetProperty(x => x.Content, request.Text),
                     cancellationToken);
-
+            
+            return new GetOrCreateMessageResult
+            {
+                Result = Result.MainMessageUpdated,
+            };
+        }
+        // The case when first message was deleted and text added to the second
+        if (request.Text is not null && firstGroupMessageData is not null)
+        {
+            // TODO - here we can detect and remove previous messages. But should we?
+            await context.Cards
+                .Where(x => x.Id == firstGroupMessageData.CardId)
+                .ExecuteUpdateAsync(upd => upd
+                        .SetProperty(x => x.Content, request.Text),
+                    cancellationToken);
+                
+            return new GetOrCreateMessageResult
+            {
+                Result = Result.MainMessageUpdated,
+            };
+        }
+        
         return new GetOrCreateMessageResult
         {
-            Result = isFirstMessageInGroup ? Result.MainMessageUpdated : null,
+            Result = null,
         };
     }
     

@@ -22,7 +22,7 @@ public class HandleAllMessagesMiddleware(
     private static readonly UpdateType[] AllowedUpdates =
     [
         UpdateType.Message,
-        UpdateType.EditedMessage
+        UpdateType.EditedMessage,
     ];
     
     public async Task InvokeAsync(Func<CancellationToken, Task> next, CancellationToken ct)
