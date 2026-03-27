@@ -40,13 +40,13 @@ public class CategoriesService(
         CancellationToken cancellationToken)
     {
         var result = await context
-            .MessageCategories
+            .CardCategories
             .Where(x => x.UserId == userId)
             .Select(x => new CategoryCountDto
             {
                 Id = x.Id,
                 Name = x.Name,
-                Count = x.Messages!.Count,
+                Count = x.Cards!.Count,
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
             })
@@ -54,7 +54,7 @@ public class CategoriesService(
             .ToArrayAsyncEF(cancellationToken);
 
         var backlogCount = await context
-            .Messages
+            .Cards
             .Where(x => x.UserId == userId)
             .Where(x => x.CategoryId == null)
             .CountAsyncEF(cancellationToken);
@@ -71,7 +71,7 @@ public class CategoriesService(
         CancellationToken cancellationToken)
     {
         return context
-            .MessageCategories
+            .CardCategories
             .Where(x => x.Id == request.CategoryId)
             .Select(x => new CategoryDto
             {

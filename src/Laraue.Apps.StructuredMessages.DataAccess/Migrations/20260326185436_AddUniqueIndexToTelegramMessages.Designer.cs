@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260326185436_AddUniqueIndexToTelegramMessages")]
+    partial class AddUniqueIndexToTelegramMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -229,17 +232,17 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("ExternalChatId")
+                    b.Property<long>("TelegramChatId")
                         .HasColumnType("bigint")
-                        .HasColumnName("external_chat_id");
-
-                    b.Property<int>("ExternalMessageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("external_message_id");
+                        .HasColumnName("telegram_chat_id");
 
                     b.Property<long?>("TelegramMediaGroupId")
                         .HasColumnType("bigint")
                         .HasColumnName("telegram_media_group_id");
+
+                    b.Property<int>("TelegramMessageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("telegram_message_id");
 
                     b.HasKey("Id")
                         .HasName("pk_telegram_messages");
@@ -247,9 +250,9 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasIndex("TelegramMediaGroupId")
                         .HasDatabaseName("ix_telegram_messages_telegram_media_group_id");
 
-                    b.HasIndex("ExternalMessageId", "ExternalChatId")
+                    b.HasIndex("TelegramMessageId", "TelegramChatId")
                         .IsUnique()
-                        .HasDatabaseName("ix_telegram_messages_external_message_id_external_chat_id");
+                        .HasDatabaseName("ix_telegram_messages_telegram_message_id_telegram_chat_id");
 
                     b.ToTable("telegram_messages", (string)null);
                 });

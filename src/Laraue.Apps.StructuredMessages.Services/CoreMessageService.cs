@@ -21,7 +21,7 @@ public interface ICoreMessageService
     
     Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Message>> setters,
+        Action<UpdateSettersBuilder<Card>> setters,
         CancellationToken cancellationToken);
     
     Task UpdateStatus(
@@ -45,7 +45,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     
     public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
     {
-        return context.Messages
+        return context.Cards
             .Where(x => x.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
@@ -69,8 +69,8 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         }
         else
         {
-            var statusesAvailable = await context.MessageStatuses
-                .Where(x => x.MessageCategoryId == request.CategoryId)
+            var statusesAvailable = await context.CardStatuses
+                .Where(x => x.CardCategoryId == request.CategoryId)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(cancellationToken);
@@ -90,7 +90,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             }
         }
         
-        var entity = new Message
+        var entity = new Card
         {
             Content = request.Text,
             UserId = request.UserId,
@@ -109,10 +109,10 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
     public Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Message>> setters,
+        Action<UpdateSettersBuilder<Card>> setters,
         CancellationToken cancellationToken)
     {
-        return context.Messages
+        return context.Cards
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(setters, cancellationToken);
     }
@@ -121,7 +121,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     {
         if (newStatusId != NullId)
         {
-            var possibleStatusesIds = await context.Messages
+            var possibleStatusesIds = await context.Cards
                 .Where(x => x.Id == messageId)
                 .Select(x => x.Category!.Statuses!
                     .Select(s => s.Id))
@@ -135,7 +135,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
         long? value = newStatusId == NullId ? null : newStatusId;
 
-        await context.Messages
+        await context.Cards
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(x => x.StatusId, value),
@@ -146,12 +146,12 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     {
         if (newCategoryId != NullId)
         {
-            var userId = await context.Messages
+            var userId = await context.Cards
                 .Where(x => x.Id == messageId)
                 .Select(x => x.UserId)
                 .FirstOrDefaultAsyncEF(ct);
         
-            var possibleCategoryIds = await context.MessageCategories
+            var possibleCategoryIds = await context.CardCategories
                 .Where(x => x.UserId == userId)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(ct);
@@ -168,8 +168,8 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         long? newStatus = NullId;
         if (value is not null)
         {
-            var newStatusData = await context.MessageStatuses
-                .Where(s => s.MessageCategoryId == value.Value)
+            var newStatusData = await context.CardStatuses
+                .Where(s => s.CardCategoryId == value.Value)
                 .OrderBy(s => s.SortOrder)
                 .Select(s => new { s.Id })
                 .FirstOrDefaultAsyncEF(ct);
@@ -177,7 +177,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             newStatus = newStatusData?.Id;
         }
         
-        await context.Messages
+        await context.Cards
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(x => x.CategoryId, value)
@@ -187,7 +187,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
     public Task DeleteMessage(long id, CancellationToken cancellationToken)
     {
-        return context.Messages
+        return context.Cards
             .Where(x => x.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
     }
@@ -198,7 +198,7 @@ public class SaveMessageRequest
     public Guid UserId { get; set; }
     public required string? Text { get; set; }
     public required DateTime CreatedAt { get; set; }
-    public int? TelegramMessageId { get; set; }
+    public long? TelegramMessageId { get; set; }
     public long? CategoryId { get; set; }
     public long? StatusId { get; set; }
 }

@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class Message
+public class Card
 {
     public long Id { get; set; }
     
@@ -24,29 +24,14 @@ public class Message
     /// Message category.
     /// </summary>
     public long? CategoryId { get; set; }
-    public MessageCategory? Category { get; set; }
+    public CardCategory? Category { get; set; }
 
     /// <summary>
     /// Actual message status.
     /// </summary>
     public long? StatusId { get; set; }
-    public MessageStatus? Status { get; set; }
+    public CardStatus? Status { get; set; }
     
-    public int? TelegramMessageId { get; set; }
-    
-    /// <summary>
-    /// When the file contains messages this field allow to attachments in one message.
-    /// </summary>
-    [MaxLength(64)]
-    public string? TelegramMediaGroupId { get; set; }
-    
-    /// <summary>
-    /// Photos associated with a message.
-    /// </summary>
-    public IList<MessageTelegramPhoto>? Photos { get; set; }
-    
-    /// <summary>
-    /// Videos associated with a message.
-    /// </summary>
-    public IList<MessageTelegramVideo>? Videos { get; set; }
+    public TelegramMessage? TelegramMessage { get; set; }
+    public long? TelegramMessageId { get; set; }
 }

@@ -1,11 +1,11 @@
 ﻿namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class MessageTelegramPhoto
+public class TelegramMessagePhoto
 {
     public long Id { get; set; }
     
-    public Message? Message { get; set; }
-    public long MessageId { get; set; }
+    public TelegramMessage? TelegramMessage { get; set; }
+    public long TelegramMessageId { get; set; }
     
     public int Width { get; set; }
     public int Height { get; set; }
