@@ -216,8 +216,8 @@ public class TelegramSaveMessageService(
     {
         // Try to find the message
         var savedMessage = await context.TelegramMessages
-            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
-            .Where(x => x.TelegramChatId == request.TelegramUserId)
+            .Where(x => x.ExternalMessageId == request.ExternalMessageId)
+            .Where(x => x.ExternalChatId == request.ExternalUserId)
             .FirstOrDefaultAsync(cancellationToken);
         
         // When group id already stored in message - remain it as is. It can't change
@@ -243,8 +243,8 @@ public class TelegramSaveMessageService(
         {
             savedMessage = new TelegramMessage
             {
-                TelegramMessageId = request.TelegramMessageId,
-                TelegramChatId = request.TelegramUserId,
+                ExternalMessageId = request.ExternalMessageId,
+                ExternalChatId = request.ExternalUserId,
                 TelegramMediaGroupId = groupId,
             };
 
@@ -260,7 +260,7 @@ public class TelegramSaveMessageService(
                 Content = request.Text,
                 UserId = request.UserId,
                 CreatedAt = request.SentAt,
-                TelegramMessageId = request.TelegramMessageId,
+                TelegramMessageId = savedMessage.Id,
                 TelegramMessage = savedMessage
             };
                 
@@ -307,8 +307,8 @@ public class TelegramSaveMessageService(
     {
         // Try to find the message
         var savedMessage = await context.TelegramMessages
-            .Where(x => x.TelegramMessageId == request.TelegramMessageId)
-            .Where(x => x.TelegramChatId == request.TelegramUserId)
+            .Where(x => x.ExternalMessageId == request.ExternalMessageId)
+            .Where(x => x.ExternalChatId == request.ExternalUserId)
             .Select(x => new
             {
                 CardId = x.Card != null ? (long?)x.Card.Id : null,
@@ -328,8 +328,8 @@ public class TelegramSaveMessageService(
                 TelegramMessage = savedMessage is null
                     ? new TelegramMessage
                     {
-                        TelegramMessageId = request.TelegramMessageId,
-                        TelegramChatId = request.TelegramUserId,
+                        ExternalMessageId = request.ExternalMessageId,
+                        ExternalChatId = request.ExternalUserId,
                     }
                     : null
             };

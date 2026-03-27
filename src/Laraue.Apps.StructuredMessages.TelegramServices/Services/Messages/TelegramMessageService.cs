@@ -30,8 +30,8 @@ public class TelegramMessageService(
         CancellationToken ct)
     {
         await client.SetMessageReaction(
-            request.TelegramUserId,
-            request.TelegramMessageId,
+            request.ExternalUserId,
+            request.ExternalMessageId,
             reaction is not null
                 ? [new ReactionTypeEmoji { Emoji = reaction }]
                 : [],

@@ -66,9 +66,9 @@ public class HandleAllMessagesMiddleware(
         return new SaveTextMessageTelegramRequest
         {
             Text = text,
-            TelegramMessageId = message.MessageId,
+            ExternalMessageId = message.MessageId,
             UserId = context.UserId,
-            TelegramUserId = context.Update.GetUserId(),
+            ExternalUserId = context.Update.GetUserId(),
             SentAt = message.Date,
             From = message.From?.Username,
             MediaGroupId = message.MediaGroupId,
@@ -81,9 +81,9 @@ public class HandleAllMessagesMiddleware(
         return new SaveImageMessageTelegramRequest
         {
             Text = text,
-            TelegramMessageId = message.MessageId,
+            ExternalMessageId = message.MessageId,
             UserId = context.UserId,
-            TelegramUserId = context.Update.GetUserId(),
+            ExternalUserId = context.Update.GetUserId(),
             SentAt = message.Date,
             From = message.From?.Username,
             MediaGroupId = message.MediaGroupId,
@@ -110,9 +110,9 @@ public class HandleAllMessagesMiddleware(
         return new SaveVideoMessageTelegramRequest
         {
             Text = text,
-            TelegramMessageId = message.MessageId,
+            ExternalMessageId = message.MessageId,
             UserId = context.UserId,
-            TelegramUserId = context.Update.GetUserId(),
+            ExternalUserId = context.Update.GetUserId(),
             SentAt = message.Date,
             From = message.From?.Username,
             MediaGroupId = message.MediaGroupId,
@@ -149,9 +149,9 @@ public class HandleAllMessagesMiddleware(
         return new SaveVideoMessageTelegramRequest
         {
             Text = text,
-            TelegramMessageId = message.MessageId,
+            ExternalMessageId = message.MessageId,
             UserId = context.UserId,
-            TelegramUserId = context.Update.GetUserId(),
+            ExternalUserId = context.Update.GetUserId(),
             SentAt = message.Date,
             From = message.From?.Username,
             MediaGroupId = message.MediaGroupId,

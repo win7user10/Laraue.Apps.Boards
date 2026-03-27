@@ -198,7 +198,7 @@ public class SaveMessageRequest
     public Guid UserId { get; set; }
     public required string? Text { get; set; }
     public required DateTime CreatedAt { get; set; }
-    public int? TelegramMessageId { get; set; }
+    public long? TelegramMessageId { get; set; }
     public long? CategoryId { get; set; }
     public long? StatusId { get; set; }
 }

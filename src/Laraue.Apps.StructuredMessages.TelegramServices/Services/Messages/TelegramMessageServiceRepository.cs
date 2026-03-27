@@ -44,7 +44,7 @@ public class TelegramMessageServiceRepository(DatabaseContext databaseContext)
     {
         return databaseContext.TelegramMessages
             .Where(x => x.Id == telegramMessageId)
-            .Select(x => x.TelegramMessageId)
+            .Select(x => x.ExternalMessageId)
             .FirstOrDefaultAsyncEF(cancellationToken);
     }
 }

@@ -7,8 +7,8 @@ public class TelegramMessage
     /// <summary>
     /// Telegram message identifier.
     /// </summary>
-    public required int TelegramMessageId { get; init; }
-    public required long TelegramChatId { get; init; }
+    public required int ExternalMessageId { get; init; }
+    public required long ExternalChatId { get; init; }
     
     public long? TelegramMediaGroupId { get; init; }
     public TelegramMediaGroup? TelegramMediaGroup { get; set; }
