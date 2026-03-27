@@ -71,4 +71,19 @@ public class CategoriesController(ICategoriesService categoriesService)
             },
             cancellationToken);
     }
+    
+    
+    [HttpDelete("{id:long}")]
+    public Task Delete(
+        long id,
+        CancellationToken cancellationToken)
+    {
+        return categoriesService.Delete(
+            new DeleteCategoryRequest
+            {
+                Id = id,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }   

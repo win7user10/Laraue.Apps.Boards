@@ -28,6 +28,10 @@ public interface ICategoriesService
     Task Edit(
         EditCategoryRequest request,
         CancellationToken cancellationToken);
+    
+    Task Delete(
+        DeleteCategoryRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class CategoriesService(
@@ -134,6 +138,17 @@ public class CategoriesService(
                 .SetProperty(x => x.Name, request.Name),
             cancellationToken);
     }
+
+    public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
+    {
+        if (!await coreCategoryService
+                .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+            throw new NotFoundException();
+        
+        await coreCategoryService.Delete(
+            new DeleteRequest { Id = request.Id },
+            cancellationToken);
+    }
 }
 
 public class CategoryCountResult
@@ -201,4 +216,11 @@ public record EditCategoryRequest
     
     [MaxLength(7)]
     public required string Color { get; set; }
+}
+
+public record DeleteCategoryRequest
+{
+    public Guid UserId { get; set; }
+    
+    public long Id { get; set; }
 }
