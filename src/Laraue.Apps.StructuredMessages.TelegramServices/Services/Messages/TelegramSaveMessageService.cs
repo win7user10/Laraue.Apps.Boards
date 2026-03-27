@@ -80,7 +80,6 @@ public class TelegramSaveMessageService(
         if (request.Photos.Length == 0)
             return getOrCreateResult;
         
-        // TODO - Update photo only if it was changed.
         // If this unique file id already stored for file then skip
         // If not stored, then remove previous and store
         var thumbnailPhoto = request.Photos[0];
@@ -325,7 +324,7 @@ public class TelegramSaveMessageService(
                 Content = request.Text,
                 UserId = request.UserId,
                 CreatedAt = request.SentAt,
-                TelegramMessageId = request.TelegramMessageId,
+                TelegramMessageId = savedMessage?.Id,
                 TelegramMessage = savedMessage is null
                     ? new TelegramMessage
                     {
