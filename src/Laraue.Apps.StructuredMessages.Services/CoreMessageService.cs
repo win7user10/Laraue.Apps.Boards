@@ -165,7 +165,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         long? value = newCategoryId == NullId ? null : newCategoryId;
         
         // Set default category status after moving to category
-        long? newStatus = NullId;
+        long? newStatus = null;
         if (value is not null)
         {
             var newStatusData = await context.CardStatuses
