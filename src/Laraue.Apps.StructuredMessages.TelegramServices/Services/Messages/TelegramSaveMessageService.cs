@@ -240,10 +240,6 @@ public class TelegramSaveMessageService(
             })
             .FirstOrDefaultAsyncEF(cancellationToken);
         
-        // Skip the card creating
-        var isFirstMessageInGroup = firstGroupMessageData is null
-            || firstGroupMessageData.Id == request.TelegramMessageId; // When exists, it's first message. The case with deleting previous first msg
-
         if (savedMessage is null)
         {
             savedMessage = new TelegramMessage
@@ -256,9 +252,9 @@ public class TelegramSaveMessageService(
             context.Add(savedMessage);
             await context.SaveChangesAsync(cancellationToken);
         }
-            
-        // If a card is based on this message it will be updated
-        if (isFirstMessageInGroup || !(firstGroupMessageData?.CardId).HasValue)
+        
+        var cardForMessageIsCreated = (firstGroupMessageData?.CardId).HasValue;
+        if (!cardForMessageIsCreated)
         {
             var card = new Card
             {

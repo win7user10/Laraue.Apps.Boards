@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.WebApiServices", "src\Laraue.Apps.StructuredMessages.WebApiServices\Laraue.Apps.StructuredMessages.WebApiServices.csproj", "{D19CC756-66A6-408E-9755-824D7C836E08}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laraue.Apps.StructuredMessages.IntegrationTests", "tests\Laraue.Apps.StructuredMessages.IntegrationTests\Laraue.Apps.StructuredMessages.IntegrationTests.csproj", "{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +50,10 @@ Global
 		{D19CC756-66A6-408E-9755-824D7C836E08}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D19CC756-66A6-408E-9755-824D7C836E08}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D19CC756-66A6-408E-9755-824D7C836E08}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{57A6F2DA-6E02-4731-A12B-76CE9DDD7402} = {E66D8188-7DF1-4581-B431-7A2A06826342}
@@ -56,5 +62,6 @@ Global
 		{94D25C82-4A20-44DC-88B6-E3F9A634EFF8} = {743A9981-A9CD-42E7-B10B-FFF787337D50}
 		{B8E89702-1188-4D78-BF21-9EF3B3FB34B5} = {743A9981-A9CD-42E7-B10B-FFF787337D50}
 		{D19CC756-66A6-408E-9755-824D7C836E08} = {E66D8188-7DF1-4581-B431-7A2A06826342}
+		{B5F7BA80-6FA0-4F6B-9817-D4C3CF495E93} = {66F858C1-4885-4064-B257-ABFFB763755E}
 	EndGlobalSection
 EndGlobal
