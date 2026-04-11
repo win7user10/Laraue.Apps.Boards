@@ -60,8 +60,8 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<ITelegramSaveMessageService, TelegramSaveMessageService>();
 
             builder.Services
-                .AddScoped<ICoreMessageService, CoreMessageService>()
-                .AddScoped<ICoreCategoryService, CoreCategoryService>()
+                .AddScoped<ICoreIssuesService, CoreIssuesService>()
+                .AddScoped<ICoreEpicsService, CoreEpicsService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>();
             
             builder.Services.AddControllers();

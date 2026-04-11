@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface ICoreCategoryService
+public interface ICoreEpicsService
 {
     Task<MessageCategoryListDto[]> GetList(
         Guid userId,
@@ -37,8 +38,8 @@ public interface ICoreCategoryService
         CancellationToken cancellationToken);
 }
 
-public class CoreCategoryService(DatabaseContext context)
-    : ICoreCategoryService
+public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
+    : ICoreEpicsService
 {
     public Task<MessageCategoryListDto[]> GetList(
         Guid userId,
@@ -58,11 +59,16 @@ public class CoreCategoryService(DatabaseContext context)
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken)
     {
+        var dateTime = dateTimeProvider.UtcNow;
+        
         var category = new Epic
         {
             Name = request.Name,
             UserId = request.UserId,
             Color = request.Color ?? Palette.RandomColor(),
+            CreatedAt = dateTime,
+            UpdatedAt = dateTime,
+            TouchedAt = dateTime,
         };
         
         var statuses = request.Statuses ?? [
@@ -155,9 +161,19 @@ public class CoreCategoryService(DatabaseContext context)
         Action<UpdateSettersBuilder<Epic>> setters,
         CancellationToken cancellationToken)
     {
+        var date = dateTimeProvider.UtcNow;
+        
         return context.Epics
             .Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters, cancellationToken);
+            .ExecuteUpdateAsync(
+                update =>
+                {
+                    setters(update);
+                    update
+                        .SetProperty(p => p.UpdatedAt, date)
+                        .SetProperty(p => p.TouchedAt, date);
+                },
+                cancellationToken);
     }
 }
 

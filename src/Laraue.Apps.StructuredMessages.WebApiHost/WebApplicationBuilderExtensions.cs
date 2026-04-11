@@ -25,8 +25,8 @@ public static class WebApplicationBuilderExtensions
                     sp => new TelegramBotClient(sp.GetRequiredService<IOptions<TelegramOptions>>().Value.Token));
 
             builder.Services
-                .AddScoped<IMessagesService, MessagesService>()
-                .AddScoped<ICategoriesService, CategoriesService>()
+                .AddScoped<IIssuesService, IssuesService>()
+                .AddScoped<IEpicsService, EpicsService>()
                 .AddScoped<IStatusesService, StatusesService>();
 
             builder.Services

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
-public interface IMessagesService
+public interface IIssuesService
 {
     Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
@@ -55,18 +55,18 @@ public interface IMessagesService
         CancellationToken cancellationToken);
 }
 
-public class MessagesService(
+public class IssuesService(
     DatabaseContext context,
-    ICoreMessageService messageService,
-    ICoreCategoryService categoryService,
+    ICoreIssuesService messageService,
+    ICoreEpicsService epicsService,
     IDateTimeProvider dateTimeProvider)
-    : IMessagesService
+    : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = request.StatusId == CoreMessageService.NullId
+        var statusId = request.StatusId == CoreIssuesService.NullId
             ? null
             : request.StatusId;
 
@@ -121,7 +121,7 @@ public class MessagesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = request.CategoryId == CoreMessageService.NullId
+        var categoryId = request.CategoryId == CoreIssuesService.NullId
             ? null
             : request.CategoryId;
 
@@ -174,7 +174,7 @@ public class MessagesService(
             
             result.Add(new ColumnMessages
             {
-                StatusId = statusId ?? CoreMessageService.NullId,
+                StatusId = statusId ?? CoreIssuesService.NullId,
                 Items = mappedStatusResult,
             });
         }
@@ -222,7 +222,7 @@ public class MessagesService(
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = x.Key ?? CoreMessageService.NullId,
+                Id = x.Key ?? CoreIssuesService.NullId,
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
@@ -277,16 +277,16 @@ public class MessagesService(
 
     public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
     {
-        long? categoryId = request.CategoryId == CoreMessageService.NullId
+        long? categoryId = request.CategoryId == CoreIssuesService.NullId
             ? null
             : request.CategoryId;
         
-        long? statusId = request.StatusId == CoreMessageService.NullId
+        long? statusId = request.StatusId == CoreIssuesService.NullId
             ? null
             : request.StatusId;
 
         if (categoryId.HasValue
-            && !await categoryService.UserHasAccessToCategory(
+            && !await epicsService.UserHasAccessToCategory(
                 request.UserId, request.CategoryId, ct))
                     throw new BadRequestException(
                         nameof(categoryId),
@@ -325,7 +325,7 @@ public class MessagesService(
         
         if (request.CategoryId.HasValue)
         {
-            var categoryId = request.CategoryId == CoreMessageService.NullId
+            var categoryId = request.CategoryId == CoreIssuesService.NullId
                 ? null
                 : request.CategoryId;
 
@@ -512,8 +512,8 @@ public class MessagesService(
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.EpicId ?? CoreMessageService.NullId,
-            StatusId = x.StatusId ?? CoreMessageService.NullId,
+            CategoryId = x.EpicId ?? CoreIssuesService.NullId,
+            StatusId = x.StatusId ?? CoreIssuesService.NullId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,

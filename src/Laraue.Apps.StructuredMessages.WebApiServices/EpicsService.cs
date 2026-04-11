@@ -7,13 +7,13 @@ using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
-public interface ICategoriesService
+public interface IEpicsService
 {
-    Task<CategoryCountResult> GetCategoriesWithCount(
+    Task<CategoryCountResult> GetEpicsWithCount(
         Guid userId,
         CancellationToken cancellationToken);
     
-    Task<CategoryDto> GetCategory(
+    Task<CategoryDto> GetEpic(
         GetCategoryRequest request,
         CancellationToken cancellationToken);
     
@@ -34,18 +34,19 @@ public interface ICategoriesService
         CancellationToken cancellationToken);
 }
 
-public class CategoriesService(
+public class EpicsService(
     DatabaseContext context,
-    ICoreCategoryService coreCategoryService)
-    : ICategoriesService
+    ICoreEpicsService coreEpicsService)
+    : IEpicsService
 {
-    public async Task<CategoryCountResult> GetCategoriesWithCount(
+    public async Task<CategoryCountResult> GetEpicsWithCount(
         Guid userId,
         CancellationToken cancellationToken)
     {
         var result = await context
             .Epics
             .Where(x => x.UserId == userId)
+            .OrderBy(x => x.TouchedAt)
             .Select(x => new CategoryCountDto
             {
                 Id = x.Id,
@@ -54,7 +55,6 @@ public class CategoriesService(
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
             })
-            .OrderBy(x => x.Name)
             .ToArrayAsyncEF(cancellationToken);
 
         var backlogCount = await context
@@ -70,7 +70,7 @@ public class CategoriesService(
         };
     }
 
-    public Task<CategoryDto> GetCategory(
+    public Task<CategoryDto> GetEpic(
         GetCategoryRequest request,
         CancellationToken cancellationToken)
     {
@@ -98,7 +98,7 @@ public class CategoriesService(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        return coreCategoryService.Create(
+        return coreEpicsService.Create(
             new CreateMessageCategoryRequest
             {
                 UserId = request.UserId,
@@ -112,11 +112,11 @@ public class CategoriesService(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await coreCategoryService
+        if (!await coreEpicsService
             .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
             throw new NotFoundException();
         
-        await coreCategoryService.ChangeStatusesOrder(
+        await coreEpicsService.ChangeStatusesOrder(
             new Services.ChangeStatusesOrderRequest
             {
                 CategoryId = request.CategoryId,
@@ -127,11 +127,11 @@ public class CategoriesService(
 
     public async Task Edit(EditCategoryRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreCategoryService
+        if (!await coreEpicsService
             .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
 
-        await coreCategoryService.Update(
+        await coreEpicsService.Update(
             request.Id,
             upd => upd
                 .SetProperty(x => x.Color, request.Color)
@@ -141,11 +141,11 @@ public class CategoriesService(
 
     public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreCategoryService
+        if (!await coreEpicsService
                 .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
         
-        await coreCategoryService.Delete(
+        await coreEpicsService.Delete(
             new DeleteRequest { Id = request.Id },
             cancellationToken);
     }

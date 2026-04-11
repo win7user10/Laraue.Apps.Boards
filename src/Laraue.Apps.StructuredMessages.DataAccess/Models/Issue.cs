@@ -12,7 +12,15 @@ public class Issue
     [MaxLength(4096)]
     public required string? Content { get; set; }
     
+    /// <summary>
+    /// Issue creation date.
+    /// </summary>
     public DateTime CreatedAt { get; set; }
+    
+    /// <summary>
+    /// Issue update date.
+    /// </summary>
+    public DateTime UpdatedAt { get; set; }
     
     /// <summary>
     /// The user messages belongs to.

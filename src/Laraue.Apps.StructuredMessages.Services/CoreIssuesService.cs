@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface ICoreMessageService
+public interface ICoreIssuesService
 {
     Task<bool> UserHasAccessToMessage(
         Guid userId,
@@ -39,7 +40,8 @@ public interface ICoreMessageService
         CancellationToken cancellationToken);
 }
 
-public class CoreMessageService(DatabaseContext context) : ICoreMessageService
+public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
+    : ICoreIssuesService
 {
     public const long NullId = 0;
     
@@ -95,26 +97,38 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             Content = request.Text,
             UserId = request.UserId,
             CreatedAt = request.CreatedAt,
+            UpdatedAt = request.CreatedAt,
             TelegramMessageId = request.TelegramMessageId,
             EpicId = request.CategoryId,
             StatusId = statusId,
         };
         
         context.Add(entity);
-        
         await context.SaveChangesAsync(cancellationToken);
+        
+        await TouchMessageBoard(entity.Id, request.CreatedAt, cancellationToken);
         
         return entity.Id;
     }
 
-    public Task UpdateMessage(
+    public async Task UpdateMessage(
         long messageId,
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
     {
-        return context.Issues
+        var date = dateTimeProvider.UtcNow;
+
+        await context.Issues
             .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(setters, cancellationToken);
+            .ExecuteUpdateAsync(
+                upd =>
+                {
+                    setters(upd);
+                    upd.SetProperty(x => x.UpdatedAt, date);
+                },
+                cancellationToken);
+        
+        await TouchMessageBoard(messageId, date, cancellationToken);
     }
 
     public async Task UpdateStatus(long messageId, long newStatusId, CancellationToken ct)
@@ -134,12 +148,10 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         }
 
         long? value = newStatusId == NullId ? null : newStatusId;
-
-        await context.Issues
-            .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(update => update
-                .SetProperty(x => x.StatusId, value),
-                ct);
+        await UpdateMessage(
+            messageId,
+            update => update.SetProperty(x => x.StatusId, value),
+            ct);
     }
 
     public async Task UpdateCategory(long messageId, long newCategoryId, CancellationToken ct)
@@ -177,12 +189,12 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             newStatus = newStatusData?.Id;
         }
         
-        await context.Issues
-            .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(update => update
+        await UpdateMessage(
+            messageId,
+            update => update
                 .SetProperty(x => x.EpicId, value)
                 .SetProperty(x => x.StatusId, newStatus),
-                ct);
+            ct);
     }
 
     public Task DeleteMessage(long id, CancellationToken cancellationToken)
@@ -190,6 +202,17 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         return context.Issues
             .Where(x => x.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private Task<int> TouchMessageBoard(long issueId, DateTime touchedAt, CancellationToken ct)
+    {
+        return context.Issues.Where(x => x.Id == issueId)
+            .Select(x => x.Epic)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(
+                    p => p!.TouchedAt,
+                    old => old!.TouchedAt > touchedAt ? old.TouchedAt : touchedAt),
+                ct);
     }
 }
 

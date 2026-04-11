@@ -30,8 +30,8 @@ public static class WebApplicationBuilderExtensions
         public WebApplicationBuilder AddCoreServices()
         {
             builder.Services
-                .AddScoped<ICoreMessageService, CoreMessageService>()
-                .AddScoped<ICoreCategoryService, CoreCategoryService>()
+                .AddScoped<ICoreIssuesService, CoreIssuesService>()
+                .AddScoped<ICoreEpicsService, CoreEpicsService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
                 .AddSingleton<IFileStorage, FileStorage>();
 
