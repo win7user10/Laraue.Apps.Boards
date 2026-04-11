@@ -50,7 +50,7 @@ public class CategoriesService(
             {
                 Id = x.Id,
                 Name = x.Name,
-                Count = x.Cards!.Count,
+                Count = x.Issues!.Count,
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
             })
@@ -60,7 +60,7 @@ public class CategoriesService(
         var backlogCount = await context
             .Cards
             .Where(x => x.UserId == userId)
-            .Where(x => x.CategoryId == null)
+            .Where(x => x.EpicId == null)
             .CountAsyncEF(cancellationToken);
 
         return new CategoryCountResult

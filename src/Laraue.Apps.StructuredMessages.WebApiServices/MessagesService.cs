@@ -131,8 +131,8 @@ public class MessagesService(
         else
         {
             statusIds = await context.CardStatuses
-                .Where(x => x.CardCategoryId == categoryId.Value)
-                .Where(x => x.CardCategory!.UserId == request.UserId)
+                .Where(x => x.EpicId == categoryId.Value)
+                .Where(x => x.Epic!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
                 .ToListAsyncEF(cancellationToken);
         }
@@ -204,14 +204,14 @@ public class MessagesService(
             .ToDictionary(x => x.Id);
         
         var statusByCategoryId = (await context.CardStatuses
-            .Where(x => categoryById.Keys.Contains(x.CardCategoryId))
+            .Where(x => categoryById.Keys.Contains(x.EpicId))
             .Select(x => new
             {
                 x.Id,
                 x.Color,
                 x.Name,
                 x.SortOrder,
-                MessageCategoryId = x.CardCategoryId,
+                MessageCategoryId = x.EpicId,
             })
             .ToArrayAsyncEF(cancellationToken))
          .ToLookup(x => x.MessageCategoryId);
@@ -329,7 +329,7 @@ public class MessagesService(
                 ? null
                 : request.CategoryId;
 
-            query = query.Where(x => x.CategoryId == categoryId);
+            query = query.Where(x => x.EpicId == categoryId);
         }
         
         if (!string.IsNullOrEmpty(request.SearchString))
@@ -362,13 +362,13 @@ public class MessagesService(
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Epic!.Name,
                 StatusName = x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
-                CategoryColor = x.Category.Color,
+                CategoryColor = x.Epic.Color,
                 StatusColor = x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
@@ -400,8 +400,8 @@ public class MessagesService(
         
         var directLinkedMessages = await context
             .TelegramMessages
-            .Where(x => cardIds.Contains(x.Card!.Id))
-            .Select(x => new { x.Id, x.TelegramMediaGroupId, CardId = x.Card!.Id })
+            .Where(x => cardIds.Contains(x.Issue!.Id))
+            .Select(x => new { x.Id, x.TelegramMediaGroupId, CardId = x.Issue!.Id })
             .ToListAsyncEF(ct);
 
         var groupIds = directLinkedMessages
@@ -505,14 +505,14 @@ public class MessagesService(
     }
 
     private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
-        IQueryable<Card> queryable)
+        IQueryable<Issue> queryable)
     {
         return queryable.Select(x => new MessageListDtoData
         {
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.CategoryId ?? CoreMessageService.NullId,
+            CategoryId = x.EpicId ?? CoreMessageService.NullId,
             StatusId = x.StatusId ?? CoreMessageService.NullId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,

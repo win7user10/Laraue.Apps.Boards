@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class Card
+public class Issue
 {
     public long Id { get; set; }
     
@@ -23,14 +23,14 @@ public class Card
     /// <summary>
     /// Message category.
     /// </summary>
-    public long? CategoryId { get; set; }
-    public CardCategory? Category { get; set; }
+    public long? EpicId { get; set; }
+    public Epic? Epic { get; set; }
 
     /// <summary>
     /// Actual message status.
     /// </summary>
     public long? StatusId { get; set; }
-    public CardStatus? Status { get; set; }
+    public Status? Status { get; set; }
     
     public TelegramMessage? TelegramMessage { get; set; }
     public long? TelegramMessageId { get; set; }

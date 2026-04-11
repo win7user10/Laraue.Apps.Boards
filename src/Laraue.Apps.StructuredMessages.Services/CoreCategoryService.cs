@@ -33,7 +33,7 @@ public interface ICoreCategoryService
     
     Task Update(
         long id,
-        Action<UpdateSettersBuilder<CardCategory>> setters,
+        Action<UpdateSettersBuilder<Epic>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -58,7 +58,7 @@ public class CoreCategoryService(DatabaseContext context)
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var category = new CardCategory
+        var category = new Epic
         {
             Name = request.Name,
             UserId = request.UserId,
@@ -73,7 +73,7 @@ public class CoreCategoryService(DatabaseContext context)
             }];
 
         category.Statuses = statuses
-            .Select((s, i) => new CardStatus
+            .Select((s, i) => new DataAccess.Models.Status
             {
                 SortOrder = i,
                 Color = s.Color,
@@ -100,11 +100,11 @@ public class CoreCategoryService(DatabaseContext context)
         CancellationToken cancellationToken)
     {
         var existsStatuses = await context.CardStatuses
-            .Where(x => x.CardCategoryId == request.CategoryId)
-            .Select(x => new CardStatus
+            .Where(x => x.EpicId == request.CategoryId)
+            .Select(x => new DataAccess.Models.Status
             {
                 Id = x.Id,
-                CardCategoryId = x.CardCategoryId,
+                EpicId = x.EpicId,
                 SortOrder = x.SortOrder,
             })
             .ToArrayAsyncEF(cancellationToken);
@@ -133,14 +133,14 @@ public class CoreCategoryService(DatabaseContext context)
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         await context.Cards
-            .Where(x => x.CategoryId == request.Id)
+            .Where(x => x.EpicId == request.Id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.CategoryId, (long?)null)
+                .SetProperty(p => p.EpicId, (long?)null)
                 .SetProperty(p => p.StatusId, (long?)null),
                 cancellationToken);
         
         await context.CardStatuses
-            .Where(x => x.CardCategoryId == request.Id)
+            .Where(x => x.EpicId == request.Id)
             .DeleteAsync(cancellationToken);
         
         await context.CardCategories
@@ -152,7 +152,7 @@ public class CoreCategoryService(DatabaseContext context)
 
     public Task Update(
         long id,
-        Action<UpdateSettersBuilder<CardCategory>> setters,
+        Action<UpdateSettersBuilder<Epic>> setters,
         CancellationToken cancellationToken)
     {
         return context.CardCategories

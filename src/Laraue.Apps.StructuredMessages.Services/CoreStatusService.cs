@@ -29,7 +29,7 @@ public interface ICoreStatusService
     
     Task Update(
         long id,
-        Action<UpdateSettersBuilder<CardStatus>> setters,
+        Action<UpdateSettersBuilder<DataAccess.Models.Status>> setters,
         CancellationToken cancellationToken);
 }
 
@@ -40,13 +40,13 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         CancellationToken cancellationToken)
     {
         var previousMaxOrder = await context.CardStatuses
-            .Where(x => x.CardCategoryId == request.CategoryId)
+            .Where(x => x.EpicId == request.CategoryId)
             .MaxAsyncEF(x => x.SortOrder, cancellationToken);
         
-        var status = new CardStatus
+        var status = new DataAccess.Models.Status
         {
             Name = request.Name,
-            CardCategoryId = request.CategoryId,
+            EpicId = request.CategoryId,
             SortOrder = ++previousMaxOrder,
             Color = request.Color ?? Palette.DefaultStatusColor,
         };
@@ -62,7 +62,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         CancellationToken cancellationToken)
     {
         return context.CardStatuses
-            .Where(x => x.CardCategoryId == categoryId)
+            .Where(x => x.EpicId == categoryId)
             .Select(x => new MessageStatusDto
             {
                 Id = x.Id,
@@ -74,7 +74,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     public Task<bool> UserHasAccessToStatus(Guid userId, long id, CancellationToken cancellationToken)
     {
         return context.CardStatuses
-            .Where(x => x.CardCategory!.UserId == userId)
+            .Where(x => x.Epic!.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
     }
@@ -85,11 +85,11 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
 
         var categoryData = await context.CardStatuses
             .Where(x => x.Id == request.Id)
-            .Select(x => new { MessageCategoryId = x.CardCategoryId })
+            .Select(x => new { MessageCategoryId = x.EpicId })
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
         
         var newStatusId = await context.CardStatuses
-            .Where(x => x.CardCategoryId == categoryData.MessageCategoryId)
+            .Where(x => x.EpicId == categoryData.MessageCategoryId)
             .Where(x => x.Id != request.Id)
             .OrderBy(x => x.SortOrder)
             .Select(x => new { x.Id })
@@ -115,7 +115,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
 
     public Task Update(
         long id,
-        Action<UpdateSettersBuilder<CardStatus>> setters,
+        Action<UpdateSettersBuilder<DataAccess.Models.Status>> setters,
         CancellationToken cancellationToken)
     {
         return context.CardStatuses

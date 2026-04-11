@@ -235,7 +235,7 @@ public class TelegramSaveMessageService(
             .Select(x => new
             {
                 x.Id,
-                CardId = x.Card == null ? (long?)null : x.Card.Id
+                CardId = x.Issue == null ? (long?)null : x.Issue.Id
             })
             .FirstOrDefaultAsyncEF(cancellationToken);
         
@@ -255,7 +255,7 @@ public class TelegramSaveMessageService(
         var cardForMessageIsCreated = (firstGroupMessageData?.CardId).HasValue;
         if (!cardForMessageIsCreated)
         {
-            var card = new Card
+            var card = new Issue
             {
                 Content = request.Text,
                 UserId = request.UserId,
@@ -311,7 +311,7 @@ public class TelegramSaveMessageService(
             .Where(x => x.ExternalChatId == request.ExternalUserId)
             .Select(x => new
             {
-                CardId = x.Card != null ? (long?)x.Card.Id : null,
+                CardId = x.Issue != null ? (long?)x.Issue.Id : null,
                 x.Id,
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -319,7 +319,7 @@ public class TelegramSaveMessageService(
         // Message is not stored, save it // TODO - store only if it is the first message
         if (savedMessage?.CardId is null)
         {
-            var card = new Card
+            var card = new Issue
             {
                 Content = request.Text,
                 UserId = request.UserId,

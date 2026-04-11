@@ -21,7 +21,7 @@ public interface ICoreMessageService
     
     Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Card>> setters,
+        Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken);
     
     Task UpdateStatus(
@@ -70,7 +70,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         else
         {
             var statusesAvailable = await context.CardStatuses
-                .Where(x => x.CardCategoryId == request.CategoryId)
+                .Where(x => x.EpicId == request.CategoryId)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(cancellationToken);
@@ -90,13 +90,13 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             }
         }
         
-        var entity = new Card
+        var entity = new Issue
         {
             Content = request.Text,
             UserId = request.UserId,
             CreatedAt = request.CreatedAt,
             TelegramMessageId = request.TelegramMessageId,
-            CategoryId = request.CategoryId,
+            EpicId = request.CategoryId,
             StatusId = statusId,
         };
         
@@ -109,7 +109,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
     public Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Card>> setters,
+        Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
     {
         return context.Cards
@@ -123,7 +123,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         {
             var possibleStatusesIds = await context.Cards
                 .Where(x => x.Id == messageId)
-                .Select(x => x.Category!.Statuses!
+                .Select(x => x.Epic!.Statuses!
                     .Select(s => s.Id))
                 .FirstOrThrowNotFoundEFAsync(ct);
 
@@ -169,7 +169,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         if (value is not null)
         {
             var newStatusData = await context.CardStatuses
-                .Where(s => s.CardCategoryId == value.Value)
+                .Where(s => s.EpicId == value.Value)
                 .OrderBy(s => s.SortOrder)
                 .Select(s => new { s.Id })
                 .FirstOrDefaultAsyncEF(ct);
@@ -180,7 +180,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         await context.Cards
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
-                .SetProperty(x => x.CategoryId, value)
+                .SetProperty(x => x.EpicId, value)
                 .SetProperty(x => x.StatusId, newStatus),
                 ct);
     }

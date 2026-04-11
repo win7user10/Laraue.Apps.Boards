@@ -16,5 +16,5 @@ public class TelegramMessage
     /// <summary>
     /// The card related to this message
     /// </summary>
-    public Card? Card { get; set; }
+    public Issue? Issue { get; set; }
 }

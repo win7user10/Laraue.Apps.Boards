@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class CardCategory
+public class Epic
 {
     public long Id { get; set; }
     
@@ -14,7 +14,7 @@ public class CardCategory
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
-    
-    public IList<Card>? Cards { get; set; }
-    public IList<CardStatus>? Statuses { get; set; }
+
+    public IList<Issue>? Issues { get; set; }
+    public IList<Status>? Statuses { get; set; }
 }
