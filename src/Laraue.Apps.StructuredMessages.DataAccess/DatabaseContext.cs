@@ -14,9 +14,9 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     }
     
     public DbSet<User> Users { get; init; }
-    public DbSet<Issue> Cards { get; init; }
-    public DbSet<Epic> CardCategories { get; init; }
-    public DbSet<Status> CardStatuses { get; init; }
+    public DbSet<Issue> Issues { get; init; }
+    public DbSet<Epic> Epics { get; init; }
+    public DbSet<Status> Statuses { get; init; }
     public DbSet<TelegramFile> TelegramFiles { get; init; }
     public DbSet<TelegramMessagePhoto> TelegramPhotos { get; init; }
     public DbSet<TelegramMessageVideo> TelegramVideos { get; init; }
@@ -38,12 +38,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.Content)
                 .HasMethod("gin")
                 .HasOperators("gin_trgm_ops");
-
-            entity.ToTable("issues");
         });
-
-        modelBuilder.Entity<Epic>(entity => entity.ToTable("epics"));
-        modelBuilder.Entity<Status>(entity => entity.ToTable("statuses"));
         
         modelBuilder.Entity<TelegramFile>(entity =>
         {

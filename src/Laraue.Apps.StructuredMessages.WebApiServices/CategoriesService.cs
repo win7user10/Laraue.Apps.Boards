@@ -44,7 +44,7 @@ public class CategoriesService(
         CancellationToken cancellationToken)
     {
         var result = await context
-            .CardCategories
+            .Epics
             .Where(x => x.UserId == userId)
             .Select(x => new CategoryCountDto
             {
@@ -58,7 +58,7 @@ public class CategoriesService(
             .ToArrayAsyncEF(cancellationToken);
 
         var backlogCount = await context
-            .Cards
+            .Issues
             .Where(x => x.UserId == userId)
             .Where(x => x.EpicId == null)
             .CountAsyncEF(cancellationToken);
@@ -75,7 +75,7 @@ public class CategoriesService(
         CancellationToken cancellationToken)
     {
         return context
-            .CardCategories
+            .Epics
             .Where(x => x.Id == request.CategoryId)
             .Select(x => new CategoryDto
             {

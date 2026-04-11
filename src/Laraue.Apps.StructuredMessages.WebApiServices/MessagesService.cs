@@ -71,7 +71,7 @@ public class MessagesService(
             : request.StatusId;
 
         var query = context
-            .Cards
+            .Issues
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -130,7 +130,7 @@ public class MessagesService(
             statusIds.Add(null);
         else
         {
-            statusIds = await context.CardStatuses
+            statusIds = await context.Statuses
                 .Where(x => x.EpicId == categoryId.Value)
                 .Where(x => x.Epic!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
@@ -144,7 +144,7 @@ public class MessagesService(
         foreach (var statusId in statusIds)
         {
             var query = context
-                .Cards
+                .Issues
                 .Where(x => x.UserId == request.UserId)
                 .Where(x => x.StatusId == statusId);
             
@@ -192,7 +192,7 @@ public class MessagesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryById = (await context.CardCategories
+        var categoryById = (await context.Epics
             .Where(x => x.UserId == request.UserId)
             .Select(x => new
             {
@@ -203,7 +203,7 @@ public class MessagesService(
             .ToArrayAsyncEF(cancellationToken))
             .ToDictionary(x => x.Id);
         
-        var statusByCategoryId = (await context.CardStatuses
+        var statusByCategoryId = (await context.Statuses
             .Where(x => categoryById.Keys.Contains(x.EpicId))
             .Select(x => new
             {
@@ -216,7 +216,7 @@ public class MessagesService(
             .ToArrayAsyncEF(cancellationToken))
          .ToLookup(x => x.MessageCategoryId);
         
-        var counts = (await context.Cards
+        var counts = (await context.Issues
             .Where(x => x.UserId == request.UserId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
@@ -320,7 +320,7 @@ public class MessagesService(
         SearchRequest request,
         CancellationToken ct)
     {
-        var query = context.Cards
+        var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
         if (request.CategoryId.HasValue)
@@ -355,7 +355,7 @@ public class MessagesService(
             request.UserId, request.MessageId, cancellationToken))
             throw new NotFoundException();
 
-        var result = await context.Cards
+        var result = await context.Issues
             .Where(x => x.Id == request.MessageId)
             .Select(x => new MessageDetailDtoData
             {

@@ -278,7 +278,7 @@ public class TelegramSaveMessageService(
         if (request.Text is not null && firstGroupMessageData is not null)
         {
             // TODO - here we can detect and remove previous messages. But should we?
-            await context.Cards
+            await context.Issues
                 .Where(x => x.Id == firstGroupMessageData.CardId)
                 .ExecuteUpdateAsync(upd => upd
                         .SetProperty(x => x.Content, request.Text),
@@ -343,7 +343,7 @@ public class TelegramSaveMessageService(
             };
         }
         
-        await context.Cards
+        await context.Issues
             .Where(x => x.TelegramMessageId == savedMessage.Id)
             .ExecuteUpdateAsync(upd => upd
                 .SetProperty(x => x.Content, request.Text),

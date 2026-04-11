@@ -45,7 +45,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     
     public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
     {
-        return context.Cards
+        return context.Issues
             .Where(x => x.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
@@ -69,7 +69,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         }
         else
         {
-            var statusesAvailable = await context.CardStatuses
+            var statusesAvailable = await context.Statuses
                 .Where(x => x.EpicId == request.CategoryId)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => x.Id)
@@ -112,7 +112,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
     {
-        return context.Cards
+        return context.Issues
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(setters, cancellationToken);
     }
@@ -121,7 +121,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     {
         if (newStatusId != NullId)
         {
-            var possibleStatusesIds = await context.Cards
+            var possibleStatusesIds = await context.Issues
                 .Where(x => x.Id == messageId)
                 .Select(x => x.Epic!.Statuses!
                     .Select(s => s.Id))
@@ -135,7 +135,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
         long? value = newStatusId == NullId ? null : newStatusId;
 
-        await context.Cards
+        await context.Issues
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(x => x.StatusId, value),
@@ -146,12 +146,12 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
     {
         if (newCategoryId != NullId)
         {
-            var userId = await context.Cards
+            var userId = await context.Issues
                 .Where(x => x.Id == messageId)
                 .Select(x => x.UserId)
                 .FirstOrDefaultAsyncEF(ct);
         
-            var possibleCategoryIds = await context.CardCategories
+            var possibleCategoryIds = await context.Epics
                 .Where(x => x.UserId == userId)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(ct);
@@ -168,7 +168,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         long? newStatus = null;
         if (value is not null)
         {
-            var newStatusData = await context.CardStatuses
+            var newStatusData = await context.Statuses
                 .Where(s => s.EpicId == value.Value)
                 .OrderBy(s => s.SortOrder)
                 .Select(s => new { s.Id })
@@ -177,7 +177,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             newStatus = newStatusData?.Id;
         }
         
-        await context.Cards
+        await context.Issues
             .Where(x => x.Id == messageId)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(x => x.EpicId, value)
@@ -187,7 +187,7 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
 
     public Task DeleteMessage(long id, CancellationToken cancellationToken)
     {
-        return context.Cards
+        return context.Issues
             .Where(x => x.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
     }
