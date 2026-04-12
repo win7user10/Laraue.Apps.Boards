@@ -14,6 +14,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     }
     
     public DbSet<User> Users { get; init; }
+    public DbSet<UserPreferences> UserPreferences { get; init; }
     public DbSet<Issue> Issues { get; init; }
     public DbSet<Epic> Epics { get; init; }
     public DbSet<Status> Statuses { get; init; }
@@ -59,6 +60,11 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
             entity
                 .HasIndex(x => new { x.ExternalMessageId, x.ExternalChatId })
                 .IsUnique();
+        });
+        
+        modelBuilder.Entity<UserPreferences>(entity =>
+        {
+            entity.HasKey(x => x.UserId);
         });
     }
 }

@@ -27,7 +27,8 @@ public static class WebApplicationBuilderExtensions
             builder.Services
                 .AddScoped<IIssuesService, IssuesService>()
                 .AddScoped<IEpicsService, EpicsService>()
-                .AddScoped<IStatusesService, StatusesService>();
+                .AddScoped<IStatusesService, StatusesService>()
+                .AddScoped<IUserPreferencesService, UserPreferencesService>();
 
             builder.Services
                 .AddSingleton<IDateTimeProvider, DateTimeProvider>()

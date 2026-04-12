@@ -36,6 +36,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<ICoreIssuesService, CoreIssuesService>()
                 .AddScoped<ICoreEpicsService, CoreEpicsService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
+                .AddScoped<ICoreUserPreferencesService, CoreUserPreferencesService>()
                 .AddSingleton<IFileStorage, FileStorage>();
 
             builder.Services.AddMemoryCache();
