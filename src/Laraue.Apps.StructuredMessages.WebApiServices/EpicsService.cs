@@ -46,7 +46,7 @@ public class EpicsService(
         var result = await context
             .Epics
             .Where(x => x.UserId == userId)
-            .OrderBy(x => x.TouchedAt)
+            .OrderByDescending(x => x.TouchedAt)
             .Select(x => new CategoryCountDto
             {
                 Id = x.Id,
@@ -54,6 +54,7 @@ public class EpicsService(
                 Count = x.Issues!.Count,
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
+                TouchedAt = x.TouchedAt,
             })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -164,6 +165,7 @@ public record CategoryCountDto
     public required int Count { get; set; }
     public required string? Color { get; set; }
     public required int StatusesCount { get; set; }
+    public required DateTime TouchedAt { get; set; }
 }
 
 public record GetCategoryRequest

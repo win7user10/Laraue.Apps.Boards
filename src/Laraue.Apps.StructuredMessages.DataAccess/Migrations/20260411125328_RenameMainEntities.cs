@@ -11,19 +11,19 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
-                name: "fk_card_categories_users_user_id",
+                name: "fk_message_categories_users_user_id",
                 table: "card_categories");
 
             migrationBuilder.DropForeignKey(
-                name: "fk_card_statuses_card_categories_card_category_id",
+                name: "fk_message_statuses_message_categories_message_category_id",
                 table: "card_statuses");
 
             migrationBuilder.DropForeignKey(
-                name: "fk_cards_card_categories_category_id",
+                name: "fk_messages_message_categories_category_id",
                 table: "cards");
 
             migrationBuilder.DropForeignKey(
-                name: "fk_cards_card_statuses_status_id",
+                name: "fk_messages_message_statuses_status_id",
                 table: "cards");
 
             migrationBuilder.DropForeignKey(
@@ -31,19 +31,19 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                 table: "cards");
 
             migrationBuilder.DropForeignKey(
-                name: "fk_cards_users_user_id",
+                name: "fk_messages_users_user_id",
                 table: "cards");
 
             migrationBuilder.DropPrimaryKey(
-                name: "pk_cards",
+                name: "pk_messages",
                 table: "cards");
 
             migrationBuilder.DropPrimaryKey(
-                name: "pk_card_statuses",
+                name: "pk_message_statuses",
                 table: "card_statuses");
 
             migrationBuilder.DropPrimaryKey(
-                name: "pk_card_categories",
+                name: "pk_message_categories",
                 table: "card_categories");
 
             migrationBuilder.RenameTable(

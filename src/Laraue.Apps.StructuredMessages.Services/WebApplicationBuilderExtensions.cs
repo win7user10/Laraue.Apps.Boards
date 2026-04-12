@@ -1,5 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
+using Laraue.Core.DateTime.Services.Abstractions;
+using Laraue.Core.DateTime.Services.Impl;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +32,7 @@ public static class WebApplicationBuilderExtensions
         public WebApplicationBuilder AddCoreServices()
         {
             builder.Services
+                .AddSingleton<IDateTimeProvider, DateTimeProvider>()
                 .AddScoped<ICoreIssuesService, CoreIssuesService>()
                 .AddScoped<ICoreEpicsService, CoreEpicsService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
