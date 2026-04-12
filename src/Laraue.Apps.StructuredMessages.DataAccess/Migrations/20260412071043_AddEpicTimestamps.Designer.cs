@@ -13,7 +13,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
     [Migration("20260412071043_PendingChanges")]
-    partial class PendingChanges
+    partial class AddEpicTimestamps
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

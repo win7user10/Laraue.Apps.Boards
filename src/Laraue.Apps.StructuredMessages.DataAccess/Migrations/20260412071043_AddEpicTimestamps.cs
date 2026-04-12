@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class PendingChanges : Migration
+    public partial class AddEpicTimestamps : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
