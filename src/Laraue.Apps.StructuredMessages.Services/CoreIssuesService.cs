@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface ICoreMessageService
+public interface ICoreIssuesService
 {
     Task<bool> UserHasAccessToMessage(
         Guid userId,
@@ -21,7 +22,7 @@ public interface ICoreMessageService
     
     Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Card>> setters,
+        Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken);
     
     Task UpdateStatus(
@@ -39,13 +40,14 @@ public interface ICoreMessageService
         CancellationToken cancellationToken);
 }
 
-public class CoreMessageService(DatabaseContext context) : ICoreMessageService
+public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
+    : ICoreIssuesService
 {
     public const long NullId = 0;
     
     public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
     {
-        return context.Cards
+        return context.Issues
             .Where(x => x.UserId == userId)
             .Where(x => x.Id == id)
             .AnyAsyncEF(cancellationToken);
@@ -69,8 +71,8 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         }
         else
         {
-            var statusesAvailable = await context.CardStatuses
-                .Where(x => x.CardCategoryId == request.CategoryId)
+            var statusesAvailable = await context.Statuses
+                .Where(x => x.EpicId == request.CategoryId)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(cancellationToken);
@@ -90,40 +92,52 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             }
         }
         
-        var entity = new Card
+        var entity = new Issue
         {
             Content = request.Text,
             UserId = request.UserId,
             CreatedAt = request.CreatedAt,
+            UpdatedAt = request.CreatedAt,
             TelegramMessageId = request.TelegramMessageId,
-            CategoryId = request.CategoryId,
+            EpicId = request.CategoryId,
             StatusId = statusId,
         };
         
         context.Add(entity);
-        
         await context.SaveChangesAsync(cancellationToken);
+        
+        await TouchMessageBoard(entity.Id, request.CreatedAt, cancellationToken);
         
         return entity.Id;
     }
 
-    public Task UpdateMessage(
+    public async Task UpdateMessage(
         long messageId,
-        Action<UpdateSettersBuilder<Card>> setters,
+        Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
     {
-        return context.Cards
+        var date = dateTimeProvider.UtcNow;
+
+        await context.Issues
             .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(setters, cancellationToken);
+            .ExecuteUpdateAsync(
+                upd =>
+                {
+                    setters(upd);
+                    upd.SetProperty(x => x.UpdatedAt, date);
+                },
+                cancellationToken);
+        
+        await TouchMessageBoard(messageId, date, cancellationToken);
     }
 
     public async Task UpdateStatus(long messageId, long newStatusId, CancellationToken ct)
     {
         if (newStatusId != NullId)
         {
-            var possibleStatusesIds = await context.Cards
+            var possibleStatusesIds = await context.Issues
                 .Where(x => x.Id == messageId)
-                .Select(x => x.Category!.Statuses!
+                .Select(x => x.Epic!.Statuses!
                     .Select(s => s.Id))
                 .FirstOrThrowNotFoundEFAsync(ct);
 
@@ -134,24 +148,22 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         }
 
         long? value = newStatusId == NullId ? null : newStatusId;
-
-        await context.Cards
-            .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(update => update
-                .SetProperty(x => x.StatusId, value),
-                ct);
+        await UpdateMessage(
+            messageId,
+            update => update.SetProperty(x => x.StatusId, value),
+            ct);
     }
 
     public async Task UpdateCategory(long messageId, long newCategoryId, CancellationToken ct)
     {
         if (newCategoryId != NullId)
         {
-            var userId = await context.Cards
+            var userId = await context.Issues
                 .Where(x => x.Id == messageId)
                 .Select(x => x.UserId)
                 .FirstOrDefaultAsyncEF(ct);
         
-            var possibleCategoryIds = await context.CardCategories
+            var possibleCategoryIds = await context.Epics
                 .Where(x => x.UserId == userId)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(ct);
@@ -168,8 +180,8 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
         long? newStatus = null;
         if (value is not null)
         {
-            var newStatusData = await context.CardStatuses
-                .Where(s => s.CardCategoryId == value.Value)
+            var newStatusData = await context.Statuses
+                .Where(s => s.EpicId == value.Value)
                 .OrderBy(s => s.SortOrder)
                 .Select(s => new { s.Id })
                 .FirstOrDefaultAsyncEF(ct);
@@ -177,19 +189,30 @@ public class CoreMessageService(DatabaseContext context) : ICoreMessageService
             newStatus = newStatusData?.Id;
         }
         
-        await context.Cards
-            .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(update => update
-                .SetProperty(x => x.CategoryId, value)
+        await UpdateMessage(
+            messageId,
+            update => update
+                .SetProperty(x => x.EpicId, value)
                 .SetProperty(x => x.StatusId, newStatus),
-                ct);
+            ct);
     }
 
     public Task DeleteMessage(long id, CancellationToken cancellationToken)
     {
-        return context.Cards
+        return context.Issues
             .Where(x => x.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private Task<int> TouchMessageBoard(long issueId, DateTime touchedAt, CancellationToken ct)
+    {
+        return context.Issues.Where(x => x.Id == issueId)
+            .Select(x => x.Epic)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(
+                    p => p!.TouchedAt,
+                    old => old!.TouchedAt > touchedAt ? old.TouchedAt : touchedAt),
+                ct);
     }
 }
 

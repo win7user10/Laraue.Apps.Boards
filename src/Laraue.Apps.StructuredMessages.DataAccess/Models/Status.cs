@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class CardStatus
+public class Status
 {
     public long Id { get; set; }
 
@@ -12,8 +12,8 @@ public class CardStatus
     [MaxLength(7)]
     public string? Color { get; set; }
     
-    public long CardCategoryId { get; set; }
-    public CardCategory? CardCategory { get; set; }
+    public long EpicId { get; set; }
+    public Epic? Epic { get; set; }
 
     public int SortOrder { get; set; }
 }

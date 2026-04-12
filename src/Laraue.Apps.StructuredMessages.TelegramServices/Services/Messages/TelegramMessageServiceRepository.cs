@@ -21,13 +21,13 @@ public class TelegramMessageServiceRepository(DatabaseContext databaseContext)
         long id,
         CancellationToken cancellationToken = default)
     {
-        return databaseContext.Cards
+        return databaseContext.Issues
             .Where(x => x.Id == id)
             .Select(x => new MessageDto
             {
                 UserId = x.UserId,
-                CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryId = x.EpicId,
+                CategoryName = x.Epic!.Name,
                 Id = x.Id,
                 StatusId = x.StatusId,
                 StatusName = x.Status!.Name,

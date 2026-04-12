@@ -8,7 +8,7 @@ using Telegram.Bot;
 namespace Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
 
 public class TelegramMessageCategoryService(
-    ICoreCategoryService coreCategoryService,
+    ICoreEpicsService coreCategoryService,
     ITelegramBotClient client)
     : ITelegramMessageCategoryService
 {

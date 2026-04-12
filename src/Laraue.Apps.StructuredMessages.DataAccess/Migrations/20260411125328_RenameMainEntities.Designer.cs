@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260411125328_RenameMainEntities")]
+    partial class RenameMainEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -24,7 +27,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "uuid-ossp");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", b =>
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Card", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -33,50 +36,9 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("Color")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("color");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("TouchedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("touched_at");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_epics");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_epics_user_id");
-
-                    b.ToTable("epics", (string)null);
-                });
-
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long?>("CategoryId")
                         .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnName("category_id");
 
                     b.Property<string>("Content")
                         .HasMaxLength(4096)
@@ -87,10 +49,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long?>("EpicId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("epic_id");
-
                     b.Property<long?>("StatusId")
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
@@ -99,10 +57,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("telegram_message_id");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -110,14 +64,14 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasKey("Id")
                         .HasName("pk_issues");
 
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_issues_category_id");
+
                     b.HasIndex("Content")
                         .HasDatabaseName("ix_issues_content");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
-
-                    b.HasIndex("EpicId")
-                        .HasDatabaseName("ix_issues_epic_id");
 
                     b.HasIndex("StatusId")
                         .HasDatabaseName("ix_issues_status_id");
@@ -132,7 +86,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.ToTable("issues", (string)null);
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", b =>
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.CardCategory", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -146,9 +100,42 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(7)")
                         .HasColumnName("color");
 
-                    b.Property<long>("EpicId")
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_epics");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_epics_user_id");
+
+                    b.ToTable("epics", (string)null);
+                });
+
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.CardStatus", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
-                        .HasColumnName("epic_id");
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CardCategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("card_category_id");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -163,8 +150,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasKey("Id")
                         .HasName("pk_statuses");
 
-                    b.HasIndex("EpicId")
-                        .HasDatabaseName("ix_statuses_epic_id");
+                    b.HasIndex("CardCategoryId")
+                        .HasDatabaseName("ix_statuses_card_category_id");
 
                     b.ToTable("statuses", (string)null);
                 });
@@ -404,23 +391,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.UserPreferences", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<int>("EpicSortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("epic_sort_order");
-
-                    b.HasKey("UserId")
-                        .HasName("pk_user_preferences");
-
-                    b.ToTable("user_preferences", (string)null);
-                });
-
             modelBuilder.Entity("Laraue.Telegram.NET.Interceptors.EFCore.InterceptorStateModel<System.Guid>", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -491,7 +461,40 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.ToTable("updates", (string)null);
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", b =>
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Card", b =>
+                {
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.CardCategory", "Category")
+                        .WithMany("Cards")
+                        .HasForeignKey("CategoryId")
+                        .HasConstraintName("fk_issues_card_categories_category_id");
+
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.CardStatus", "Status")
+                        .WithMany()
+                        .HasForeignKey("StatusId")
+                        .HasConstraintName("fk_issues_card_statuses_status_id");
+
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", "TelegramMessage")
+                        .WithOne("Card")
+                        .HasForeignKey("Laraue.Apps.StructuredMessages.DataAccess.Models.Card", "TelegramMessageId")
+                        .HasConstraintName("fk_issues_telegram_messages_telegram_message_id");
+
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_issues_users_user_id");
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Status");
+
+                    b.Navigation("TelegramMessage");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.CardCategory", b =>
                 {
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "User")
                         .WithMany()
@@ -503,49 +506,16 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", b =>
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.CardStatus", b =>
                 {
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", "Epic")
-                        .WithMany("Issues")
-                        .HasForeignKey("EpicId")
-                        .HasConstraintName("fk_issues_epics_epic_id");
-
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", "Status")
-                        .WithMany()
-                        .HasForeignKey("StatusId")
-                        .HasConstraintName("fk_issues_statuses_status_id");
-
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", "TelegramMessage")
-                        .WithOne("Issue")
-                        .HasForeignKey("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", "TelegramMessageId")
-                        .HasConstraintName("fk_issues_telegram_messages_telegram_message_id");
-
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_issues_users_user_id");
-
-                    b.Navigation("Epic");
-
-                    b.Navigation("Status");
-
-                    b.Navigation("TelegramMessage");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", b =>
-                {
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", "Epic")
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.CardCategory", "CardCategory")
                         .WithMany("Statuses")
-                        .HasForeignKey("EpicId")
+                        .HasForeignKey("CardCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_statuses_epics_epic_id");
+                        .HasConstraintName("fk_statuses_epics_card_category_id");
 
-                    b.Navigation("Epic");
+                    b.Navigation("CardCategory");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", b =>
@@ -607,16 +577,16 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("ThumbnailFile");
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", b =>
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.CardCategory", b =>
                 {
-                    b.Navigation("Issues");
+                    b.Navigation("Cards");
 
                     b.Navigation("Statuses");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", b =>
                 {
-                    b.Navigation("Issue");
+                    b.Navigation("Card");
                 });
 #pragma warning restore 612, 618
         }

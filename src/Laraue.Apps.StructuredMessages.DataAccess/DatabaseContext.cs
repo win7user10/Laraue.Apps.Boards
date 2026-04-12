@@ -14,9 +14,10 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     }
     
     public DbSet<User> Users { get; init; }
-    public DbSet<Card> Cards { get; init; }
-    public DbSet<CardCategory> CardCategories { get; init; }
-    public DbSet<CardStatus> CardStatuses { get; init; }
+    public DbSet<UserPreferences> UserPreferences { get; init; }
+    public DbSet<Issue> Issues { get; init; }
+    public DbSet<Epic> Epics { get; init; }
+    public DbSet<Status> Statuses { get; init; }
     public DbSet<TelegramFile> TelegramFiles { get; init; }
     public DbSet<TelegramMessagePhoto> TelegramPhotos { get; init; }
     public DbSet<TelegramMessageVideo> TelegramVideos { get; init; }
@@ -32,7 +33,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
         modelBuilder.HasPostgresExtension("uuid-ossp");
         modelBuilder.HasPostgresExtension("pg_trgm");
         
-        modelBuilder.Entity<Card>(entity =>
+        modelBuilder.Entity<Issue>(entity =>
         {
             entity
                 .HasIndex(x => x.Content)
@@ -59,6 +60,11 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
             entity
                 .HasIndex(x => new { x.ExternalMessageId, x.ExternalChatId })
                 .IsUnique();
+        });
+        
+        modelBuilder.Entity<UserPreferences>(entity =>
+        {
+            entity.HasKey(x => x.UserId);
         });
     }
 }

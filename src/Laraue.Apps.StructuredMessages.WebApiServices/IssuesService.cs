@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
-public interface IMessagesService
+public interface IIssuesService
 {
     Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
@@ -55,23 +55,23 @@ public interface IMessagesService
         CancellationToken cancellationToken);
 }
 
-public class MessagesService(
+public class IssuesService(
     DatabaseContext context,
-    ICoreMessageService messageService,
-    ICoreCategoryService categoryService,
+    ICoreIssuesService messageService,
+    ICoreEpicsService epicsService,
     IDateTimeProvider dateTimeProvider)
-    : IMessagesService
+    : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = request.StatusId == CoreMessageService.NullId
+        var statusId = request.StatusId == CoreIssuesService.NullId
             ? null
             : request.StatusId;
 
         var query = context
-            .Cards
+            .Issues
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -121,7 +121,7 @@ public class MessagesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = request.CategoryId == CoreMessageService.NullId
+        var categoryId = request.CategoryId == CoreIssuesService.NullId
             ? null
             : request.CategoryId;
 
@@ -130,9 +130,9 @@ public class MessagesService(
             statusIds.Add(null);
         else
         {
-            statusIds = await context.CardStatuses
-                .Where(x => x.CardCategoryId == categoryId.Value)
-                .Where(x => x.CardCategory!.UserId == request.UserId)
+            statusIds = await context.Statuses
+                .Where(x => x.EpicId == categoryId.Value)
+                .Where(x => x.Epic!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
                 .ToListAsyncEF(cancellationToken);
         }
@@ -144,7 +144,7 @@ public class MessagesService(
         foreach (var statusId in statusIds)
         {
             var query = context
-                .Cards
+                .Issues
                 .Where(x => x.UserId == request.UserId)
                 .Where(x => x.StatusId == statusId);
             
@@ -174,7 +174,7 @@ public class MessagesService(
             
             result.Add(new ColumnMessages
             {
-                StatusId = statusId ?? CoreMessageService.NullId,
+                StatusId = statusId ?? CoreIssuesService.NullId,
                 Items = mappedStatusResult,
             });
         }
@@ -192,7 +192,7 @@ public class MessagesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryById = (await context.CardCategories
+        var categoryById = (await context.Epics
             .Where(x => x.UserId == request.UserId)
             .Select(x => new
             {
@@ -203,26 +203,26 @@ public class MessagesService(
             .ToArrayAsyncEF(cancellationToken))
             .ToDictionary(x => x.Id);
         
-        var statusByCategoryId = (await context.CardStatuses
-            .Where(x => categoryById.Keys.Contains(x.CardCategoryId))
+        var statusByCategoryId = (await context.Statuses
+            .Where(x => categoryById.Keys.Contains(x.EpicId))
             .Select(x => new
             {
                 x.Id,
                 x.Color,
                 x.Name,
                 x.SortOrder,
-                MessageCategoryId = x.CardCategoryId,
+                MessageCategoryId = x.EpicId,
             })
             .ToArrayAsyncEF(cancellationToken))
          .ToLookup(x => x.MessageCategoryId);
         
-        var counts = (await context.Cards
+        var counts = (await context.Issues
             .Where(x => x.UserId == request.UserId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = x.Key ?? CoreMessageService.NullId,
+                Id = x.Key ?? CoreIssuesService.NullId,
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
@@ -277,16 +277,16 @@ public class MessagesService(
 
     public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
     {
-        long? categoryId = request.CategoryId == CoreMessageService.NullId
+        long? categoryId = request.CategoryId == CoreIssuesService.NullId
             ? null
             : request.CategoryId;
         
-        long? statusId = request.StatusId == CoreMessageService.NullId
+        long? statusId = request.StatusId == CoreIssuesService.NullId
             ? null
             : request.StatusId;
 
         if (categoryId.HasValue
-            && !await categoryService.UserHasAccessToCategory(
+            && !await epicsService.UserHasAccessToCategory(
                 request.UserId, request.CategoryId, ct))
                     throw new BadRequestException(
                         nameof(categoryId),
@@ -320,16 +320,16 @@ public class MessagesService(
         SearchRequest request,
         CancellationToken ct)
     {
-        var query = context.Cards
+        var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
         if (request.CategoryId.HasValue)
         {
-            var categoryId = request.CategoryId == CoreMessageService.NullId
+            var categoryId = request.CategoryId == CoreIssuesService.NullId
                 ? null
                 : request.CategoryId;
 
-            query = query.Where(x => x.CategoryId == categoryId);
+            query = query.Where(x => x.EpicId == categoryId);
         }
         
         if (!string.IsNullOrEmpty(request.SearchString))
@@ -355,20 +355,20 @@ public class MessagesService(
             request.UserId, request.MessageId, cancellationToken))
             throw new NotFoundException();
 
-        var result = await context.Cards
+        var result = await context.Issues
             .Where(x => x.Id == request.MessageId)
             .Select(x => new MessageDetailDtoData
             {
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Epic!.Name,
                 StatusName = x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
-                CategoryColor = x.Category.Color,
+                CategoryColor = x.Epic.Color,
                 StatusColor = x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
@@ -400,8 +400,8 @@ public class MessagesService(
         
         var directLinkedMessages = await context
             .TelegramMessages
-            .Where(x => cardIds.Contains(x.Card!.Id))
-            .Select(x => new { x.Id, x.TelegramMediaGroupId, CardId = x.Card!.Id })
+            .Where(x => cardIds.Contains(x.Issue!.Id))
+            .Select(x => new { x.Id, x.TelegramMediaGroupId, CardId = x.Issue!.Id })
             .ToListAsyncEF(ct);
 
         var groupIds = directLinkedMessages
@@ -505,15 +505,15 @@ public class MessagesService(
     }
 
     private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
-        IQueryable<Card> queryable)
+        IQueryable<Issue> queryable)
     {
         return queryable.Select(x => new MessageListDtoData
         {
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.CategoryId ?? CoreMessageService.NullId,
-            StatusId = x.StatusId ?? CoreMessageService.NullId,
+            CategoryId = x.EpicId ?? CoreIssuesService.NullId,
+            StatusId = x.StatusId ?? CoreIssuesService.NullId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,

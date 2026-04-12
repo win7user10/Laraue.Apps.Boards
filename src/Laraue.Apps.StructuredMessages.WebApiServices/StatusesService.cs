@@ -20,14 +20,14 @@ public interface IStatusesService
 }
 
 public class StatusesService(
-    ICoreCategoryService categoriesService,
+    ICoreEpicsService epicsesService,
     ICoreStatusService statusService) : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await categoriesService
+        if (!await epicsesService
             .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
             throw new BadRequestException(
                 nameof(request.CategoryId),

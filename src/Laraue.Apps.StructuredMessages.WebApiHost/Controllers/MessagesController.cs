@@ -8,7 +8,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize]
 [ApiController]
 [Route("/api/messages")]
-public class MessagesController(IMessagesService messagesService) : ControllerBase
+public class MessagesController(IIssuesService messagesService) : ControllerBase
 {
     [HttpGet]
     public Task<BatchResult<MessageListDto>> GetMessages(
