@@ -43,8 +43,6 @@ public interface ICoreIssuesService
 public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
     : ICoreIssuesService
 {
-    public const long NullId = 0;
-    
     public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
     {
         return context.Issues
@@ -71,6 +69,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
         }
         else
         {
+            // Check that status is correct
             var statusesAvailable = await context.Statuses
                 .Where(x => x.EpicId == request.CategoryId)
                 .OrderBy(x => x.SortOrder)
@@ -91,6 +90,20 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
                 statusId ??= statusesAvailable.FirstOrDefault();
             }
         }
+
+        if (request.SpaceId is not null && request.CategoryId is not null)
+        {
+            // Check that epic is correct
+            var epicsAvailable = await context.Epics
+                .Where(x => x.SpaceId == request.SpaceId)
+                .Select(x => x.Id)
+                .ToArrayAsyncEF(cancellationToken);
+            
+            if (!epicsAvailable.Contains(request.CategoryId.Value))
+                throw new BadRequestException(
+                    nameof(request.StatusId),
+                    "Epic is not found in the space");
+        }
         
         var entity = new Issue
         {
@@ -101,6 +114,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
             TelegramMessageId = request.TelegramMessageId,
             EpicId = request.CategoryId,
             StatusId = statusId,
+            SpaceId = request.SpaceId,
         };
         
         context.Add(entity);
@@ -133,7 +147,8 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
 
     public async Task UpdateStatus(long messageId, long newStatusId, CancellationToken ct)
     {
-        if (newStatusId != NullId)
+        var value = IdService.ToNullableId(newStatusId);
+        if (value.HasValue)
         {
             var possibleStatusesIds = await context.Issues
                 .Where(x => x.Id == messageId)
@@ -147,7 +162,6 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
                     "Incorrect Status Id");
         }
 
-        long? value = newStatusId == NullId ? null : newStatusId;
         await UpdateMessage(
             messageId,
             update => update.SetProperty(x => x.StatusId, value),
@@ -156,7 +170,8 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
 
     public async Task UpdateCategory(long messageId, long newCategoryId, CancellationToken ct)
     {
-        if (newCategoryId != NullId)
+        var value = IdService.ToNullableId(newCategoryId);
+        if (value.HasValue)
         {
             var userId = await context.Issues
                 .Where(x => x.Id == messageId)
@@ -173,8 +188,6 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
                     nameof(newCategoryId),
                     "Incorrect Category Id");
         }
-        
-        long? value = newCategoryId == NullId ? null : newCategoryId;
         
         // Set default category status after moving to category
         long? newStatus = null;
@@ -224,4 +237,5 @@ public class SaveMessageRequest
     public long? TelegramMessageId { get; set; }
     public long? CategoryId { get; set; }
     public long? StatusId { get; set; }
+    public long? SpaceId { get; set; }
 }

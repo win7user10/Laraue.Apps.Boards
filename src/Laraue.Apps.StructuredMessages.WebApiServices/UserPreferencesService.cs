@@ -36,18 +36,19 @@ public class UserPreferencesService(ICoreUserPreferencesService coreService, ICo
 
     public async Task UpdateSpace(Guid userId, long spaceId, CancellationToken cancellationToken = default)
     {
-        if (await spacesService.UserHasAccessToSpace(
+        var value = IdService.ToNullableId(spaceId);
+        if (value.HasValue && !await spacesService.UserHasAccessToSpace(
             userId,
             spaceId,
             AccessType.Read,
             cancellationToken))
-        {
-            await coreService
-                .Update(
-                    userId,
-                    update => update.SetProperty(p => p.SpaceId, spaceId),
-                    cancellationToken);
-        }
+            return;
+        
+        await coreService
+            .Update(
+                userId,
+                update => update.SetProperty(p => p.SpaceId, value),
+                cancellationToken);
     }
 
     public Task<UserPreferencesResponse> GetPreferences(Guid userId, CancellationToken cancellationToken)

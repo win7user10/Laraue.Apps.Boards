@@ -7,8 +7,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("/api/messages")]
-public class MessagesController(IIssuesService messagesService) : ControllerBase
+[Route("/api/issues")]
+public class IssuesController(IIssuesService messagesService) : ControllerBase
 {
     [HttpGet]
     public Task<BatchResult<MessageListDto>> GetMessages(
@@ -68,7 +68,7 @@ public class MessagesController(IIssuesService messagesService) : ControllerBase
     }
     
     
-    [HttpPut("{id:long}/category/{categoryId:long}")]
+    [HttpPut("{id:long}/epic/{categoryId:long}")]
     public Task UpdateCategory(
         long id,
         long categoryId,

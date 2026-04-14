@@ -9,8 +9,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IEpicsService
 {
-    Task<CategoryCountResult> GetEpicsWithCount(
-        Guid userId,
+    Task<EpicCountResult> GetEpicsWithCount(
+        GetEpicsRequest request,
         CancellationToken cancellationToken);
     
     Task<CategoryDto> GetEpic(
@@ -39,15 +39,18 @@ public class EpicsService(
     ICoreEpicsService coreEpicsService)
     : IEpicsService
 {
-    public async Task<CategoryCountResult> GetEpicsWithCount(
-        Guid userId,
+    public async Task<EpicCountResult> GetEpicsWithCount(
+        GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        
         var result = await context
             .Epics
-            .Where(x => x.UserId == userId)
+            .Where(x => x.SpaceId == spaceId)
+            .Where(x => x.UserId == request.UserId)
             .OrderByDescending(x => x.TouchedAt)
-            .Select(x => new CategoryCountDto
+            .Select(x => new EpicCountDto
             {
                 Id = x.Id,
                 Name = x.Name,
@@ -60,11 +63,12 @@ public class EpicsService(
 
         var backlogCount = await context
             .Issues
-            .Where(x => x.UserId == userId)
+            .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Where(x => x.EpicId == null)
             .CountAsyncEF(cancellationToken);
 
-        return new CategoryCountResult
+        return new EpicCountResult
         {
             Categories = result,
             BacklogCount = backlogCount
@@ -152,13 +156,13 @@ public class EpicsService(
     }
 }
 
-public class CategoryCountResult
+public class EpicCountResult
 {
     public int BacklogCount { get; set; }
-    public required CategoryCountDto[] Categories { get; set; }
+    public required EpicCountDto[] Categories { get; set; }
 }
 
-public record CategoryCountDto
+public record EpicCountDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
@@ -225,4 +229,10 @@ public record DeleteCategoryRequest
     public Guid UserId { get; set; }
     
     public long Id { get; set; }
+}
+
+public record GetEpicsRequest
+{
+    public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
 }

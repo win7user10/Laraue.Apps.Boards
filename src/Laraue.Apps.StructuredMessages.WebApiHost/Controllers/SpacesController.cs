@@ -52,7 +52,7 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     }
     
     [HttpGet]
-    public Task<SpaceDto[]> Get(
+    public Task<GetSpacesResponse> Get(
         CancellationToken cancellationToken)
     {
         return spacesService.GetSpaces(

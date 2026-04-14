@@ -6,5 +6,6 @@ public enum AccessType
     Read = 0,
     Create = 1,
     Update = 2,
-    Delete = 4
+    Delete = 4,
+    CreateItems = 8,
 }

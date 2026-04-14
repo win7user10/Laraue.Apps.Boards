@@ -59,16 +59,15 @@ public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService messageService,
     ICoreEpicsService epicsService,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICoreSpacesService coreSpacesService)
     : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = request.StatusId == CoreIssuesService.NullId
-            ? null
-            : request.StatusId;
+        var statusId = IdService.ToNullableId(request.StatusId);
 
         var query = context
             .Issues
@@ -121,9 +120,8 @@ public class IssuesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = request.CategoryId == CoreIssuesService.NullId
-            ? null
-            : request.CategoryId;
+        var categoryId = IdService.ToNullableId(request.CategoryId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         var statusIds = new List<long?>();
         if (categoryId is null)
@@ -131,6 +129,7 @@ public class IssuesService(
         else
         {
             statusIds = await context.Statuses
+                .Where(x => x.Epic!.SpaceId == spaceId)
                 .Where(x => x.EpicId == categoryId.Value)
                 .Where(x => x.Epic!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
@@ -146,6 +145,7 @@ public class IssuesService(
             var query = context
                 .Issues
                 .Where(x => x.UserId == request.UserId)
+                .Where(x => x.SpaceId == spaceId)
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
@@ -174,7 +174,7 @@ public class IssuesService(
             
             result.Add(new ColumnMessages
             {
-                StatusId = statusId ?? CoreIssuesService.NullId,
+                StatusId = IdService.ToNotNullableId(statusId),
                 Items = mappedStatusResult,
             });
         }
@@ -222,7 +222,7 @@ public class IssuesService(
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = x.Key ?? CoreIssuesService.NullId,
+                Id = IdService.ToNotNullableId(x.Key),
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
@@ -277,13 +277,9 @@ public class IssuesService(
 
     public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
     {
-        long? categoryId = request.CategoryId == CoreIssuesService.NullId
-            ? null
-            : request.CategoryId;
-        
-        long? statusId = request.StatusId == CoreIssuesService.NullId
-            ? null
-            : request.StatusId;
+        var categoryId = IdService.ToNullableId(request.CategoryId);
+        var statusId = IdService.ToNullableId(request.StatusId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         if (categoryId.HasValue
             && !await epicsService.UserHasAccessToCategory(
@@ -291,6 +287,16 @@ public class IssuesService(
                     throw new BadRequestException(
                         nameof(categoryId),
                         "Category is not found");
+        
+        if (spaceId.HasValue
+            && !await coreSpacesService.UserHasAccessToSpace(
+                request.UserId,
+                request.SpaceId,
+                AccessType.CreateItems,
+                ct))
+            throw new BadRequestException(
+                nameof(categoryId),
+                "Space is not found");
 
         return await messageService.SaveMessage(
             new SaveMessageRequest
@@ -300,6 +306,7 @@ public class IssuesService(
                 UserId = request.UserId,
                 CategoryId = categoryId,
                 StatusId = statusId,
+                SpaceId = spaceId,
             },
             ct);
     }
@@ -323,14 +330,9 @@ public class IssuesService(
         var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
-        if (request.CategoryId.HasValue)
-        {
-            var categoryId = request.CategoryId == CoreIssuesService.NullId
-                ? null
-                : request.CategoryId;
-
+        var categoryId = IdService.ToNullableId(request.CategoryId);
+        if (categoryId.HasValue)
             query = query.Where(x => x.EpicId == categoryId);
-        }
         
         if (!string.IsNullOrEmpty(request.SearchString))
             query = query
@@ -512,8 +514,8 @@ public class IssuesService(
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.EpicId ?? CoreIssuesService.NullId,
-            StatusId = x.StatusId ?? CoreIssuesService.NullId,
+            CategoryId = IdService.ToNotNullableId(x.EpicId),
+            StatusId = IdService.ToNotNullableId(x.StatusId),
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,
@@ -559,7 +561,7 @@ public record UpdateCategoryRequest
 public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
-    public long? StatusId { get; set; }
+    public long StatusId { get; set; }
     public string? SearchString { get; set; }
 }
 
@@ -572,7 +574,8 @@ public record GetMessageRequest
 public record GetBoardRequest
 {
     public Guid UserId { get; set; }
-    public long? CategoryId { get; set; }
+    public long CategoryId { get; set; }
+    public long SpaceId { get; set; }
     public int Take { get; init; }
     public string? SearchString { get; init; }
 }
@@ -641,6 +644,7 @@ public record DeleteMessageRequest
 public record CreateMessageRequest
 {
     public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
     public long CategoryId { get; set; }
     public long StatusId { get; set; }
     public required string Content { get; set; }

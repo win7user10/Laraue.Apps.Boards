@@ -12,7 +12,7 @@ public class UserPreferences
     /// <summary>
     /// Last selected space id.
     /// </summary>
-    public long SpaceId { get; set; }
+    public long? SpaceId { get; set; }
 }
 
 public enum EpicSortOrder

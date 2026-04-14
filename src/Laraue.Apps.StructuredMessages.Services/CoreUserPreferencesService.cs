@@ -54,7 +54,7 @@ public class CoreUserPreferencesService(DatabaseContext context) : ICoreUserPref
         return new UserPreferencesResponse
         {
             EpicSortOrder = preferences.EpicSortOrder,
-            SpaceId = preferences.SpaceId,
+            SpaceId = IdService.ToNotNullableId(preferences.SpaceId),
         };
     }
     

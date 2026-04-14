@@ -8,7 +8,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface ISpacesService
 {
-    Task<SpaceDto[]> GetSpaces(
+    Task<GetSpacesResponse> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken);
     
@@ -28,19 +28,31 @@ public interface ISpacesService
 public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext context)
     : ISpacesService
 {
-    public Task<SpaceDto[]> GetSpaces(
+    public async Task<GetSpacesResponse> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        return context.Spaces
+        var spaces = await context.Spaces
             .Where(x => x.CreatorId == request.UserId)
             .Select(x => new SpaceDto
             {
                 Id = x.Id,
                 Name = x.Name,
                 Color = x.Color,
+                EpicsCount = x.Epics!.Count
             })
             .ToArrayAsyncEF(cancellationToken);
+
+        var noEpicsCount = await context.Epics
+            .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == null)
+            .CountAsyncEF(cancellationToken);
+
+        return new GetSpacesResponse
+        {
+            Spaces = spaces,
+            NoSpaceEpicsCount = noEpicsCount
+        };
     }
 
     public Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
@@ -123,4 +135,11 @@ public record SpaceDto
     public long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
+    public required int EpicsCount { get; set; }
+}
+
+public record GetSpacesResponse
+{
+    public required SpaceDto[] Spaces { get; set; }
+    public required int NoSpaceEpicsCount { get; set; }
 }

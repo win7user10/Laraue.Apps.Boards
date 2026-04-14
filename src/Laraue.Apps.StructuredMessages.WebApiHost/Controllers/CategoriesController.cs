@@ -11,9 +11,12 @@ public class CategoriesController(IEpicsService categoriesService)
     : ControllerBase
 {
     [HttpGet("categories-with-count")]
-    public Task<CategoryCountResult> GetCategoriesWithCount(CancellationToken cancellationToken) => 
+    public Task<EpicCountResult> GetCategoriesWithCount([FromQuery] GetEpicsRequest request, CancellationToken cancellationToken) => 
         categoriesService.GetEpicsWithCount(
-            HttpContext.User.GetId(),
+            request with
+            {
+                UserId = HttpContext.User.GetId()
+            },
             cancellationToken);
     
     [HttpGet("{id}")]

@@ -24,4 +24,9 @@ public class Space
     /// Epic attribute update date.
     /// </summary>
     public DateTime UpdatedAt { get; set; }
+    
+    /// <summary>
+    /// Epics linked to the space.
+    /// </summary>
+    public IList<Epic>? Epics { get; set; }
 }

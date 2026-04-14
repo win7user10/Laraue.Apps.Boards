@@ -14,7 +14,13 @@ public class Epic
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
-    
+
+    /// <summary>
+    /// The space the epic belongs to.
+    /// </summary>
+    public long? SpaceId { get; set; }
+    public Space? Space { get; set; }
+
     /// <summary>
     /// Epic creation date.
     /// </summary>

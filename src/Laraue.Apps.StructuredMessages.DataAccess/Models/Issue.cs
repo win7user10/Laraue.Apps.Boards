@@ -33,6 +33,12 @@ public class Issue
     /// </summary>
     public long? EpicId { get; set; }
     public Epic? Epic { get; set; }
+    
+    /// <summary>
+    /// The space the issue belongs to.
+    /// </summary>
+    public long? SpaceId { get; set; }
+    public Space? Space { get; set; }
 
     /// <summary>
     /// Actual message status.
