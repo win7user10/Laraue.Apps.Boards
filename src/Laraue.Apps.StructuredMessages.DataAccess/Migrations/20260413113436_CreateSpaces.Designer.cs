@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260413113436_CreateSpaces")]
+    partial class CreateSpaces
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -455,10 +458,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Property<int>("EpicSortOrder")
                         .HasColumnType("integer")
                         .HasColumnName("epic_sort_order");
-
-                    b.Property<long>("SpaceId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("space_id");
 
                     b.HasKey("UserId")
                         .HasName("pk_user_preferences");

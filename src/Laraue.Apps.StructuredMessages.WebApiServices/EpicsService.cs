@@ -17,12 +17,12 @@ public interface IEpicsService
         GetCategoryRequest request,
         CancellationToken cancellationToken);
     
-    Task<long> CreateCategory(
-        CreateCategoryRequest request,
-        CancellationToken cancellationToken);
-    
     Task ChangeStatusesOrder(
         ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<long> CreateCategory(
+        CreateCategoryRequest request,
         CancellationToken cancellationToken);
     
     Task Edit(
