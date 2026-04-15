@@ -68,9 +68,11 @@ public class IssuesService(
         CancellationToken cancellationToken)
     {
         var statusId = IdService.ToNullableId(request.StatusId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         var query = context
             .Issues
+            .Where(x => x.SpaceId == spaceId)
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -561,6 +563,7 @@ public record UpdateCategoryRequest
 public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
     public long StatusId { get; set; }
     public string? SearchString { get; set; }
 }

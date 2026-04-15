@@ -36,7 +36,8 @@ public interface IEpicsService
 
 public class EpicsService(
     DatabaseContext context,
-    ICoreEpicsService coreEpicsService)
+    ICoreEpicsService coreEpicsService,
+    ICoreSpacesService coreSpacesService)
     : IEpicsService
 {
     public async Task<EpicCountResult> GetEpicsWithCount(
@@ -99,16 +100,26 @@ public class EpicsService(
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
     }
 
-    public Task<long> CreateCategory(
+    public async Task<long> CreateCategory(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        return coreEpicsService.Create(
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        if (spaceId.HasValue && !await coreSpacesService
+            .UserHasAccessToSpace(
+                request.UserId,
+                spaceId.Value,
+                AccessType.CreateEpics,
+                cancellationToken))
+            throw new NotFoundException("Space is not found");
+        
+        return await coreEpicsService.Create(
             new CreateMessageCategoryRequest
             {
                 UserId = request.UserId,
                 Name = request.Name,
                 Color = request.Color,
+                SpaceId = spaceId,
             },
             cancellationToken);
     }
@@ -196,6 +207,8 @@ public class StatusDto
 public record CreateCategoryRequest
 {
     public Guid UserId { get; set; }
+    
+    public long SpaceId { get; set; }
     
     [MaxLength(128)]
     public required string Name { get; set; }

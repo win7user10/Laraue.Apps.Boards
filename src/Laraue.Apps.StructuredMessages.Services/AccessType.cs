@@ -7,5 +7,6 @@ public enum AccessType
     Create = 1,
     Update = 2,
     Delete = 4,
-    CreateItems = 8,
+    CreateEpics = 8,
+    CreateItems = 16,
 }

@@ -69,6 +69,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
             TouchedAt = dateTime,
+            SpaceId = request.SpaceId,
         };
         
         var statuses = request.Statuses ?? [
@@ -198,6 +199,7 @@ public class CreateMessageCategoryRequest
     public required string Name { get; set; }
     public string? Color { get; set; }
     public required Guid UserId { get; set; }
+    public required long? SpaceId { get; set; }
     public Status[]? Statuses { get; set; }
 }
 
