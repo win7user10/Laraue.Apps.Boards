@@ -19,7 +19,7 @@ public interface ICoreEpicsService
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken);
     
-    Task<bool> UserHasAccessToCategory(
+    Task<bool> UserHasAccessToEpic(
         Guid userId,
         long id,
         CancellationToken cancellationToken);
@@ -69,6 +69,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
             TouchedAt = dateTime,
+            SpaceId = request.SpaceId,
         };
         
         var statuses = request.Statuses ?? [
@@ -93,7 +94,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         return category.Id;
     }
 
-    public Task<bool> UserHasAccessToCategory(Guid userId, long id, CancellationToken cancellationToken)
+    public Task<bool> UserHasAccessToEpic(Guid userId, long id, CancellationToken cancellationToken)
     {
         return context.Epics
             .Where(x => x.UserId == userId)
@@ -198,6 +199,7 @@ public class CreateMessageCategoryRequest
     public required string Name { get; set; }
     public string? Color { get; set; }
     public required Guid UserId { get; set; }
+    public required long? SpaceId { get; set; }
     public Status[]? Statuses { get; set; }
 }
 

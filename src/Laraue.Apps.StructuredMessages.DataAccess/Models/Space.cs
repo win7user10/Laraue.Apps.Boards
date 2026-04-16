@@ -2,7 +2,7 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
-public class Epic
+public class Space
 {
     public long Id { get; set; }
     
@@ -12,15 +12,9 @@ public class Epic
     [MaxLength(7)]
     public string? Color { get; set; }
     
-    public Guid UserId { get; set; }
-    public User? User { get; set; }
-
-    /// <summary>
-    /// The space the epic belongs to.
-    /// </summary>
-    public long? SpaceId { get; set; }
-    public Space? Space { get; set; }
-
+    public Guid CreatorId { get; set; }
+    public User? Creator { get; set; }
+    
     /// <summary>
     /// Epic creation date.
     /// </summary>
@@ -32,11 +26,7 @@ public class Epic
     public DateTime UpdatedAt { get; set; }
     
     /// <summary>
-    /// When the epic or issues in epic were updated.
-    /// Property to sort epics.
+    /// Epics linked to the space.
     /// </summary>
-    public DateTime TouchedAt { get; set; }
-
-    public IList<Issue>? Issues { get; set; }
-    public IList<Status>? Statuses { get; set; }
+    public IList<Epic>? Epics { get; set; }
 }

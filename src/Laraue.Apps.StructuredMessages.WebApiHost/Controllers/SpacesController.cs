@@ -1,26 +1,38 @@
-﻿using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Apps.StructuredMessages.WebApiServices;
+﻿using Laraue.Apps.StructuredMessages.WebApiServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using DeleteStatusRequest = Laraue.Apps.StructuredMessages.WebApiServices.DeleteStatusRequest;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("/api/statuses")]
-public class StatusesController(IStatusesService statusesService)
-    : ControllerBase
+[Route("/api/spaces")]
+public class SpacesController(ISpacesService spacesService) : ControllerBase
 {
     [HttpPost]
-    public Task<long> CreateStatus(
-        [FromBody] CreateStatusRequest request,
+    public Task<long> Create(
+        [FromBody] CreateSpaceRequest request,
         CancellationToken cancellationToken)
     {
-        return statusesService.CreateStatus(
+        return spacesService.Create(
             request with
             {
                 UserId = HttpContext.User.GetId()
+            },
+            cancellationToken);
+    }
+    
+    [HttpPut("{id:long}")]
+    public Task Update(
+        long id,
+        [FromBody] EditSpaceRequest request,
+        CancellationToken cancellationToken)
+    {
+        return spacesService.Update(
+            request with
+            {
+                Id = id,
+                UserId = HttpContext.User.GetId(),
             },
             cancellationToken);
     }
@@ -30,40 +42,24 @@ public class StatusesController(IStatusesService statusesService)
         long id,
         CancellationToken cancellationToken)
     {
-        return statusesService.Delete(
-            new DeleteStatusRequest
+        return spacesService.Delete(
+            new DeleteSpaceRequest
             {
                 Id = id,
                 UserId = HttpContext.User.GetId(),
             },
             cancellationToken);
     }
-
-    [HttpPut("{id:long}")]
-    public Task Edit(
-        long id,
-        [FromBody] EditStatusRequest request,
-        CancellationToken cancellationToken)
-    {
-        return statusesService.Edit(
-            request with
-            {
-                Id = id,
-                UserId = HttpContext.User.GetId(),
-            },
-            cancellationToken);
-    }
-
+    
     [HttpGet]
-    public Task<MessageStatusDto[]> GetStatuses(
-        [FromQuery] GetStatusesRequest request,
+    public Task<GetSpacesResponse> Get(
         CancellationToken cancellationToken)
     {
-        return statusesService.GetStatuses(
-            request with
+        return spacesService.GetSpaces(
+            new GetSpacesRequest
             {
                 UserId = HttpContext.User.GetId(),
             },
             cancellationToken);
     }
-}   
+}

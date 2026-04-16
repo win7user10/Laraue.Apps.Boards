@@ -1,5 +1,4 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -15,7 +14,7 @@ public interface ICoreStatusService
         CancellationToken cancellationToken);
 
     Task<MessageStatusDto[]> GetStatuses(
-        long categoryId,
+        long epicId,
         CancellationToken cancellationToken);
     
     Task<bool> UserHasAccessToStatus(
@@ -58,15 +57,17 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     }
 
     public Task<MessageStatusDto[]> GetStatuses(
-        long categoryId,
+        long epicId,
         CancellationToken cancellationToken)
     {
         return context.Statuses
-            .Where(x => x.EpicId == categoryId)
+            .Where(x => x.EpicId == epicId)
             .Select(x => new MessageStatusDto
             {
                 Id = x.Id,
                 Name = x.Name,
+                Color = x.Color,
+                Count = x.Issues!.Count,
             })
             .ToArrayAsyncEF(cancellationToken);
     }
@@ -135,6 +136,8 @@ public class MessageStatusDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
+    public required string? Color { get; set; }
+    public required int Count { get; set; }
 }
 
 public class DeleteStatusRequest

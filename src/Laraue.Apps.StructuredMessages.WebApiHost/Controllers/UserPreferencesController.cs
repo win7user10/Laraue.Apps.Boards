@@ -23,6 +23,14 @@ public class UserPreferencesController(IUserPreferencesService service) : Contro
         [FromRoute] EpicSortOrder epicSortOrder,
         CancellationToken cancellationToken)
     {
-        return service.Update(HttpContext.User.GetId(), epicSortOrder, cancellationToken);
+        return service.UpdateEpicSortOrder(HttpContext.User.GetId(), epicSortOrder, cancellationToken);
+    }
+    
+    [HttpPut("space/{spaceId}")]
+    public Task UpdateSpaceId(
+        [FromRoute] long spaceId,
+        CancellationToken cancellationToken)
+    {
+        return service.UpdateSpace(HttpContext.User.GetId(), spaceId, cancellationToken);
     }
 }

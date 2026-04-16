@@ -17,6 +17,10 @@ public interface IStatusesService
     Task Edit(
         EditStatusRequest request,
         CancellationToken cancellationToken);
+    
+    Task<MessageStatusDto[]> GetStatuses(
+        GetStatusesRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class StatusesService(
@@ -28,7 +32,7 @@ public class StatusesService(
         CancellationToken cancellationToken)
     {
         if (!await epicsesService
-            .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
+            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
             throw new BadRequestException(
                 nameof(request.CategoryId),
                 "Invalid category");
@@ -70,6 +74,19 @@ public class StatusesService(
                 .SetProperty(x => x.Name, request.Name),
             cancellationToken);
     }
+
+    public async Task<MessageStatusDto[]> GetStatuses(GetStatusesRequest request, CancellationToken cancellationToken)
+    {
+        if (!await epicsesService.UserHasAccessToEpic(
+            request.UserId,
+            request.EpicId,
+            cancellationToken))
+            throw new NotFoundException("Epic is not found");
+
+        return await statusService.GetStatuses(
+            request.EpicId,
+            cancellationToken);
+    }
 }
 
 public record CreateStatusRequest
@@ -99,4 +116,10 @@ public record EditStatusRequest
     [MaxLength(7)]
     public required string Color { get; set; }
     public required string Name { get; set; }
+}
+
+public record GetStatusesRequest
+{
+    public Guid UserId { get; set; }
+    public required long EpicId { get; set; }
 }

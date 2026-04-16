@@ -16,4 +16,6 @@ public class Status
     public Epic? Epic { get; set; }
 
     public int SortOrder { get; set; }
+    
+    public IList<Issue>? Issues { get; set; }
 }

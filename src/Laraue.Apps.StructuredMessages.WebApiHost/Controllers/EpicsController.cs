@@ -6,14 +6,17 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("/api/categories")]
-public class CategoriesController(IEpicsService categoriesService)
+[Route("/api/epics")]
+public class EpicsController(IEpicsService categoriesService)
     : ControllerBase
 {
-    [HttpGet("categories-with-count")]
-    public Task<CategoryCountResult> GetCategoriesWithCount(CancellationToken cancellationToken) => 
+    [HttpGet]
+    public Task<EpicCountResult> GetCategoriesWithCount([FromQuery] GetEpicsRequest request, CancellationToken cancellationToken) => 
         categoriesService.GetEpicsWithCount(
-            HttpContext.User.GetId(),
+            request with
+            {
+                UserId = HttpContext.User.GetId()
+            },
             cancellationToken);
     
     [HttpGet("{id}")]

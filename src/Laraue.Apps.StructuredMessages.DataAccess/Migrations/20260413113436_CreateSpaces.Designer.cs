@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260413113436_CreateSpaces")]
+    partial class CreateSpaces
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -48,10 +51,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
 
-                    b.Property<long?>("SpaceId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("space_id");
-
                     b.Property<DateTime>("TouchedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("touched_at");
@@ -66,9 +65,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_epics");
-
-                    b.HasIndex("SpaceId")
-                        .HasDatabaseName("ix_epics_space_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_epics_user_id");
@@ -98,10 +94,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("epic_id");
 
-                    b.Property<long?>("SpaceId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("space_id");
-
                     b.Property<long?>("StatusId")
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
@@ -129,9 +121,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     b.HasIndex("EpicId")
                         .HasDatabaseName("ix_issues_epic_id");
-
-                    b.HasIndex("SpaceId")
-                        .HasDatabaseName("ix_issues_space_id");
 
                     b.HasIndex("StatusId")
                         .HasDatabaseName("ix_issues_status_id");
@@ -470,10 +459,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("epic_sort_order");
 
-                    b.Property<long?>("SpaceId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("space_id");
-
                     b.HasKey("UserId")
                         .HasName("pk_user_preferences");
 
@@ -552,19 +537,12 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", b =>
                 {
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
-                        .WithMany()
-                        .HasForeignKey("SpaceId")
-                        .HasConstraintName("fk_epics_spaces_space_id");
-
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_epics_users_user_id");
-
-                    b.Navigation("Space");
 
                     b.Navigation("User");
                 });
@@ -575,11 +553,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .WithMany("Issues")
                         .HasForeignKey("EpicId")
                         .HasConstraintName("fk_issues_epics_epic_id");
-
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
-                        .WithMany()
-                        .HasForeignKey("SpaceId")
-                        .HasConstraintName("fk_issues_spaces_space_id");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", "Status")
                         .WithMany()
@@ -599,8 +572,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasConstraintName("fk_issues_users_user_id");
 
                     b.Navigation("Epic");
-
-                    b.Navigation("Space");
 
                     b.Navigation("Status");
 

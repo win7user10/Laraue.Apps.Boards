@@ -9,20 +9,20 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IEpicsService
 {
-    Task<CategoryCountResult> GetEpicsWithCount(
-        Guid userId,
+    Task<EpicCountResult> GetEpicsWithCount(
+        GetEpicsRequest request,
         CancellationToken cancellationToken);
     
     Task<CategoryDto> GetEpic(
         GetCategoryRequest request,
         CancellationToken cancellationToken);
     
-    Task<long> CreateCategory(
-        CreateCategoryRequest request,
-        CancellationToken cancellationToken);
-    
     Task ChangeStatusesOrder(
         ChangeStatusesOrderRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<long> CreateCategory(
+        CreateCategoryRequest request,
         CancellationToken cancellationToken);
     
     Task Edit(
@@ -36,18 +36,22 @@ public interface IEpicsService
 
 public class EpicsService(
     DatabaseContext context,
-    ICoreEpicsService coreEpicsService)
+    ICoreEpicsService coreEpicsService,
+    ICoreSpacesService coreSpacesService)
     : IEpicsService
 {
-    public async Task<CategoryCountResult> GetEpicsWithCount(
-        Guid userId,
+    public async Task<EpicCountResult> GetEpicsWithCount(
+        GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        
         var result = await context
             .Epics
-            .Where(x => x.UserId == userId)
+            .Where(x => x.SpaceId == spaceId)
+            .Where(x => x.UserId == request.UserId)
             .OrderByDescending(x => x.TouchedAt)
-            .Select(x => new CategoryCountDto
+            .Select(x => new EpicCountDto
             {
                 Id = x.Id,
                 Name = x.Name,
@@ -60,11 +64,12 @@ public class EpicsService(
 
         var backlogCount = await context
             .Issues
-            .Where(x => x.UserId == userId)
+            .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Where(x => x.EpicId == null)
             .CountAsyncEF(cancellationToken);
 
-        return new CategoryCountResult
+        return new EpicCountResult
         {
             Categories = result,
             BacklogCount = backlogCount
@@ -95,16 +100,26 @@ public class EpicsService(
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
     }
 
-    public Task<long> CreateCategory(
+    public async Task<long> CreateCategory(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        return coreEpicsService.Create(
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        if (spaceId.HasValue && !await coreSpacesService
+            .UserHasAccessToSpace(
+                request.UserId,
+                spaceId.Value,
+                AccessType.CreateEpics,
+                cancellationToken))
+            throw new NotFoundException("Space is not found");
+        
+        return await coreEpicsService.Create(
             new CreateMessageCategoryRequest
             {
                 UserId = request.UserId,
                 Name = request.Name,
                 Color = request.Color,
+                SpaceId = spaceId,
             },
             cancellationToken);
     }
@@ -114,7 +129,7 @@ public class EpicsService(
         CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-            .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
+            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
             throw new NotFoundException();
         
         await coreEpicsService.ChangeStatusesOrder(
@@ -129,7 +144,7 @@ public class EpicsService(
     public async Task Edit(EditCategoryRequest request, CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-            .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+            .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
 
         await coreEpicsService.Update(
@@ -143,7 +158,7 @@ public class EpicsService(
     public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-                .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+                .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
         
         await coreEpicsService.Delete(
@@ -152,13 +167,13 @@ public class EpicsService(
     }
 }
 
-public class CategoryCountResult
+public class EpicCountResult
 {
     public int BacklogCount { get; set; }
-    public required CategoryCountDto[] Categories { get; set; }
+    public required EpicCountDto[] Categories { get; set; }
 }
 
-public record CategoryCountDto
+public record EpicCountDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
@@ -193,6 +208,8 @@ public record CreateCategoryRequest
 {
     public Guid UserId { get; set; }
     
+    public long SpaceId { get; set; }
+    
     [MaxLength(128)]
     public required string Name { get; set; }
     
@@ -225,4 +242,10 @@ public record DeleteCategoryRequest
     public Guid UserId { get; set; }
     
     public long Id { get; set; }
+}
+
+public record GetEpicsRequest
+{
+    public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
 }

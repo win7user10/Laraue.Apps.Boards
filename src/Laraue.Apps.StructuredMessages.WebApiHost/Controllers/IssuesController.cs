@@ -7,8 +7,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("/api/messages")]
-public class MessagesController(IIssuesService messagesService) : ControllerBase
+[Route("/api/issues")]
+public class IssuesController(IIssuesService messagesService) : ControllerBase
 {
     [HttpGet]
     public Task<BatchResult<MessageListDto>> GetMessages(
@@ -51,35 +51,17 @@ public class MessagesController(IIssuesService messagesService) : ControllerBase
             cancellationToken);
     }
     
-    [HttpPut("{id:long}/status/{statusId:long}")]
-    public Task UpdateStatus(
+    [HttpPut("{id:long}/move")]
+    public Task Move(
         long id,
-        long statusId,
+        MoveCardRequest request,
         CancellationToken cancellationToken)
     {
-        return messagesService.UpdateStatus(
-            new UpdateStatusRequest
+        return messagesService.Move(
+            request with
             {
                 UserId = HttpContext.User.GetId(),
-                StatusId = statusId,
-                MessageId = id,
-            },
-            cancellationToken);
-    }
-    
-    
-    [HttpPut("{id:long}/category/{categoryId:long}")]
-    public Task UpdateCategory(
-        long id,
-        long categoryId,
-        CancellationToken cancellationToken)
-    {
-        return messagesService.UpdateCategory(
-            new UpdateCategoryRequest
-            {
-                UserId = HttpContext.User.GetId(),
-                CategoryId = categoryId,
-                MessageId = id,
+                IssueId = id
             },
             cancellationToken);
     }
@@ -141,10 +123,11 @@ public class MessagesController(IIssuesService messagesService) : ControllerBase
 
     [HttpGet("summary")]
     public Task<CategorySummary[]> GetBoardSummary(
+        [FromQuery] GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
         return messagesService.GetBoardSummary(
-            new GetBoardSummaryRequest
+            request with
             {
                 UserId = HttpContext.User.GetId(),
             },

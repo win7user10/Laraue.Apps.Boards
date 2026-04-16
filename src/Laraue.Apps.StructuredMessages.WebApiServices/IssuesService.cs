@@ -26,12 +26,8 @@ public interface IIssuesService
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken);
 
-    Task UpdateStatus(
-        UpdateStatusRequest request,
-        CancellationToken ct);
-    
-    Task UpdateCategory(
-        UpdateCategoryRequest request,
+    Task Move(
+        MoveCardRequest request,
         CancellationToken ct);
     
     Task DeleteMessage(
@@ -59,19 +55,21 @@ public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService messageService,
     ICoreEpicsService epicsService,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICoreSpacesService coreSpacesService,
+    ICoreStatusService statusService)
     : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = request.StatusId == CoreIssuesService.NullId
-            ? null
-            : request.StatusId;
+        var statusId = IdService.ToNullableId(request.StatusId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         var query = context
             .Issues
+            .Where(x => x.SpaceId == spaceId)
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -121,9 +119,8 @@ public class IssuesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = request.CategoryId == CoreIssuesService.NullId
-            ? null
-            : request.CategoryId;
+        var categoryId = IdService.ToNullableId(request.CategoryId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         var statusIds = new List<long?>();
         if (categoryId is null)
@@ -131,6 +128,7 @@ public class IssuesService(
         else
         {
             statusIds = await context.Statuses
+                .Where(x => x.Epic!.SpaceId == spaceId)
                 .Where(x => x.EpicId == categoryId.Value)
                 .Where(x => x.Epic!.UserId == request.UserId)
                 .Select(x => (long?)x.Id)
@@ -146,6 +144,7 @@ public class IssuesService(
             var query = context
                 .Issues
                 .Where(x => x.UserId == request.UserId)
+                .Where(x => x.SpaceId == spaceId)
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
@@ -174,7 +173,7 @@ public class IssuesService(
             
             result.Add(new ColumnMessages
             {
-                StatusId = statusId ?? CoreIssuesService.NullId,
+                StatusId = IdService.ToNotNullableId(statusId),
                 Items = mappedStatusResult,
             });
         }
@@ -192,8 +191,11 @@ public class IssuesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        
         var categoryById = (await context.Epics
             .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Select(x => new
             {
                 x.Id,
@@ -218,11 +220,12 @@ public class IssuesService(
         
         var counts = (await context.Issues
             .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = x.Key ?? CoreIssuesService.NullId,
+                Id = IdService.ToNotNullableId(x.Key),
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
@@ -251,20 +254,28 @@ public class IssuesService(
         return result;
     }
 
-    public async Task UpdateStatus(UpdateStatusRequest request, CancellationToken ct)
+    public async Task Move(MoveCardRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+        if (!await messageService.UserHasAccessToMessage(request.UserId, request.IssueId, ct))
+            throw new NotFoundException("Card not found");
         
-        await messageService.UpdateStatus(request.MessageId, request.StatusId, ct);
-    }
-
-    public async Task UpdateCategory(UpdateCategoryRequest request, CancellationToken ct)
-    {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessType.CreateItems, ct))
+            throw new NotFoundException("Space not found");
         
-        await messageService.UpdateCategory(request.MessageId, request.CategoryId, ct);
+        var epicId = IdService.ToNullableId(request.EpicId);
+        if (epicId.HasValue && !await epicsService.UserHasAccessToEpic(request.UserId, request.EpicId, ct))
+            throw new NotFoundException("Epic not found");
+        
+        if (!await statusService.UserHasAccessToStatus(request.UserId, request.StatusId, ct))
+            throw new NotFoundException("Status not found");
+        
+        await messageService.Move(
+            request.IssueId,
+            request.SpaceId,
+            request.EpicId,
+            request.StatusId,
+            ct);
     }
 
     public async Task DeleteMessage(DeleteMessageRequest request, CancellationToken ct)
@@ -277,22 +288,28 @@ public class IssuesService(
 
     public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
     {
-        long? categoryId = request.CategoryId == CoreIssuesService.NullId
-            ? null
-            : request.CategoryId;
-        
-        long? statusId = request.StatusId == CoreIssuesService.NullId
-            ? null
-            : request.StatusId;
+        var categoryId = IdService.ToNullableId(request.CategoryId);
+        var statusId = IdService.ToNullableId(request.StatusId);
+        var spaceId = IdService.ToNullableId(request.SpaceId);
 
         if (categoryId.HasValue
-            && !await epicsService.UserHasAccessToCategory(
+            && !await epicsService.UserHasAccessToEpic(
                 request.UserId, request.CategoryId, ct))
                     throw new BadRequestException(
                         nameof(categoryId),
                         "Category is not found");
+        
+        if (spaceId.HasValue
+            && !await coreSpacesService.UserHasAccessToSpace(
+                request.UserId,
+                request.SpaceId,
+                AccessType.CreateItems,
+                ct))
+            throw new BadRequestException(
+                nameof(categoryId),
+                "Space is not found");
 
-        return await messageService.SaveMessage(
+        return await messageService.Create(
             new SaveMessageRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
@@ -300,6 +317,7 @@ public class IssuesService(
                 UserId = request.UserId,
                 CategoryId = categoryId,
                 StatusId = statusId,
+                SpaceId = spaceId,
             },
             ct);
     }
@@ -309,7 +327,7 @@ public class IssuesService(
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
             throw new NotFoundException();
         
-        await messageService.UpdateMessage(
+        await messageService.Update(
             request.MessageId,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
@@ -323,14 +341,13 @@ public class IssuesService(
         var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
-        if (request.CategoryId.HasValue)
-        {
-            var categoryId = request.CategoryId == CoreIssuesService.NullId
-                ? null
-                : request.CategoryId;
-
+        var categoryId = IdService.ToNullableId(request.EpicId);
+        if (categoryId.HasValue)
             query = query.Where(x => x.EpicId == categoryId);
-        }
+        
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        if (spaceId.HasValue)
+            query = query.Where(x => x.SpaceId == spaceId);
         
         if (!string.IsNullOrEmpty(request.SearchString))
             query = query
@@ -512,8 +529,8 @@ public class IssuesService(
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.EpicId ?? CoreIssuesService.NullId,
-            StatusId = x.StatusId ?? CoreIssuesService.NullId,
+            CategoryId = IdService.ToNotNullableId(x.EpicId),
+            StatusId = IdService.ToNotNullableId(x.StatusId),
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,
@@ -542,24 +559,20 @@ public class IssuesService(
     }
 }
 
-public record UpdateStatusRequest
+public record MoveCardRequest
 {
     public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public long IssueId { get; set; }
+    public long SpaceId { get; set; }
+    public long EpicId { get; set; }
     public long StatusId { get; set; }
-}
-
-public record UpdateCategoryRequest
-{
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
-    public long CategoryId { get; set; }
 }
 
 public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
-    public long? StatusId { get; set; }
+    public long SpaceId { get; set; }
+    public long StatusId { get; set; }
     public string? SearchString { get; set; }
 }
 
@@ -572,7 +585,8 @@ public record GetMessageRequest
 public record GetBoardRequest
 {
     public Guid UserId { get; set; }
-    public long? CategoryId { get; set; }
+    public long CategoryId { get; set; }
+    public long SpaceId { get; set; }
     public int Take { get; init; }
     public string? SearchString { get; init; }
 }
@@ -580,6 +594,7 @@ public record GetBoardRequest
 public record GetBoardSummaryRequest
 {
     public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
 }
 
 public record ColumnMessages
@@ -641,6 +656,7 @@ public record DeleteMessageRequest
 public record CreateMessageRequest
 {
     public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
     public long CategoryId { get; set; }
     public long StatusId { get; set; }
     public required string Content { get; set; }
@@ -656,7 +672,8 @@ public record EditMessageRequest
 public record SearchRequest : IPaginationData
 {
     public Guid UserId { get; set; }
-    public long? CategoryId { get; set; }
+    public long? EpicId { get; set; }
+    public long? SpaceId { get; set; }
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
