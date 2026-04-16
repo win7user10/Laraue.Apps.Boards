@@ -568,13 +568,6 @@ public record MoveCardRequest
     public long StatusId { get; set; }
 }
 
-public record UpdateCategoryRequest
-{
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
-    public long CategoryId { get; set; }
-}
-
 public record GetMessagesRequest : BatchRequest
 {
     public Guid UserId { get; set; }
