@@ -123,10 +123,11 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
 
     [HttpGet("summary")]
     public Task<CategorySummary[]> GetBoardSummary(
+        [FromQuery] GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
         return messagesService.GetBoardSummary(
-            new GetBoardSummaryRequest
+            request with
             {
                 UserId = HttpContext.User.GetId(),
             },

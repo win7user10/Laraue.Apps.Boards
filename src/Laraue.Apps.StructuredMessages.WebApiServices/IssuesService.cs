@@ -191,8 +191,11 @@ public class IssuesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        
         var categoryById = (await context.Epics
             .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Select(x => new
             {
                 x.Id,
@@ -217,6 +220,7 @@ public class IssuesService(
         
         var counts = (await context.Issues
             .Where(x => x.UserId == request.UserId)
+            .Where(x => x.SpaceId == spaceId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
@@ -337,9 +341,13 @@ public class IssuesService(
         var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
-        var categoryId = IdService.ToNullableId(request.CategoryId);
+        var categoryId = IdService.ToNullableId(request.EpicId);
         if (categoryId.HasValue)
             query = query.Where(x => x.EpicId == categoryId);
+        
+        var spaceId = IdService.ToNullableId(request.SpaceId);
+        if (spaceId.HasValue)
+            query = query.Where(x => x.SpaceId == spaceId);
         
         if (!string.IsNullOrEmpty(request.SearchString))
             query = query
@@ -593,6 +601,7 @@ public record GetBoardRequest
 public record GetBoardSummaryRequest
 {
     public Guid UserId { get; set; }
+    public long SpaceId { get; set; }
 }
 
 public record ColumnMessages
@@ -670,7 +679,8 @@ public record EditMessageRequest
 public record SearchRequest : IPaginationData
 {
     public Guid UserId { get; set; }
-    public long? CategoryId { get; set; }
+    public long? EpicId { get; set; }
+    public long? SpaceId { get; set; }
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
