@@ -1,6 +1,8 @@
-﻿using Laraue.Apps.StructuredMessages.WebApiServices;
+﻿using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.WebApiServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using DeleteStatusRequest = Laraue.Apps.StructuredMessages.WebApiServices.DeleteStatusRequest;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
@@ -36,7 +38,7 @@ public class StatusesController(IStatusesService statusesService)
             },
             cancellationToken);
     }
-    
+
     [HttpPut("{id:long}")]
     public Task Edit(
         long id,
@@ -47,6 +49,19 @@ public class StatusesController(IStatusesService statusesService)
             request with
             {
                 Id = id,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+
+    [HttpGet]
+    public Task<MessageStatusDto[]> GetStatuses(
+        [FromQuery] GetStatusesRequest request,
+        CancellationToken cancellationToken)
+    {
+        return statusesService.GetStatuses(
+            request with
+            {
                 UserId = HttpContext.User.GetId(),
             },
             cancellationToken);

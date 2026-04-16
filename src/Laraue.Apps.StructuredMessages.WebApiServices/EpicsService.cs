@@ -129,7 +129,7 @@ public class EpicsService(
         CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-            .UserHasAccessToCategory(request.UserId, request.CategoryId, cancellationToken))
+            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
             throw new NotFoundException();
         
         await coreEpicsService.ChangeStatusesOrder(
@@ -144,7 +144,7 @@ public class EpicsService(
     public async Task Edit(EditCategoryRequest request, CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-            .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+            .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
 
         await coreEpicsService.Update(
@@ -158,7 +158,7 @@ public class EpicsService(
     public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
-                .UserHasAccessToCategory(request.UserId, request.Id, cancellationToken))
+                .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
             throw new NotFoundException();
         
         await coreEpicsService.Delete(

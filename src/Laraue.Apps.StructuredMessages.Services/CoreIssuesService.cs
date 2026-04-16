@@ -16,23 +16,20 @@ public interface ICoreIssuesService
         long id,
         CancellationToken cancellationToken);
     
-    Task<long> SaveMessage(
+    Task<long> Create(
         SaveMessageRequest request,
         CancellationToken cancellationToken);
     
-    Task UpdateMessage(
+    Task Update(
         long messageId,
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken);
     
-    Task UpdateStatus(
-        long messageId,
-        long newStatusId,
-        CancellationToken ct);
-    
-    Task UpdateCategory(
-        long messageId,
-        long newCategoryId,
+    Task Move(
+        long issueId,
+        long spaceId,
+        long epicId,
+        long statusId,
         CancellationToken ct);
     
     Task DeleteMessage(
@@ -51,7 +48,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
             .AnyAsyncEF(cancellationToken);
     }
 
-    public async Task<long> SaveMessage(
+    public async Task<long> Create(
         SaveMessageRequest request,
         CancellationToken cancellationToken)
     {
@@ -125,7 +122,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
         return entity.Id;
     }
 
-    public async Task UpdateMessage(
+    public async Task Update(
         long messageId,
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
@@ -145,68 +142,82 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
         await TouchMessageBoard(messageId, date, cancellationToken);
     }
 
-    public async Task UpdateStatus(long messageId, long newStatusId, CancellationToken ct)
+    public async Task Move(
+        long issueId,
+        long spaceId,
+        long epicId,
+        long statusId,
+        CancellationToken ct)
     {
-        var value = IdService.ToNullableId(newStatusId);
-        if (value.HasValue)
-        {
-            var possibleStatusesIds = await context.Issues
-                .Where(x => x.Id == messageId)
-                .Select(x => x.Epic!.Statuses!
-                    .Select(s => s.Id))
-                .FirstOrThrowNotFoundEFAsync(ct);
-
-            if (!possibleStatusesIds.Contains(newStatusId))
-                throw new BadRequestException(
-                    nameof(newStatusId),
-                    "Incorrect Status Id");
-        }
-
-        await UpdateMessage(
-            messageId,
-            update => update.SetProperty(x => x.StatusId, value),
-            ct);
-    }
-
-    public async Task UpdateCategory(long messageId, long newCategoryId, CancellationToken ct)
-    {
-        var value = IdService.ToNullableId(newCategoryId);
-        if (value.HasValue)
+        var currentState = await context.Issues
+            .Where(x => x.Id == issueId)
+            .Select(x => new
+            {
+                x.EpicId,
+                x.StatusId,
+                x.SpaceId,
+            })
+            .FirstOrThrowNotFoundEFAsync(ct);
+        
+        // Validate new space
+        var newSpaceId = IdService.ToNullableId(spaceId);
+        var updateSpace = newSpaceId != currentState.SpaceId;
+        if (updateSpace && newSpaceId.HasValue)
         {
             var userId = await context.Issues
-                .Where(x => x.Id == messageId)
+                .Where(x => x.Id == issueId)
                 .Select(x => x.UserId)
                 .FirstOrDefaultAsyncEF(ct);
         
-            var possibleCategoryIds = await context.Epics
-                .Where(x => x.UserId == userId)
+            var possibleSpacesIds = await context.Spaces
+                .Where(x => x.CreatorId == userId)
                 .Select(x => x.Id)
                 .ToArrayAsyncEF(ct);
         
-            if (!possibleCategoryIds.Contains(newCategoryId))
+            if (!possibleSpacesIds.Contains(newSpaceId.Value))
                 throw new BadRequestException(
-                    nameof(newCategoryId),
-                    "Incorrect Category Id");
+                    nameof(spaceId),
+                    "Incorrect Space Id");
         }
         
-        // Set default category status after moving to category
-        long? newStatus = null;
-        if (value is not null)
+        // Validate new epic
+        var newEpicId = IdService.ToNullableId(epicId);
+        var updateEpic = newEpicId != currentState.EpicId;
+        if (updateEpic && newEpicId.HasValue)
         {
-            var newStatusData = await context.Statuses
-                .Where(s => s.EpicId == value.Value)
-                .OrderBy(s => s.SortOrder)
-                .Select(s => new { s.Id })
-                .FirstOrDefaultAsyncEF(ct);
-            
-            newStatus = newStatusData?.Id;
+            var possibleEpicIds = await context.Epics
+                .Where(x => x.SpaceId == newSpaceId)
+                .Select(x => x.Id)
+                .ToArrayAsyncEF(ct);
+        
+            if (!possibleEpicIds.Contains(newEpicId.Value))
+                throw new BadRequestException(
+                    nameof(epicId),
+                    "Incorrect Epic Id");
         }
         
-        await UpdateMessage(
-            messageId,
+        // Validate new status
+        var newStatusId = IdService.ToNullableId(statusId);
+        var updateStatus = newStatusId != currentState.StatusId;
+        if (updateStatus && newStatusId.HasValue)
+        {
+            var possibleStatusesIds = await context.Statuses
+                .Where(x => x.EpicId == newEpicId)
+                .Select(x => x.Id)
+                .ToListAsyncEF(ct);
+
+            if (!possibleStatusesIds.Contains(newStatusId.Value))
+                throw new BadRequestException(
+                    nameof(statusId),
+                    "Incorrect Status Id");
+        }
+
+        await Update(
+            issueId,
             update => update
-                .SetProperty(x => x.EpicId, value)
-                .SetProperty(x => x.StatusId, newStatus),
+                .SetProperty(x => x.StatusId, newStatusId)
+                .SetProperty(x => x.SpaceId, newSpaceId)
+                .SetProperty(x => x.EpicId, newEpicId),
             ct);
     }
 

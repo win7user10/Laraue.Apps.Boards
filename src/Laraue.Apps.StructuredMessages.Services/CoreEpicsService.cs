@@ -19,7 +19,7 @@ public interface ICoreEpicsService
         CreateMessageCategoryRequest request,
         CancellationToken cancellationToken);
     
-    Task<bool> UserHasAccessToCategory(
+    Task<bool> UserHasAccessToEpic(
         Guid userId,
         long id,
         CancellationToken cancellationToken);
@@ -94,7 +94,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         return category.Id;
     }
 
-    public Task<bool> UserHasAccessToCategory(Guid userId, long id, CancellationToken cancellationToken)
+    public Task<bool> UserHasAccessToEpic(Guid userId, long id, CancellationToken cancellationToken)
     {
         return context.Epics
             .Where(x => x.UserId == userId)

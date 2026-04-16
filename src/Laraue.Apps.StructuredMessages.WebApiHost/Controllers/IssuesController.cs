@@ -51,35 +51,17 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
             cancellationToken);
     }
     
-    [HttpPut("{id:long}/status/{statusId:long}")]
-    public Task UpdateStatus(
+    [HttpPut("{id:long}/move")]
+    public Task Move(
         long id,
-        long statusId,
+        MoveCardRequest request,
         CancellationToken cancellationToken)
     {
-        return messagesService.UpdateStatus(
-            new UpdateStatusRequest
+        return messagesService.Move(
+            request with
             {
                 UserId = HttpContext.User.GetId(),
-                StatusId = statusId,
-                MessageId = id,
-            },
-            cancellationToken);
-    }
-    
-    
-    [HttpPut("{id:long}/epic/{categoryId:long}")]
-    public Task UpdateCategory(
-        long id,
-        long categoryId,
-        CancellationToken cancellationToken)
-    {
-        return messagesService.UpdateCategory(
-            new UpdateCategoryRequest
-            {
-                UserId = HttpContext.User.GetId(),
-                CategoryId = categoryId,
-                MessageId = id,
+                IssueId = id
             },
             cancellationToken);
     }
