@@ -75,11 +75,31 @@ public class CoreSpacesService(
                 cancellationToken);
     }
 
-    public Task Delete(long id, CancellationToken cancellationToken)
+    public async Task Delete(long id, CancellationToken cancellationToken)
     {
-        return context.Spaces
-            .Where(x => x.Id == id)
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        await context.Issues
+            .Where(x => x.SpaceId == id)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(p => p.SpaceId, (long?)null)
+                .SetProperty(p => p.EpicId, (long?)null)
+                .SetProperty(p => p.StatusId, (long?)null),
+                cancellationToken);
+        
+        await context.Statuses
+            .Where(x => x.Epic!.Space!.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.Epics
+            .Where(c => c.SpaceId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.Spaces
+            .Where(c => c.Id == id)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public Task<bool> UserHasAccessToSpace(
