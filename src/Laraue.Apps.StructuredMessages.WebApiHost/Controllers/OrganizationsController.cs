@@ -52,8 +52,8 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     }
     
     [HttpGet]
-    public Task<GetOrganizationsResponse> Get(
-        CancellationToken cancellationToken)
+    public Task<GetOrganizationsResponse> GetOrganizations(
+        CancellationToken cancellationToken = default)
     {
         return organizationsService.GetSpaces(
             new GetOrganizationsRequest
