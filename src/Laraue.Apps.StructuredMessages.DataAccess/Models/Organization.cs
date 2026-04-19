@@ -3,23 +3,25 @@
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
 /// <summary>
-/// Space is the direct alternative of Jira Space (ex Project).
+/// The unit that can has spaces, boards, issues.
 /// </summary>
-public class Space
+public class Organization
 {
     public long Id { get; set; }
     
     [MaxLength(128)]
     public required string Name { get; set; }
     
-    [MaxLength(7)]
-    public string? Color { get; set; }
+    /// <summary>
+    /// Who has the full space permissions.
+    /// </summary>
+    public Guid OwnerId { get; set; }
+    public User? Owner { get; set; }
     
-    public Guid CreatorId { get; set; }
-    public User? Creator { get; set; }
-    
-    public long? OrganizationId { get; set; }
-    public Organization? Organization { get; set; }
+    /// <summary>
+    /// Type. Organization can be a personal (single user) or organization (multiple users).
+    /// </summary>
+    public OrganizationType Type { get; set; }
     
     /// <summary>
     /// Epic creation date.
@@ -30,9 +32,10 @@ public class Space
     /// Epic attribute update date.
     /// </summary>
     public DateTime UpdatedAt { get; set; }
-    
-    /// <summary>
-    /// Epics linked to the space.
-    /// </summary>
-    public IList<Epic>? Epics { get; set; }
+}
+
+public enum OrganizationType
+{
+    Personal,
+    Organization,
 }

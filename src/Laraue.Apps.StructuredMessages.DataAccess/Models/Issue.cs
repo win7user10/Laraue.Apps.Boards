@@ -22,6 +22,9 @@ public class Issue
     /// </summary>
     public DateTime UpdatedAt { get; set; }
     
+    public long? OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
+    
     /// <summary>
     /// The user messages belongs to.
     /// </summary>

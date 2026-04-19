@@ -11,7 +11,9 @@ public class EpicsController(IEpicsService categoriesService)
     : ControllerBase
 {
     [HttpGet]
-    public Task<EpicCountResult> GetCategoriesWithCount([FromQuery] GetEpicsRequest request, CancellationToken cancellationToken) => 
+    public Task<EpicCountResult> GetCategoriesWithCount(
+        [FromQuery] GetEpicsRequest request,
+        CancellationToken cancellationToken = default) => 
         categoriesService.GetEpicsWithCount(
             request with
             {
@@ -22,7 +24,7 @@ public class EpicsController(IEpicsService categoriesService)
     [HttpGet("{id}")]
     public Task<CategoryDto> GetCategory(
         [FromRoute] long id,
-        CancellationToken cancellationToken) => 
+        CancellationToken cancellationToken = default) => 
         categoriesService.GetEpic(
             new GetCategoryRequest
             {

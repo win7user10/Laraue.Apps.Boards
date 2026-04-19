@@ -12,7 +12,7 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     [HttpPost]
     public Task<long> Create(
         [FromBody] CreateSpaceRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Create(
             request with
