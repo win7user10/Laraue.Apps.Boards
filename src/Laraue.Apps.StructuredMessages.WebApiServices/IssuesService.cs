@@ -260,7 +260,7 @@ public class IssuesService(
             throw new NotFoundException("Card not found");
         
         var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessType.CreateItems, ct))
+        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessType.Create, ct))
             throw new NotFoundException("Space not found");
         
         var epicId = IdService.ToNullableId(request.EpicId);
@@ -303,7 +303,7 @@ public class IssuesService(
             && !await coreSpacesService.UserHasAccessToSpace(
                 request.UserId,
                 request.SpaceId,
-                AccessType.CreateItems,
+                AccessType.Create,
                 ct))
             throw new BadRequestException(
                 nameof(categoryId),

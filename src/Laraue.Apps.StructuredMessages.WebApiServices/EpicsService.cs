@@ -109,7 +109,7 @@ public class EpicsService(
             .UserHasAccessToSpace(
                 request.UserId,
                 spaceId.Value,
-                AccessType.CreateEpics,
+                AccessType.Create,
                 cancellationToken))
             throw new NotFoundException("Space is not found");
         

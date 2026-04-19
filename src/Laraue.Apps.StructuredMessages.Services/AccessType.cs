@@ -1,12 +1,11 @@
 ﻿namespace Laraue.Apps.StructuredMessages.Services;
 
 [Flags]
-public enum AccessType
+public enum AccessType : byte
 {
-    Read = 0,
-    Create = 1,
-    Update = 2,
-    Delete = 4,
-    CreateEpics = 8,
-    CreateItems = 16,
+    Read = 1,
+    Create = 2,
+    Update = 4,
+    Delete = 8,
+    Manage = 16,
 }

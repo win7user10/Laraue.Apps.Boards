@@ -6,32 +6,32 @@ using LinqToDB.EntityFrameworkCore;
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 
 [Collection("IntegrationTest")]
-public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
+public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
-    private readonly Proxy<SpacesController> _epicsController = host.Controller<SpacesController>();
+    private readonly Proxy<OrganizationsController> _organizationsController = host.Controller<OrganizationsController>();
 
     [Fact]
-    public async Task CreateSpace_ShouldCreateNewSpace_Always()
+    public async Task CreateOrganization_ShouldCreateNewOrganization_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         
-        var spaceId = await _epicsController
+        var newId = await _organizationsController
             .WithAuthorization(userId)
             .Execute(x => x.Create(
-                new CreateSpaceRequest
+                new CreateOrganizationRequest
                 {
-                    Name = "Space 1",
+                    Name = "Org 1",
                     Color = "#ffffff"
                 }));
 
-        var spaces = await testScope.Database.Spaces.ToListAsyncEF();
+        var organizations = await testScope.Database.Organizations.ToListAsyncEF();
         
-        var space = Assert.Single(spaces);
-        Assert.Equal("Space 1", space.Name);
+        var space = Assert.Single(organizations);
+        Assert.Equal("Org 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
-        Assert.Equal(userId, space.CreatorId);
-        Assert.Equal(spaceId, space.Id);
+        Assert.Equal(userId, space.OwnerId);
+        Assert.Equal(newId, space.Id);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
     }

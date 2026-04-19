@@ -12,6 +12,9 @@ public class Organization
     [MaxLength(128)]
     public required string Name { get; set; }
     
+    [MaxLength(7)]
+    public string? Color { get; set; }
+    
     /// <summary>
     /// Who has the full space permissions.
     /// </summary>
@@ -32,6 +35,11 @@ public class Organization
     /// Epic attribute update date.
     /// </summary>
     public DateTime UpdatedAt { get; set; }
+    
+    /// <summary>
+    /// Spaces linked to the organization.
+    /// </summary>
+    public IList<Space>? Spaces { get; set; }
 }
 
 public enum OrganizationType
