@@ -302,19 +302,19 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             OrganizationUserId = organizationUser.Id,
             Permissions = new Permissions
             {
-                OrganizationAccessLevel = AccessLevel.Create | AccessLevel.Delete,
+                OrganizationAccessLevel = AccessLevel.Read,
                 EpicsAccessLevels = new AccessLevels
                 {
                     DirectAccess = new Dictionary<long, AccessLevel>
                     {
-                        [epic.Id] = AccessLevel.Read,
+                        [epic.Id] = AccessLevel.Create,
                     }
                 },
                 SpacesAccessLevels = new AccessLevels
                 {
                     DirectAccess = new Dictionary<long, AccessLevel>
                     {
-                        [space.Id] = AccessLevel.Read,
+                        [space.Id] = AccessLevel.Create | AccessLevel.Update,
                     }
                 }
             }
@@ -326,7 +326,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
         organizationUser = Assert.Single(organizationUsers);
+        Assert.Equal(AccessLevel.Read, organizationUser.AccessLevel);
         
-        Assert.Equal(AccessLevel.Create | AccessLevel.Delete, organizationUser.AccessLevel);
+        var spaceOrganizationUsers = await testScope.Database.SpaceOrganizationUsers.ToListAsyncEF();
+        var spaceOrganizationUser = Assert.Single(spaceOrganizationUsers);
+        Assert.Equal(AccessLevel.Create | AccessLevel.Update, spaceOrganizationUser.AccessLevel);
+        Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
+        Assert.Equal(space.Id, spaceOrganizationUser.SpaceId);
     }
 }

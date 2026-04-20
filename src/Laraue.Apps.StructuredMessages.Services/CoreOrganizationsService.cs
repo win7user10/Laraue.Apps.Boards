@@ -139,8 +139,39 @@ public class CoreOrganizationsService(
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.AccessLevel, permissions.OrganizationAccessLevel), cancellationToken);
+                .SetProperty(p => p.AccessLevel, permissions.OrganizationAccessLevel),
+                cancellationToken);
         
+        await context.SpaceOrganizationUsers
+            .Where(x => x.OrganizationUserId == organizationUserId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var spaceLevels = permissions.SpacesAccessLevels;
+        if (spaceLevels.DirectAccess is not null)
+        {
+            var spacePermissions = spaceLevels.DirectAccess
+                .Select(x => new SpaceOrganizationUser
+                {
+                    AccessLevel = x.Value,
+                    OrganizationUserId = organizationUserId,
+                    SpaceId = x.Key,
+                });
+            
+            context.SpaceOrganizationUsers.AddRange(spacePermissions);
+        }
+        else 
+        {
+            var spacePermission = new SpaceOrganizationUser
+            {
+                AccessLevel = spaceLevels.AccessLevel,
+                OrganizationUserId = organizationUserId,
+                SpaceId = null,
+            };
+            
+            context.SpaceOrganizationUsers.Add(spacePermission);
+        }
+        
+        await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 }
@@ -157,6 +188,6 @@ public record Permissions
 /// </summary>
 public record AccessLevels
 {
-    public AccessLevel? AccessLevel { get; init; }
+    public AccessLevel AccessLevel { get; init; }
     public Dictionary<long, AccessLevel>? DirectAccess { get; init; }
 }
