@@ -26,7 +26,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     public Task Update(
         long id,
         [FromBody] EditOrganizationRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return organizationsService.Update(
             request with

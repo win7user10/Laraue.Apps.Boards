@@ -1,8 +1,10 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess.Models;
+﻿using System.Net;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 
@@ -38,7 +40,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldViewAvailableOrganizations_WhenHasPermissions()
+    public async Task User_ShouldViewAvailableOrganizations_WhenHasAccess()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -49,6 +51,14 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 Name = "Org 1",
                 OwnerId = userId,
                 Color = "#ffffff",
+                Spaces = new List<Space>
+                {
+                    new()
+                    {
+                        Name = "Space 1",
+                        CreatorId = userId,
+                    }
+                }
             });
         
         await testScope.Database.SaveChangesAsync();
@@ -60,11 +70,11 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var organization = Assert.Single(organizationsResponse!.Organizations);
         Assert.Equal("Org 1", organization.Name);
         Assert.Equal("#ffffff", organization.Color);
-        Assert.Equal(0, organization.SpacesCount);
+        Assert.Equal(1, organization.SpacesCount);
     }
     
     [Fact]
-    public async Task User_ShouldNotViewOrganizations_WhenHasNotPermissions()
+    public async Task User_ShouldNotViewOrganizations_WhenHasNotAccess()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -76,6 +86,14 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 Name = "Org 1",
                 OwnerId = userId,
                 Color = "#ffffff",
+                Spaces = new List<Space>
+                {
+                    new()
+                    {
+                        Name = "Space 1",
+                        CreatorId = userId,
+                    }
+                }
             });
         
         await testScope.Database.SaveChangesAsync();
@@ -85,5 +103,73 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetOrganizations());
         
         Assert.Empty(organizationsResponse!.Organizations);
+    }
+    
+    [Fact]
+    public async Task User_ShouldUpdateOrganization_WhenHasAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+
+        var date1 = new DateTime(2020, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+        var entity = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = userId,
+            Color = "#ffffff",
+            CreatedAt = date1,
+            UpdatedAt = date1,
+        };
+        
+        testScope.Database.Organizations.Add(entity);
+        await testScope.Database.SaveChangesAsync();
+        
+        await _organizationsController
+            .WithAuthorization(userId)
+            .Execute(x => x.Update(
+                entity.Id,
+                new EditOrganizationRequest
+                {
+                    Name = "Org 2",
+                    Color = "#000000"
+                }));
+
+        var organizations = await testScope.Database.Organizations.ToListAsyncEF();
+        
+        var organization = Assert.Single(organizations);
+        Assert.Equal("Org 2", organization.Name);
+        Assert.Equal("#000000", organization.Color);
+        Assert.Equal(userId, organization.OwnerId);
+        Assert.Equal(date1, organization.CreatedAt);
+        Assert.True(organization.UpdatedAt > date1);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotUpdateOrganization_WhenHasNoAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var nonPermittedUserId = await testScope.CreateUser();
+
+        var entity = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = userId,
+        };
+        
+        testScope.Database.Organizations.Add(entity);
+        await testScope.Database.SaveChangesAsync();
+        
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
+            .WithAuthorization(nonPermittedUserId)
+            .Execute(x => x.Update(
+                entity.Id,
+                new EditOrganizationRequest
+                {
+                    Name = "Org 2",
+                    Color = "#000000"
+                })));
+        
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 }
