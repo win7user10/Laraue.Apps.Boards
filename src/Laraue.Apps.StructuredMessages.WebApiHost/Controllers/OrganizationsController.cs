@@ -40,7 +40,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return organizationsService.Delete(
             new DeleteOrganizationRequest

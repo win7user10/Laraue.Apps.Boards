@@ -137,6 +137,7 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
             HttpGetAttribute => client.GetAsync(fullPath),
             HttpPostAttribute => client.PostAsJsonAsync(fullPath, body),
             HttpPutAttribute => client.PutAsJsonAsync(fullPath, body),
+            HttpDeleteAttribute => client.DeleteAsync(fullPath),
             _ => throw new InvalidOperationException($"Requests with {httpAttribute} are not supported")
         };
         
@@ -180,7 +181,9 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         if (!response.IsSuccessStatusCode)
         {
             var responseContent = await response.Content.ReadAsStringAsync();
-            var requestContent = await response.RequestMessage!.Content!.ReadAsStringAsync();
+            var content = response.RequestMessage!.Content;
+            
+            var requestContent = content is not null ? await response.Content.ReadAsStringAsync() : string.Empty;
             var error =
                 $"[{response.RequestMessage?.Method}] {response.RequestMessage?.RequestUri} ({response.StatusCode:D}) \nRequest Content: {requestContent}\nResponse Content:{responseContent}";
             throw new HttpRequestException(error, null, response.StatusCode);

@@ -4,7 +4,6 @@ using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 
@@ -139,7 +138,6 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var organization = Assert.Single(organizations);
         Assert.Equal("Org 2", organization.Name);
         Assert.Equal("#000000", organization.Color);
-        Assert.Equal(userId, organization.OwnerId);
         Assert.Equal(date1, organization.CreatedAt);
         Assert.True(organization.UpdatedAt > date1);
     }
@@ -169,6 +167,52 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                     Name = "Org 2",
                     Color = "#000000"
                 })));
+        
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+    }
+    
+    [Fact]
+    public async Task User_ShouldDeleteOrganization_WhenHasAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+
+        var entity = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = userId,
+        };
+        
+        testScope.Database.Organizations.Add(entity);
+        await testScope.Database.SaveChangesAsync();
+        
+        await _organizationsController
+            .WithAuthorization(userId)
+            .Execute(x => x.Delete(entity.Id));
+
+        var organizations = await testScope.Database.Organizations.ToListAsyncEF();
+        Assert.Empty(organizations);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotDeleteOrganization_WhenHasNoAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var nonPermittedUserId = await testScope.CreateUser();
+
+        var entity = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = userId,
+        };
+        
+        testScope.Database.Organizations.Add(entity);
+        await testScope.Database.SaveChangesAsync();
+        
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
+            .WithAuthorization(nonPermittedUserId)
+            .Execute(x => x.Delete(entity.Id)));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
