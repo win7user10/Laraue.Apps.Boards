@@ -151,7 +151,7 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         if (template == null)
             return [];
         
-        var regex = new Regex("{(\\w+)\\:?\\w+?}");
+        var regex = new Regex("{(\\w+)(?::(\\w+))?}", RegexOptions.Compiled);
         var matches = regex.Matches(template);
         return matches
             .Select(x => new TemplateParameter

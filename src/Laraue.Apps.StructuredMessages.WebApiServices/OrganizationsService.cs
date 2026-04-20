@@ -23,6 +23,10 @@ public interface IOrganizationsService
     Task Delete(
         DeleteOrganizationRequest request,
         CancellationToken cancellationToken);
+    
+    Task Join(
+        JoinOrganizationRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(ICoreOrganizationsService coreOrganizationsService, DatabaseContext context)
@@ -67,8 +71,8 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
     public async Task Update(EditOrganizationRequest request, CancellationToken cancellationToken)
     {
         if (!await coreOrganizationsService.HasAccess(
-            request.UserId,
             request.Id,
+            request.UserId,
             AccessType.Update,
             cancellationToken))
             throw new NotFoundException();
@@ -84,13 +88,28 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
     public async Task Delete(DeleteOrganizationRequest request, CancellationToken cancellationToken)
     {
         if (!await coreOrganizationsService.HasAccess(
-            request.UserId,
             request.Id,
+            request.UserId,
             AccessType.Delete,
             cancellationToken))
             throw new NotFoundException();
         
         await coreOrganizationsService.Delete(request.Id, cancellationToken);
+    }
+
+    public async Task Join(JoinOrganizationRequest request, CancellationToken cancellationToken)
+    {
+        var organizationId = await coreOrganizationsService.GetOrganizationIdByJoinCode(
+            request.JoinCode,
+            cancellationToken);
+        
+        if (organizationId == null)
+            throw new NotFoundException();
+
+        await coreOrganizationsService.AddMember(
+            organizationId.Value,
+            request.UserId,
+            cancellationToken);
     }
 }
 
@@ -142,4 +161,10 @@ public record GetOrganizationsResponse
 {
     public required OrganizationDto[] Organizations { get; set; }
     public required int PersonalOrganizationSpacesCount { get; set; }
+}
+
+public record JoinOrganizationRequest
+{
+    public Guid UserId { get; set; }
+    public required string JoinCode { get; set; }
 }

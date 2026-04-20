@@ -62,4 +62,18 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             },
             cancellationToken);
     }
+    
+    [HttpPost("join/{code}")]
+    public Task Join(
+        string code,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.Join(
+            new JoinOrganizationRequest
+            {
+                JoinCode = code,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }

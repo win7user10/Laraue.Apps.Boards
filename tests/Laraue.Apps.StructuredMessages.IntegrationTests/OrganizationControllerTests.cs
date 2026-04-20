@@ -34,6 +34,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal("#ffffff", organization.Color);
         Assert.Equal(userId, organization.OwnerId);
         Assert.Equal(newId, organization.Id);
+        Assert.Equal(8, organization.JoinCode.Length);
         Assert.True(organization.CreatedAt != default);
         Assert.True(organization.UpdatedAt != default);
     }
@@ -215,5 +216,33 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.Delete(entity.Id)));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+    }
+    
+    [Fact]
+    public async Task User_ShouldJoinOrganization_WhenHasCode()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var newUserId = await testScope.CreateUser();
+
+        var organization = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = ownerId,
+            JoinCode = "abc"
+        };
+        
+        testScope.Database.Organizations.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+
+        await _organizationsController
+            .WithAuthorization(newUserId)
+            .Execute(x => x.Join("abc"));
+        
+        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
+        var organizationUser = Assert.Single(organizationUsers);
+        
+        Assert.Equal(organization.Id, organizationUser.OrganizationId);
+        Assert.Equal(newUserId, organizationUser.UserId);
     }
 }

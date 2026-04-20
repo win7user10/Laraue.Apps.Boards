@@ -25,9 +25,18 @@ public interface ICoreOrganizationsService
         CancellationToken cancellationToken);
     
     Task<bool> HasAccess(
-        Guid userId,
         long organizationId,
+        Guid userId,
         AccessType accessType,
+        CancellationToken cancellationToken);
+    
+    Task AddMember(
+        long organizationId,
+        Guid userId,
+        CancellationToken cancellationToken);
+    
+    Task<long?> GetOrganizationIdByJoinCode(
+        string code,
         CancellationToken cancellationToken);
 }
 
@@ -51,6 +60,7 @@ public class CoreOrganizationsService(
             Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
+            JoinCode = StringGenerator.GenerateJoinCode(),
         };
         
         context.Organizations.Add(entity);
@@ -83,8 +93,8 @@ public class CoreOrganizationsService(
     }
 
     public Task<bool> HasAccess(
-        Guid userId,
         long organizationId,
+        Guid userId,
         AccessType accessType,
         CancellationToken cancellationToken)
     {
@@ -92,5 +102,24 @@ public class CoreOrganizationsService(
             .Where(x => x.OwnerId == userId)
             .Where(x => x.Id == organizationId)
             .AnyAsyncEF(cancellationToken);
+    }
+
+    public Task AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)
+    {
+        context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = organizationId,
+            UserId = userId,
+        });
+
+        return context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<long?> GetOrganizationIdByJoinCode(string code, CancellationToken cancellationToken)
+    {
+        return (await context.Organizations
+            .Where(x => x.JoinCode == code)
+            .Select(x => new { x.Id })
+            .FirstOrDefaultAsyncEF(cancellationToken))?.Id;
     }
 }

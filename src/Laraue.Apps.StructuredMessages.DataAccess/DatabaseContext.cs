@@ -19,6 +19,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<Epic> Epics { get; init; }
     public DbSet<Space> Spaces { get; init; }
     public DbSet<Organization> Organizations { get; init; }
+    public DbSet<OrganizationUser> OrganizationUsers { get; init; }
     public DbSet<Status> Statuses { get; init; }
     public DbSet<TelegramFile> TelegramFiles { get; init; }
     public DbSet<TelegramMessagePhoto> TelegramPhotos { get; init; }

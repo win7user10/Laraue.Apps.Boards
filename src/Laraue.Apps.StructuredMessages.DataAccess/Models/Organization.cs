@@ -10,7 +10,7 @@ public class Organization
     public long Id { get; set; }
     
     [MaxLength(128)]
-    public required string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     
     [MaxLength(7)]
     public string? Color { get; set; }
@@ -40,6 +40,12 @@ public class Organization
     /// Spaces linked to the organization.
     /// </summary>
     public IList<Space>? Spaces { get; set; }
+    
+    /// <summary>
+    /// Organization code to join an organization.
+    /// </summary>
+    [MaxLength(8)]
+    public string JoinCode { get; set; } = string.Empty;
 }
 
 public enum OrganizationType
