@@ -1,6 +1,8 @@
 ﻿using System.Net;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
+using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
@@ -244,5 +246,87 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         Assert.Equal(organization.Id, organizationUser.OrganizationId);
         Assert.Equal(newUserId, organizationUser.UserId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotJoinOrganization_WhenCodeIsWrong()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var newUserId = await testScope.CreateUser();
+
+        var organization = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = ownerId,
+            JoinCode = "abc"
+        };
+        
+        testScope.Database.Organizations.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
+            .WithAuthorization(newUserId)
+            .Execute(x => x.Join("def")));
+        
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task User_ShouldSetDirectPermissions_WhenHeIsOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var userIdToReceivePermissions = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
+        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
+        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
+        
+        var organization = new Organization
+        {
+            Name = "Org 1",
+            OwnerId = ownerId,
+            JoinCode = "abc",
+            Users = new List<OrganizationUser> { organizationUser },
+            Spaces = new List<Space> { space }
+        };
+        
+        testScope.Database.Add(epic);
+        testScope.Database.Add(space);
+        testScope.Database.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+
+        var request = new SetPermissionsRequest
+        {
+            OrganizationUserId = organizationUser.Id,
+            Permissions = new Permissions
+            {
+                OrganizationAccessLevel = AccessLevel.Create | AccessLevel.Delete,
+                EpicsAccessLevels = new AccessLevels
+                {
+                    DirectAccess = new Dictionary<long, AccessLevel>
+                    {
+                        [epic.Id] = AccessLevel.Read,
+                    }
+                },
+                SpacesAccessLevels = new AccessLevels
+                {
+                    DirectAccess = new Dictionary<long, AccessLevel>
+                    {
+                        [space.Id] = AccessLevel.Read,
+                    }
+                }
+            }
+        };
+        
+        await _organizationsController
+            .WithAuthorization(ownerId)
+            .Execute(x => x.SetPermissions(request));
+        
+        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
+        organizationUser = Assert.Single(organizationUsers);
+        
+        Assert.Equal(AccessLevel.Create | AccessLevel.Delete, organizationUser.AccessLevel);
     }
 }

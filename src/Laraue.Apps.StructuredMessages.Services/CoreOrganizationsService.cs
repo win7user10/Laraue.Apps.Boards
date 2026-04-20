@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DateTime.Services.Abstractions;
 using LinqToDB.EntityFrameworkCore;
@@ -27,7 +28,7 @@ public interface ICoreOrganizationsService
     Task<bool> HasAccess(
         long organizationId,
         Guid userId,
-        AccessType accessType,
+        AccessLevel accessLevel,
         CancellationToken cancellationToken);
     
     Task AddMember(
@@ -37,6 +38,11 @@ public interface ICoreOrganizationsService
     
     Task<long?> GetOrganizationIdByJoinCode(
         string code,
+        CancellationToken cancellationToken);
+    
+    Task SetPermissions(
+        long organizationUserId,
+        Permissions permissions,
         CancellationToken cancellationToken);
 }
 
@@ -95,7 +101,7 @@ public class CoreOrganizationsService(
     public Task<bool> HasAccess(
         long organizationId,
         Guid userId,
-        AccessType accessType,
+        AccessLevel accessLevel,
         CancellationToken cancellationToken)
     {
         return context.Organizations
@@ -122,4 +128,35 @@ public class CoreOrganizationsService(
             .Select(x => new { x.Id })
             .FirstOrDefaultAsyncEF(cancellationToken))?.Id;
     }
+
+    public async Task SetPermissions(
+        long organizationUserId,
+        Permissions permissions,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        await context.OrganizationUsers
+            .Where(x => x.Id == organizationUserId)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.AccessLevel, permissions.OrganizationAccessLevel), cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
+    }
+}
+
+public record Permissions
+{
+    public AccessLevel OrganizationAccessLevel { get; set; }
+    public required AccessLevels SpacesAccessLevels { get; set; }
+    public required AccessLevels EpicsAccessLevels { get; set; }
+}
+
+/// <summary>
+/// Allows to set up AccessLevel for all items in a time or separately for each item.
+/// </summary>
+public record AccessLevels
+{
+    public AccessLevel? AccessLevel { get; init; }
+    public Dictionary<long, AccessLevel>? DirectAccess { get; init; }
 }

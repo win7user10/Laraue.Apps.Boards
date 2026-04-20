@@ -76,4 +76,17 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             },
             cancellationToken);
     }
+    
+    [HttpPost("set-permissions")]
+    public Task SetPermissions(
+        [FromBody] SetPermissionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.SetPermissions(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
 }

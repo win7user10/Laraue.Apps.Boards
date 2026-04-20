@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DateTime.Services.Abstractions;
 using LinqToDB.EntityFrameworkCore;
@@ -27,7 +28,7 @@ public interface ICoreSpacesService
     Task<bool> UserHasAccessToSpace(
         Guid userId,
         long spaceId,
-        AccessType accessType,
+        AccessLevel accessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -105,7 +106,7 @@ public class CoreSpacesService(
     public Task<bool> UserHasAccessToSpace(
         Guid userId,
         long spaceId,
-        AccessType accessType,
+        AccessLevel accessType,
         CancellationToken cancellationToken)
     {
         return context.Spaces

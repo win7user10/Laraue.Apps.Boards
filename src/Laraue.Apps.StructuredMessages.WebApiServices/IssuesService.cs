@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Extensions;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
@@ -260,7 +261,7 @@ public class IssuesService(
             throw new NotFoundException("Card not found");
         
         var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessType.Create, ct))
+        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessLevel.Create, ct))
             throw new NotFoundException("Space not found");
         
         var epicId = IdService.ToNullableId(request.EpicId);
@@ -303,7 +304,7 @@ public class IssuesService(
             && !await coreSpacesService.UserHasAccessToSpace(
                 request.UserId,
                 request.SpaceId,
-                AccessType.Create,
+                AccessLevel.Create,
                 ct))
             throw new BadRequestException(
                 nameof(categoryId),

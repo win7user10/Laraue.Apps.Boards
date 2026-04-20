@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess.Models;
+﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -40,7 +41,7 @@ public class UserPreferencesService(ICoreUserPreferencesService coreService, ICo
         if (value.HasValue && !await spacesService.UserHasAccessToSpace(
             userId,
             spaceId,
-            AccessType.Read,
+            AccessLevel.Read,
             cancellationToken))
             return;
         

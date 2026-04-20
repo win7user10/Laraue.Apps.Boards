@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
@@ -109,7 +110,7 @@ public class EpicsService(
             .UserHasAccessToSpace(
                 request.UserId,
                 spaceId.Value,
-                AccessType.Create,
+                AccessLevel.Create,
                 cancellationToken))
             throw new NotFoundException("Space is not found");
         

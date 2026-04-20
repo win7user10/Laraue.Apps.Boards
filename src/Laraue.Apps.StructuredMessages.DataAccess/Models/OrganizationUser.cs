@@ -1,4 +1,6 @@
-﻿namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
+﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+
+namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
 public class OrganizationUser
 {
@@ -9,4 +11,6 @@ public class OrganizationUser
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
+    
+    public AccessLevel AccessLevel { get; set; }
 }

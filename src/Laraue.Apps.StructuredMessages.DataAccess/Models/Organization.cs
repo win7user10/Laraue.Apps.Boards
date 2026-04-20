@@ -46,6 +46,11 @@ public class Organization
     /// </summary>
     [MaxLength(8)]
     public string JoinCode { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Users of organization.
+    /// </summary>
+    public IList<OrganizationUser>? Users { get; set; }
 }
 
 public enum OrganizationType

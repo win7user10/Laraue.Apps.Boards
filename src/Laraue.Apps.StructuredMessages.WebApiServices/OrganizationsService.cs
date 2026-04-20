@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
@@ -26,6 +28,10 @@ public interface IOrganizationsService
     
     Task Join(
         JoinOrganizationRequest request,
+        CancellationToken cancellationToken);
+    
+    Task SetPermissions(
+        SetPermissionsRequest request,
         CancellationToken cancellationToken);
 }
 
@@ -73,7 +79,7 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
         if (!await coreOrganizationsService.HasAccess(
             request.Id,
             request.UserId,
-            AccessType.Update,
+            AccessLevel.Update,
             cancellationToken))
             throw new NotFoundException();
 
@@ -90,7 +96,7 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
         if (!await coreOrganizationsService.HasAccess(
             request.Id,
             request.UserId,
-            AccessType.Delete,
+            AccessLevel.Delete,
             cancellationToken))
             throw new NotFoundException();
         
@@ -109,6 +115,27 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
         await coreOrganizationsService.AddMember(
             organizationId.Value,
             request.UserId,
+            cancellationToken);
+    }
+
+    public async Task SetPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
+    {
+        // TODO - check that passed permissions are correct, check access to passed items
+        var organizationUser = await context.OrganizationUsers
+            .Where(x => x.Id == request.OrganizationUserId)
+            .Select(x => new { x.OrganizationId })
+            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+        
+        if (!await coreOrganizationsService.HasAccess(
+            organizationUser.OrganizationId,
+            request.UserId,
+            AccessLevel.Manage,
+            cancellationToken))
+            throw new NotFoundException();
+        
+        await coreOrganizationsService.SetPermissions(
+            request.OrganizationUserId,
+            request.Permissions,
             cancellationToken);
     }
 }
@@ -167,4 +194,11 @@ public record JoinOrganizationRequest
 {
     public Guid UserId { get; set; }
     public required string JoinCode { get; set; }
+}
+
+public record SetPermissionsRequest
+{
+    public Guid UserId { get; set; }
+    public long OrganizationUserId { get; set; }
+    public required Permissions Permissions { get; set; }
 }

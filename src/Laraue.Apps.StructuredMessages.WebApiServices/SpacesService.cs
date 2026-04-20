@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -69,7 +70,7 @@ public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext
         if (!await coreSpacesService.UserHasAccessToSpace(
             request.UserId,
             request.Id,
-            AccessType.Update,
+            AccessLevel.Update,
             cancellationToken))
             throw new NotFoundException();
 
@@ -86,7 +87,7 @@ public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext
         if (!await coreSpacesService.UserHasAccessToSpace(
             request.UserId,
             request.Id,
-            AccessType.Delete,
+            AccessLevel.Delete,
             cancellationToken))
             throw new NotFoundException();
         

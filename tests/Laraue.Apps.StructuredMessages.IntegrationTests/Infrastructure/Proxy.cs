@@ -1,6 +1,8 @@
 ﻿using System.Linq.Expressions;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Laraue.Apps.StructuredMessages.WebApiHost;
 using Laraue.Telegram.NET.Abstractions.Request;
@@ -13,6 +15,8 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 
 public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TController : ControllerBase
 {
+    private readonly JsonSerializerOptions _options = new(JsonSerializerDefaults.Web);
+    
     public async Task<T?> Execute<T>(Expression<Func<TController, Task<T>>> makeCall)
     {
         var nonGenericCall = ConvertToNonGeneric(makeCall);
@@ -115,6 +119,18 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
                 case ConstantExpression constExpr:
                     values[arg.Name] = constExpr.Value;
                     break;
+                case MemberExpression memberExpr:
+                    var memberValue = Expression.Lambda(memberExpr).Compile().DynamicInvoke();
+                    var memberType = memberValue!.GetType();
+                    if (memberType.IsClass)
+                    {
+                        var properties = memberType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+                        foreach (var property in properties)
+                            values[property.Name] = property.GetValue(memberValue);
+                    }
+                    else
+                        values[arg.Name] = memberValue;
+                    break;
                 default:
                     values[arg.Name] = Expression.Lambda(arg.Expression).Compile().DynamicInvoke();
                     break;
@@ -131,18 +147,21 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
             var pattern = templateParameter.RoutePattern;
             fullPath = fullPath.Replace(pattern, pathParameter.Value!.ToString());
         }
+
+        var bodyString = JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var stringContent = new StringContent(bodyString, Encoding.UTF8, "application/json");
         
         var responseTask = httpAttribute switch
         {
             HttpGetAttribute => client.GetAsync(fullPath),
-            HttpPostAttribute => client.PostAsJsonAsync(fullPath, body),
-            HttpPutAttribute => client.PutAsJsonAsync(fullPath, body),
+            HttpPostAttribute => client.PostAsync(fullPath, stringContent),
+            HttpPutAttribute => client.PutAsync(fullPath, stringContent),
             HttpDeleteAttribute => client.DeleteAsync(fullPath),
             _ => throw new InvalidOperationException($"Requests with {httpAttribute} are not supported")
         };
         
         var response = await responseTask;
-        await HandleNonSuccessCode(response);
+        await HandleNonSuccessCode(response, bodyString);
         return response;
     }
 
@@ -176,16 +195,13 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         return Expression.Lambda<Func<TController, Task>>(convertedBody, parameter);
     }
 
-    private async Task HandleNonSuccessCode(HttpResponseMessage response)
+    private async Task HandleNonSuccessCode(HttpResponseMessage response, string bodyString)
     {
         if (!response.IsSuccessStatusCode)
         {
             var responseContent = await response.Content.ReadAsStringAsync();
-            var content = response.RequestMessage!.Content;
-            
-            var requestContent = content is not null ? await response.Content.ReadAsStringAsync() : string.Empty;
             var error =
-                $"[{response.RequestMessage?.Method}] {response.RequestMessage?.RequestUri} ({response.StatusCode:D}) \nRequest Content: {requestContent}\nResponse Content:{responseContent}";
+                $"[{response.RequestMessage?.Method}] {response.RequestMessage?.RequestUri} ({response.StatusCode:D}) \nRequest Content: {bodyString}\nResponse Content:{responseContent}";
             throw new HttpRequestException(error, null, response.StatusCode);
         }
     }
