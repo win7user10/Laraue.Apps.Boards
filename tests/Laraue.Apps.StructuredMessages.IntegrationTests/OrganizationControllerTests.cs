@@ -42,12 +42,13 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldViewAvailableOrganizations_Always()
+    public async Task User_ShouldViewOwnedAndParticipatingOrganizations_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
+        var user2Id = await testScope.CreateUser();
 
-        testScope.Database.Organizations.Add(
+        testScope.Database.Organizations.AddRange(
             new Organization
             {
                 Name = "Org 1",
@@ -60,19 +61,63 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                         Name = "Space 1",
                         CreatorId = userId,
                     }
+                },
+                Users = new List<OrganizationUser>
+                {
+                    new ()
+                    {
+                        UserId = user2Id,
+                        AccessLevel = AccessLevel.Update,
+                    }
+                }
+            },
+            new Organization
+            {
+                Name = "Org 2",
+                OwnerId = user2Id,
+                Color = "#000000",
+                Spaces = new List<Space>
+                {
+                    new()
+                    {
+                        Name = "Space 2",
+                        CreatorId = userId,
+                    }
                 }
             });
         
         await testScope.Database.SaveChangesAsync();
         
-        var organizationsResponse = await _organizationsController
+        // First user see only owned organization
+        var userOrganizationsResponse = await _organizationsController
             .WithAuthorization(userId)
             .Execute(x => x.GetOrganizations());
+        var organizations = userOrganizationsResponse!.Organizations;
+        var organization = Assert.Single(organizations);
         
-        var organization = Assert.Single(organizationsResponse!.Organizations);
+        Assert.Equal(AccessLevel.Manage, organization.AccessLevel);
         Assert.Equal("Org 1", organization.Name);
         Assert.Equal("#ffffff", organization.Color);
         Assert.Equal(1, organization.SpacesCount);
+        
+        // Second user see owned organization and organization where he was added
+        var user2OrganizationsResponse = await _organizationsController
+            .WithAuthorization(user2Id)
+            .Execute(x => x.GetOrganizations());
+        
+        organizations = user2OrganizationsResponse!.Organizations;
+        Assert.Equal(2, organizations.Length);
+        var (organization1, organization2) = (organizations[0], organizations[1]);
+        
+        Assert.Equal(AccessLevel.Update, organization1.AccessLevel);
+        Assert.Equal("Org 1", organization1.Name);
+        Assert.Equal("#ffffff", organization1.Color);
+        Assert.Equal(1, organization1.SpacesCount);
+        
+        Assert.Equal(AccessLevel.Manage, organization2.AccessLevel);
+        Assert.Equal("Org 2", organization2.Name);
+        Assert.Equal("#000000", organization2.Color);
+        Assert.Equal(1, organization2.SpacesCount);
     }
     
     [Fact]

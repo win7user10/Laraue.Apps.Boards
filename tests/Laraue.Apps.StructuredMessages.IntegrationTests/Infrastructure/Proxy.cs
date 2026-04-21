@@ -34,7 +34,9 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         var authService = host.Services.GetRequiredService<IAuthService>();
         var bearer = authService.CreateToken(userId);
         
-        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {bearer}");
+        const string headerName = "Authorization";
+        client.DefaultRequestHeaders.Remove(headerName);
+        client.DefaultRequestHeaders.Add(headerName, $"Bearer {bearer}");
         return this;
     }
     

@@ -10,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IOrganizationsService
 {
-    Task<GetOrganizationsResponse> GetSpaces(
+    Task<GetOrganizationsResponse> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken);
     
@@ -42,19 +42,35 @@ public interface IOrganizationsService
 public class OrganizationsService(ICoreOrganizationsService coreOrganizationsService, DatabaseContext context)
     : IOrganizationsService
 {
-    public async Task<GetOrganizationsResponse> GetSpaces(
+    public async Task<GetOrganizationsResponse> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken)
     {
-        var organizations = await context.Organizations
+        var userOrganizationsQuery = context.OrganizationUsers
+            .Where(x => x.UserId == request.UserId)
+            .Select(x => new OrganizationDto
+            {
+                Id = x.Id,
+                AccessLevel = x.AccessLevel,
+                Name = x.Organization!.Name,
+                Color = x.Organization.Color,
+                SpacesCount = x.Organization.Spaces!.Count
+            });
+
+        var userOwnedOrganizationsQuery = context.Organizations
             .Where(x => x.OwnerId == request.UserId)
             .Select(x => new OrganizationDto
             {
                 Id = x.Id,
+                AccessLevel = AccessLevel.Manage,
                 Name = x.Name,
                 Color = x.Color,
                 SpacesCount = x.Spaces!.Count
-            })
+            });
+        
+        var allOrganizations = await userOrganizationsQuery
+            .Union(userOwnedOrganizationsQuery)
+            .OrderBy(x => x.Name)
             .ToArrayAsyncEF(cancellationToken);
 
         var noSpacesCount = await context.Spaces
@@ -64,7 +80,7 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
 
         return new GetOrganizationsResponse
         {
-            Organizations = organizations,
+            Organizations = allOrganizations,
             PersonalOrganizationSpacesCount = noSpacesCount
         };
     }
@@ -205,6 +221,7 @@ public record OrganizationDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
+    public required AccessLevel AccessLevel { get; set; }
 }
 
 public record GetOrganizationsResponse

@@ -56,7 +56,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     public Task<GetOrganizationsResponse> GetOrganizations(
         CancellationToken cancellationToken = default)
     {
-        return organizationsService.GetSpaces(
+        return organizationsService.GetOrganizations(
             new GetOrganizationsRequest
             {
                 UserId = HttpContext.User.GetId(),

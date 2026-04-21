@@ -16,7 +16,7 @@ public class Organization
     public string? Color { get; set; }
     
     /// <summary>
-    /// Who has the full space permissions.
+    /// Who is the owner of organization. That can be transferred.
     /// </summary>
     public Guid OwnerId { get; set; }
     public User? Owner { get; set; }
