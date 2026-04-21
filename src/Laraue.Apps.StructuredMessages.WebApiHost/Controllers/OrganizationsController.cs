@@ -105,11 +105,11 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     }
     
     [HttpPost("login")]
-    public Task Login(
-        [FromBody] SetPermissionsRequest request,
+    public Task<string> Login(
+        [FromBody] LoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        return organizationsService.SetPermissions(
+        return organizationsService.Login(
             request with
             {
                 UserId = HttpContext.User.GetId(),

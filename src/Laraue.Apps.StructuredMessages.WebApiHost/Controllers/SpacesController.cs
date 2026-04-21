@@ -53,7 +53,7 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     
     [HttpGet]
     public Task<GetSpacesResponse> Get(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return spacesService.GetSpaces(
             new GetSpacesRequest

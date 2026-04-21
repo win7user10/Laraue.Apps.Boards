@@ -13,6 +13,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
     private readonly Proxy<OrganizationsController> _organizationsController = host.Controller<OrganizationsController>();
+    private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
 
     [Fact]
     public async Task CreateOrganization_ShouldCreateNewOrganization_Always()
@@ -573,5 +574,47 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var directEpicAccess = Assert.Single(permissions.EpicsAccessLevels.DirectAccess);
         Assert.Equal(epic.Id, directEpicAccess.Key);
         Assert.Equal(AccessLevel.Delete, directEpicAccess.Value);
+    }
+    
+    [Fact]
+    public async Task Login_ShouldReturnValidOrganizationToken_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var organizationUserId = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = organizationUserId, AccessLevel = AccessLevel.Read };
+        
+        var organization = new Organization
+        {
+            OwnerId = ownerId,
+            Users = new List<OrganizationUser> { organizationUser },
+        };
+        
+        testScope.Database.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+        
+        var organizationAuthToken = await _organizationsController
+            .WithUserAuthorization(ownerId)
+            .Execute(x => x.Login(
+                new LoginRequest
+                {
+                    OrganizationId = organization.Id
+                }));
+        
+        Assert.NotNull(organizationAuthToken);
+        
+        // Spaces are available with organization token
+        var getSpacesResponse = await _spacesController
+            .WithAuthorizationToken(organizationAuthToken)
+            .Execute(x => x.Get());
+        
+        Assert.NotNull(getSpacesResponse);
+        
+        // And not available with user token
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _spacesController
+            .WithUserAuthorization(organizationUserId)
+            .Execute(x => x.Get()));
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
     }
 }

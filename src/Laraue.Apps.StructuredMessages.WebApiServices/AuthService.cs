@@ -4,11 +4,11 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Laraue.Apps.StructuredMessages.WebApiHost;
+namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IAuthService
 {
-    string CreateOrganizationToken(long organizationId, long userOrganizationId);
+    string CreateOrganizationToken(long organizationId, Guid userId);
     string CreateUserToken(Guid userId);
 }
 
@@ -18,12 +18,12 @@ public class AuthService(IOptions<AuthOptions> options) : IAuthService
     public const string OrganizationAudience = "NoteBoardTelegramMiniApp";
     public const string UserAudience = "NoteBoardUserTelegramMiniApp";
 
-    public string CreateOrganizationToken(long organizationId, long userOrganizationId)
+    public string CreateOrganizationToken(long organizationId, Guid userId)
     {
         var claims = new List<Claim>
         {
             new("orgId", organizationId.ToString()),
-            new("orgUserId", userOrganizationId.ToString()),
+            new("id", userId.ToString()),
         };
         
         var jwt = new JwtSecurityToken(

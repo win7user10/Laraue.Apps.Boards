@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
@@ -37,40 +38,34 @@ public interface IOrganizationsService
     Task<Permissions> GetPermissions(
         GetPermissionsRequest request,
         CancellationToken cancellationToken);
+    
+    Task<string> Login(
+        LoginRequest request,
+        CancellationToken cancellationToken);
 }
 
-public class OrganizationsService(ICoreOrganizationsService coreOrganizationsService, DatabaseContext context)
+public class OrganizationsService(
+    ICoreOrganizationsService coreOrganizationsService,
+    DatabaseContext context,
+    IAuthService authService)
     : IOrganizationsService
 {
     public async Task<GetOrganizationsResponse> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken)
     {
-        var userOrganizationsQuery = context.OrganizationUsers
-            .Where(x => x.UserId == request.UserId)
+        var allOrganizations = await AvailableOrganizations(request.UserId)
+            .OrderBy(x => x.Name)
             .Select(x => new OrganizationDto
             {
                 Id = x.Id,
-                AccessLevel = x.AccessLevel,
-                Name = x.Organization!.Name,
-                Color = x.Organization.Color,
-                SpacesCount = x.Organization.Spaces!.Count
-            });
-
-        var userOwnedOrganizationsQuery = context.Organizations
-            .Where(x => x.OwnerId == request.UserId)
-            .Select(x => new OrganizationDto
-            {
-                Id = x.Id,
-                AccessLevel = AccessLevel.Manage,
+                AccessLevel = x.Users!.FirstOrDefault(u => u.UserId == request.UserId) != null
+                    ? x.Users!.FirstOrDefault(u => u.UserId == request.UserId)!.AccessLevel
+                    : AccessLevel.Manage,
                 Name = x.Name,
                 Color = x.Color,
                 SpacesCount = x.Spaces!.Count
-            });
-        
-        var allOrganizations = await userOrganizationsQuery
-            .Union(userOwnedOrganizationsQuery)
-            .OrderBy(x => x.Name)
+            })
             .ToArrayAsyncEF(cancellationToken);
 
         var noSpacesCount = await context.Spaces
@@ -83,6 +78,20 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
             Organizations = allOrganizations,
             PersonalOrganizationSpacesCount = noSpacesCount
         };
+    }
+
+    private IQueryable<Organization> AvailableOrganizations(Guid userId)
+    {
+        var userOrganizationsQuery = context.OrganizationUsers
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Organization!);
+
+        var userOwnedOrganizationsQuery = context.Organizations
+            .Where(x => x.OwnerId == userId)
+            .Select(x => x);
+        
+        return userOrganizationsQuery
+            .Union(userOwnedOrganizationsQuery);
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -177,6 +186,14 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
             request.OrganizationUserId,
             cancellationToken);
     }
+
+    public async Task<string> Login(LoginRequest request, CancellationToken cancellationToken)
+    {
+        await AvailableOrganizations(request.UserId)
+            .AnyOrThrowNotFoundEFAsync(x => x.Id == request.OrganizationId, cancellationToken);
+
+        return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
+    }
 }
 
 public record CreateOrganizationRequest
@@ -247,4 +264,10 @@ public record GetPermissionsRequest
 {
     public Guid UserId { get; set; }
     public long OrganizationUserId { get; set; }
+}
+
+public record LoginRequest
+{
+    public Guid UserId { get; set; }
+    public long OrganizationId { get; set; }
 }

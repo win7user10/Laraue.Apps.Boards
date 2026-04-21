@@ -17,7 +17,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var userId = await testScope.CreateUser();
         
         var spaceId = await _epicsController
-            .WithUserAuthorization(userId)
+            .WithPersonalOrganizationAuthorization(userId)
             .Execute(x => x.Create(
                 new CreateSpaceRequest
                 {

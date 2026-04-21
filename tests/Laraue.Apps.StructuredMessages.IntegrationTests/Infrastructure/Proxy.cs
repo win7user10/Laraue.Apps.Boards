@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Laraue.Apps.StructuredMessages.WebApiHost;
+using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Telegram.NET.Abstractions.Request;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -21,6 +22,8 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
     {
         var nonGenericCall = ConvertToNonGeneric(makeCall);
         var response = await ExecuteInternal(nonGenericCall);
+        if (typeof(T) == typeof(string))
+            return (dynamic) await response.Content.ReadAsStringAsync();
         return await response.Content.ReadFromJsonAsync<T>();
     }
     
@@ -33,21 +36,26 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
     {
         var authService = host.Services.GetRequiredService<IAuthService>();
         var bearer = authService.CreateUserToken(userId);
-        
-        const string headerName = "Authorization";
-        client.DefaultRequestHeaders.Remove(headerName);
-        client.DefaultRequestHeaders.Add(headerName, $"Bearer {bearer}");
-        return this;
+        return WithAuthorizationToken(bearer);
     }
 
-    public Proxy<TController> WithOrganizationAuthorization(long organizationId, long organizationUserId)
+    public Proxy<TController> WithOrganizationAuthorization(long organizationId, Guid userId)
     {
         var authService = host.Services.GetRequiredService<IAuthService>();
-        var bearer = authService.CreateOrganizationToken(organizationId, organizationUserId);
-        
+        var bearer = authService.CreateOrganizationToken(organizationId, userId);
+        return WithAuthorizationToken(bearer);
+    }
+
+    public Proxy<TController> WithPersonalOrganizationAuthorization(Guid userId)
+    {
+        return WithOrganizationAuthorization(0, userId);
+    }
+
+    public Proxy<TController> WithAuthorizationToken(string token)
+    {
         const string headerName = "Authorization";
         client.DefaultRequestHeaders.Remove(headerName);
-        client.DefaultRequestHeaders.Add(headerName, $"Bearer {bearer}");
+        client.DefaultRequestHeaders.Add(headerName, $"Bearer {token}");
         return this;
     }
     
