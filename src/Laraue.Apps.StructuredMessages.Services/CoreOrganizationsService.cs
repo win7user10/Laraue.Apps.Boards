@@ -195,7 +195,7 @@ public class CoreOrganizationsService(
         {
             var epicPermission = new EpicOrganizationUser
             {
-                AccessLevel = spaceLevels.AccessLevel,
+                AccessLevel = epicLevels.AccessLevel,
                 OrganizationUserId = organizationUserId,
                 EpicId = null,
             };

@@ -285,9 +285,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         var organization = new Organization
         {
-            Name = "Org 1",
             OwnerId = ownerId,
-            JoinCode = "abc",
             Users = new List<OrganizationUser> { organizationUser },
             Spaces = new List<Space> { space }
         };
@@ -314,7 +312,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 {
                     DirectAccess = new Dictionary<long, AccessLevel>
                     {
-                        [space.Id] = AccessLevel.Create | AccessLevel.Update,
+                        [space.Id] = AccessLevel.Update,
                     }
                 }
             }
@@ -330,7 +328,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         var spaceOrganizationUsers = await testScope.Database.SpaceOrganizationUsers.ToListAsyncEF();
         var spaceOrganizationUser = Assert.Single(spaceOrganizationUsers);
-        Assert.Equal(AccessLevel.Create | AccessLevel.Update, spaceOrganizationUser.AccessLevel);
+        Assert.Equal(AccessLevel.Update, spaceOrganizationUser.AccessLevel);
         Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
         Assert.Equal(space.Id, spaceOrganizationUser.SpaceId);
         
@@ -339,5 +337,66 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal(AccessLevel.Create, epicOrganizationUser.AccessLevel);
         Assert.Equal(organizationUser.Id, epicOrganizationUser.OrganizationUserId);
         Assert.Equal(epic.Id, epicOrganizationUser.EpicId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSetSectionAccess_WhenHeIsOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var userIdToReceivePermissions = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
+        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
+        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
+        
+        var organization = new Organization
+        {
+            OwnerId = ownerId,
+            Users = new List<OrganizationUser> { organizationUser },
+            Spaces = new List<Space> { space }
+        };
+        
+        testScope.Database.Add(epic);
+        testScope.Database.Add(space);
+        testScope.Database.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+
+        var request = new SetPermissionsRequest
+        {
+            OrganizationUserId = organizationUser.Id,
+            Permissions = new Permissions
+            {
+                OrganizationAccessLevel = AccessLevel.None,
+                EpicsAccessLevels = new AccessLevels
+                {
+                    AccessLevel = AccessLevel.Delete,
+                },
+                SpacesAccessLevels = new AccessLevels
+                {
+                    AccessLevel = AccessLevel.Read,
+                }
+            }
+        };
+        
+        await _organizationsController
+            .WithAuthorization(ownerId)
+            .Execute(x => x.SetPermissions(request));
+        
+        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
+        organizationUser = Assert.Single(organizationUsers);
+        Assert.Equal(AccessLevel.None, organizationUser.AccessLevel);
+        
+        var spaceOrganizationUsers = await testScope.Database.SpaceOrganizationUsers.ToListAsyncEF();
+        var spaceOrganizationUser = Assert.Single(spaceOrganizationUsers);
+        Assert.Equal(AccessLevel.Read, spaceOrganizationUser.AccessLevel);
+        Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
+        Assert.Null(spaceOrganizationUser.SpaceId);
+        
+        var epicOrganizationUsers = await testScope.Database.EpicOrganizationUsers.ToListAsyncEF();
+        var epicOrganizationUser = Assert.Single(epicOrganizationUsers);
+        Assert.Equal(AccessLevel.Delete, epicOrganizationUser.AccessLevel);
+        Assert.Equal(organizationUser.Id, epicOrganizationUser.OrganizationUserId);
+        Assert.Null(epicOrganizationUser.EpicId);
     }
 }
