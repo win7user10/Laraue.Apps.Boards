@@ -33,6 +33,10 @@ public interface IOrganizationsService
     Task SetPermissions(
         SetPermissionsRequest request,
         CancellationToken cancellationToken);
+    
+    Task<Permissions> GetPermissions(
+        GetPermissionsRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(ICoreOrganizationsService coreOrganizationsService, DatabaseContext context)
@@ -138,6 +142,25 @@ public class OrganizationsService(ICoreOrganizationsService coreOrganizationsSer
             request.Permissions,
             cancellationToken);
     }
+
+    public async Task<Permissions> GetPermissions(GetPermissionsRequest request, CancellationToken cancellationToken)
+    {
+        var organizationUser = await context.OrganizationUsers
+            .Where(x => x.Id == request.OrganizationUserId)
+            .Select(x => new { x.OrganizationId })
+            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+        
+        if (!await coreOrganizationsService.HasAccess(
+            organizationUser.OrganizationId,
+            request.UserId,
+            AccessLevel.Manage,
+            cancellationToken))
+            throw new NotFoundException();
+        
+        return await coreOrganizationsService.GetPermissions(
+            request.OrganizationUserId,
+            cancellationToken);
+    }
 }
 
 public record CreateOrganizationRequest
@@ -201,4 +224,10 @@ public record SetPermissionsRequest
     public Guid UserId { get; set; }
     public long OrganizationUserId { get; set; }
     public required Permissions Permissions { get; set; }
+}
+
+public record GetPermissionsRequest
+{
+    public Guid UserId { get; set; }
+    public long OrganizationUserId { get; set; }
 }

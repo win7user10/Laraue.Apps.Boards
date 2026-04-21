@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.WebApiServices;
+﻿using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.WebApiServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -77,12 +78,25 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             cancellationToken);
     }
     
-    [HttpPost("set-permissions")]
+    [HttpPost("permissions")]
     public Task SetPermissions(
         [FromBody] SetPermissionsRequest request,
         CancellationToken cancellationToken = default)
     {
         return organizationsService.SetPermissions(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
+    [HttpGet("permissions")]
+    public Task<Permissions> GetPermissions(
+        [FromQuery] GetPermissionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetPermissions(
             request with
             {
                 UserId = HttpContext.User.GetId(),

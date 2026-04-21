@@ -347,18 +347,13 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var userIdToReceivePermissions = await testScope.CreateUser();
 
         var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
-        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
-        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
         
         var organization = new Organization
         {
             OwnerId = ownerId,
             Users = new List<OrganizationUser> { organizationUser },
-            Spaces = new List<Space> { space }
         };
         
-        testScope.Database.Add(epic);
-        testScope.Database.Add(space);
         testScope.Database.Add(organization);
         await testScope.Database.SaveChangesAsync();
 
@@ -398,5 +393,83 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal(AccessLevel.Delete, epicOrganizationUser.AccessLevel);
         Assert.Equal(organizationUser.Id, epicOrganizationUser.OrganizationUserId);
         Assert.Null(epicOrganizationUser.EpicId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotSetAccess_WhenHeIsNotOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var userIdToReceivePermissions = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
+        
+        var organization = new Organization
+        {
+            OwnerId = ownerId,
+            Users = new List<OrganizationUser> { organizationUser },
+        };
+        
+        testScope.Database.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+
+        var request = new SetPermissionsRequest
+        {
+            OrganizationUserId = organizationUser.Id,
+            Permissions = new Permissions
+            {
+                OrganizationAccessLevel = AccessLevel.None,
+                EpicsAccessLevels = new AccessLevels
+                {
+                    AccessLevel = AccessLevel.Delete,
+                },
+                SpacesAccessLevels = new AccessLevels
+                {
+                    AccessLevel = AccessLevel.Read,
+                }
+            }
+        };
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
+            .WithAuthorization(userIdToReceivePermissions)
+            .Execute(x => x.SetPermissions(request)));
+        Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewPermissionsOfNewOrganizationUser_WhenHeIsOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var organizationUserId = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = organizationUserId };
+        var organization = new Organization
+        {
+            OwnerId = ownerId,
+            Users = new List<OrganizationUser> { organizationUser },
+        };
+        
+        testScope.Database.Add(organization);
+        await testScope.Database.SaveChangesAsync();
+        
+        var permissions = await _organizationsController
+            .WithAuthorization(ownerId)
+            .Execute(x => x.GetPermissions(
+                new GetPermissionsRequest
+                {
+                    OrganizationUserId = organizationUser.Id
+                }));
+        
+        Assert.NotNull(permissions);
+        Assert.Equal(AccessLevel.None, permissions.OrganizationAccessLevel);
+        
+        Assert.NotNull(permissions.SpacesAccessLevels);
+        Assert.Null(permissions.SpacesAccessLevels.DirectAccess);
+        Assert.Equal(AccessLevel.None, permissions.SpacesAccessLevels.AccessLevel);
+        
+        Assert.NotNull(permissions.EpicsAccessLevels);
+        Assert.Null(permissions.EpicsAccessLevels.DirectAccess);
+        Assert.Equal(AccessLevel.None, permissions.EpicsAccessLevels.AccessLevel);
     }
 }

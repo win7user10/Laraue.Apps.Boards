@@ -44,6 +44,10 @@ public interface ICoreOrganizationsService
         long organizationUserId,
         Permissions permissions,
         CancellationToken cancellationToken);
+    
+    Task<Permissions> GetPermissions(
+        long organizationUserId,
+        CancellationToken cancellationToken);
 }
 
 public class CoreOrganizationsService(
@@ -205,6 +209,56 @@ public class CoreOrganizationsService(
         
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<Permissions> GetPermissions(long organizationUserId, CancellationToken cancellationToken)
+    {
+        var organizationAccessLevel = await context.OrganizationUsers
+            .Where(x => x.Id == organizationUserId)
+            .Select(x => x.AccessLevel)
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        var spacePermissions = await context.SpaceOrganizationUsers
+            .Where(x => x.Id == organizationUserId)
+            .Select(x => new { x.SpaceId, x.AccessLevel })
+            .ToArrayAsyncEF(cancellationToken);
+        
+        var epicPermissions = await context.EpicOrganizationUsers
+            .Where(x => x.Id == organizationUserId)
+            .Select(x => new { x.EpicId, x.AccessLevel })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var spaceAccessLevels = ToAccessLevels(
+            spacePermissions,
+            x => x.SpaceId,
+            x => x.AccessLevel);
+        
+        var epicAccessLevels = ToAccessLevels(
+            epicPermissions,
+            x => x.EpicId,
+            x => x.AccessLevel);
+        
+        return new Permissions
+        {
+            OrganizationAccessLevel = organizationAccessLevel,
+            SpacesAccessLevels = spaceAccessLevels,
+            EpicsAccessLevels = epicAccessLevels,
+        };
+    }
+
+    private static AccessLevels ToAccessLevels<T>(T[] permissions, Func<T, long?> getItemId, Func<T, AccessLevel> getAccessLevel)
+    {
+        if (permissions.Length == 0)
+            return new AccessLevels();
+        
+        if (permissions.Length == 1 && getItemId(permissions[0]) is null)
+            return new AccessLevels { AccessLevel = getAccessLevel(permissions[0]) };
+
+        return new AccessLevels
+        {
+            DirectAccess = permissions
+                .ToDictionary(x => getItemId(x)!.Value, getAccessLevel),
+        };
     }
 }
 
