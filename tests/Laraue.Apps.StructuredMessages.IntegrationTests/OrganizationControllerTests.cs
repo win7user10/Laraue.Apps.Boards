@@ -42,7 +42,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldViewAvailableOrganizations_WhenHasAccess()
+    public async Task User_ShouldViewAvailableOrganizations_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -76,7 +76,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldNotViewOrganizations_WhenHasNotAccess()
+    public async Task User_ShouldNotViewUnavailableOrganizations_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -221,7 +221,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldJoinOrganization_WhenHasCode()
+    public async Task User_ShouldJoinOrganization_WhenHasCorrectCode()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -273,7 +273,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
 
     [Fact]
-    public async Task User_ShouldSetDirectAccess_WhenHeIsOwner()
+    public async Task User_ShouldSetEmployeeDirectAccess_WhenHeIsOwner()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -290,8 +290,6 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             Spaces = new List<Space> { space }
         };
         
-        testScope.Database.Add(epic);
-        testScope.Database.Add(space);
         testScope.Database.Add(organization);
         await testScope.Database.SaveChangesAsync();
 
@@ -340,7 +338,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldSetSectionAccess_WhenHeIsOwner()
+    public async Task User_ShouldSetEmployeeSectionAccess_WhenHeIsOwner()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -396,7 +394,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldNotSetAccess_WhenHeIsNotOwner()
+    public async Task User_ShouldNotSetEmployeeAccess_WhenHeIsNotOwner()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -437,7 +435,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldViewPermissionsOfNewOrganizationUser_WhenHeIsOwner()
+    public async Task User_ShouldViewPermissionsOfNewEmployee_WhenHeIsOwner()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -471,5 +469,64 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.NotNull(permissions.EpicsAccessLevels);
         Assert.Null(permissions.EpicsAccessLevels.DirectAccess);
         Assert.Equal(AccessLevel.None, permissions.EpicsAccessLevels.AccessLevel);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewEmployeePermissions_WhenHeIsOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var organizationUserId = await testScope.CreateUser();
+
+        var organizationUser = new OrganizationUser { UserId = organizationUserId, AccessLevel = AccessLevel.Read };
+        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
+        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
+        
+        var organization = new Organization
+        {
+            OwnerId = ownerId,
+            Users = new List<OrganizationUser> { organizationUser },
+            Spaces = new List<Space> { space },
+        };
+
+        var spaceOrganizationUser = new SpaceOrganizationUser
+        {
+            OrganizationUser = organizationUser,
+            AccessLevel = AccessLevel.Create,
+        };
+        
+        var epicOrganizationUser = new EpicOrganizationUser
+        {
+            OrganizationUser = organizationUser,
+            AccessLevel = AccessLevel.Delete,
+            Epic = epic,
+        };
+        
+        testScope.Database.Add(organization);
+        testScope.Database.Add(spaceOrganizationUser);
+        testScope.Database.Add(epicOrganizationUser);
+        await testScope.Database.SaveChangesAsync();
+        
+        var permissions = await _organizationsController
+            .WithAuthorization(ownerId)
+            .Execute(x => x.GetPermissions(
+                new GetPermissionsRequest
+                {
+                    OrganizationUserId = organizationUser.Id
+                }));
+        
+        Assert.NotNull(permissions);
+        Assert.Equal(AccessLevel.Read, permissions.OrganizationAccessLevel);
+        
+        Assert.NotNull(permissions.SpacesAccessLevels);
+        Assert.Null(permissions.SpacesAccessLevels.DirectAccess);
+        Assert.Equal(AccessLevel.Create, permissions.SpacesAccessLevels.AccessLevel);
+        
+        Assert.NotNull(permissions.EpicsAccessLevels);
+        Assert.Equal(AccessLevel.None, permissions.EpicsAccessLevels.AccessLevel);
+        Assert.NotNull(permissions.EpicsAccessLevels.DirectAccess);
+        var directEpicAccess = Assert.Single(permissions.EpicsAccessLevels.DirectAccess);
+        Assert.Equal(epic.Id, directEpicAccess.Key);
+        Assert.Equal(AccessLevel.Delete, directEpicAccess.Value);
     }
 }

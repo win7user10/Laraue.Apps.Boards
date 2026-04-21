@@ -219,12 +219,12 @@ public class CoreOrganizationsService(
             .FirstOrDefaultAsyncEF(cancellationToken);
         
         var spacePermissions = await context.SpaceOrganizationUsers
-            .Where(x => x.Id == organizationUserId)
+            .Where(x => x.OrganizationUserId == organizationUserId)
             .Select(x => new { x.SpaceId, x.AccessLevel })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicPermissions = await context.EpicOrganizationUsers
-            .Where(x => x.Id == organizationUserId)
+            .Where(x => x.OrganizationUserId == organizationUserId)
             .Select(x => new { x.EpicId, x.AccessLevel })
             .ToArrayAsyncEF(cancellationToken);
 
