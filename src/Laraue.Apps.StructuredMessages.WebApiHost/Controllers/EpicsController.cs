@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/epics")]
 public class EpicsController(IEpicsService categoriesService)

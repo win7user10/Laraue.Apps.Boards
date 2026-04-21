@@ -3,7 +3,6 @@ using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.DateTime.Services.Impl;
 using Laraue.Core.Exceptions;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Telegram.Bot;
@@ -43,23 +42,37 @@ public static class WebApplicationBuilderExtensions
         
         public WebApplicationBuilder AddAuthentication()
         {
+            var stringKey = builder.Configuration["Auth:Key"] ?? throw new InvalidOperationException("Auth:Key is required.");
+            var symmetricSecurityKey = AuthService.GetSymmetricSecurityKey(stringKey);
+
             builder.Services.AddOptions<AuthOptions>();
             builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
             
             builder.Services.AddSingleton<IAuthService, AuthService>();
-            builder.Services.AddAuthentication()
-                .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+            builder.Services
+                .AddAuthentication()
+                .AddJwtBearer(AuthSchemas.User, options =>
                 {
-                    var key = builder.Configuration["Auth:Key"]
-                        ?? throw new InvalidOperationException("Auth:Key is required.");
-
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
                         ValidIssuer = AuthService.Issuer,
                         ValidateAudience = true,
-                        ValidAudience = AuthService.Audience,
-                        IssuerSigningKey = AuthService.GetSymmetricSecurityKey(key),
+                        ValidAudience = AuthService.UserAudience,
+                        IssuerSigningKey = symmetricSecurityKey,
+                        ValidateIssuerSigningKey = true,
+                        ValidateLifetime = false,
+                    };
+                })
+                .AddJwtBearer(AuthSchemas.Organization, options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = AuthService.Issuer,
+                        ValidateAudience = true,
+                        ValidAudience = AuthService.OrganizationAudience,
+                        IssuerSigningKey = symmetricSecurityKey,
                         ValidateIssuerSigningKey = true,
                         ValidateLifetime = false,
                     };

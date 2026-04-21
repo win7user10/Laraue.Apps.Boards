@@ -21,7 +21,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var userId = await testScope.CreateUser();
         
         var newId = await _organizationsController
-            .WithAuthorization(userId)
+            .WithUserAuthorization(userId)
             .Execute(x => x.Create(
                 new CreateOrganizationRequest
                 {
@@ -90,7 +90,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         // First user see only owned organization
         var userOrganizationsResponse = await _organizationsController
-            .WithAuthorization(userId)
+            .WithUserAuthorization(userId)
             .Execute(x => x.GetOrganizations());
         var organizations = userOrganizationsResponse!.Organizations;
         var organization = Assert.Single(organizations);
@@ -102,7 +102,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         // Second user see owned organization and organization where he was added
         var user2OrganizationsResponse = await _organizationsController
-            .WithAuthorization(user2Id)
+            .WithUserAuthorization(user2Id)
             .Execute(x => x.GetOrganizations());
         
         organizations = user2OrganizationsResponse!.Organizations;
@@ -146,7 +146,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         var organizationsResponse = await _organizationsController
-            .WithAuthorization(nonPermittedUserId)
+            .WithUserAuthorization(nonPermittedUserId)
             .Execute(x => x.GetOrganizations());
         
         Assert.Empty(organizationsResponse!.Organizations);
@@ -172,7 +172,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         await _organizationsController
-            .WithAuthorization(userId)
+            .WithUserAuthorization(userId)
             .Execute(x => x.Update(
                 entity.Id,
                 new EditOrganizationRequest
@@ -207,7 +207,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
-            .WithAuthorization(nonPermittedUserId)
+            .WithUserAuthorization(nonPermittedUserId)
             .Execute(x => x.Update(
                 entity.Id,
                 new EditOrganizationRequest
@@ -235,7 +235,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         await _organizationsController
-            .WithAuthorization(userId)
+            .WithUserAuthorization(userId)
             .Execute(x => x.Delete(entity.Id));
 
         var organizations = await testScope.Database.Organizations.ToListAsyncEF();
@@ -259,7 +259,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
-            .WithAuthorization(nonPermittedUserId)
+            .WithUserAuthorization(nonPermittedUserId)
             .Execute(x => x.Delete(entity.Id)));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
@@ -283,7 +283,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
 
         await _organizationsController
-            .WithAuthorization(newUserId)
+            .WithUserAuthorization(newUserId)
             .Execute(x => x.Join("abc"));
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
@@ -311,7 +311,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
 
         var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
-            .WithAuthorization(newUserId)
+            .WithUserAuthorization(newUserId)
             .Execute(x => x.Join("def")));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
@@ -362,7 +362,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         };
         
         await _organizationsController
-            .WithAuthorization(ownerId)
+            .WithUserAuthorization(ownerId)
             .Execute(x => x.SetPermissions(request));
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
@@ -418,7 +418,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         };
         
         await _organizationsController
-            .WithAuthorization(ownerId)
+            .WithUserAuthorization(ownerId)
             .Execute(x => x.SetPermissions(request));
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
@@ -474,7 +474,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         };
         
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
-            .WithAuthorization(userIdToReceivePermissions)
+            .WithUserAuthorization(userIdToReceivePermissions)
             .Execute(x => x.SetPermissions(request)));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }
@@ -497,7 +497,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         var permissions = await _organizationsController
-            .WithAuthorization(ownerId)
+            .WithUserAuthorization(ownerId)
             .Execute(x => x.GetPermissions(
                 new GetPermissionsRequest
                 {
@@ -553,7 +553,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         await testScope.Database.SaveChangesAsync();
         
         var permissions = await _organizationsController
-            .WithAuthorization(ownerId)
+            .WithUserAuthorization(ownerId)
             .Execute(x => x.GetPermissions(
                 new GetPermissionsRequest
                 {

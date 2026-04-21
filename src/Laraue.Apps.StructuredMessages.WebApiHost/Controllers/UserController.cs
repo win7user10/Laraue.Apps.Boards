@@ -1,12 +1,13 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/user")]
 public class UserController(DatabaseContext context) : ControllerBase

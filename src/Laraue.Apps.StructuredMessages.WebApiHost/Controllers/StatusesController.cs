@@ -6,7 +6,7 @@ using DeleteStatusRequest = Laraue.Apps.StructuredMessages.WebApiServices.Delete
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/statuses")]
 public class StatusesController(IStatusesService statusesService)

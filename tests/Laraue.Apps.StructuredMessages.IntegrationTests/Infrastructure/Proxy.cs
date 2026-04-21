@@ -29,10 +29,21 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         return ExecuteInternal(makeCall);
     }
 
-    public Proxy<TController> WithAuthorization(Guid userId)
+    public Proxy<TController> WithUserAuthorization(Guid userId)
     {
         var authService = host.Services.GetRequiredService<IAuthService>();
-        var bearer = authService.CreateToken(userId);
+        var bearer = authService.CreateUserToken(userId);
+        
+        const string headerName = "Authorization";
+        client.DefaultRequestHeaders.Remove(headerName);
+        client.DefaultRequestHeaders.Add(headerName, $"Bearer {bearer}");
+        return this;
+    }
+
+    public Proxy<TController> WithOrganizationAuthorization(long organizationId, long organizationUserId)
+    {
+        var authService = host.Services.GetRequiredService<IAuthService>();
+        var bearer = authService.CreateOrganizationToken(organizationId, organizationUserId);
         
         const string headerName = "Authorization";
         client.DefaultRequestHeaders.Remove(headerName);

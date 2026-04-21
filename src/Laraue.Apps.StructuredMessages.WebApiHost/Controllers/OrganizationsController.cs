@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/organizations")]
 public class OrganizationsController(IOrganizationsService organizationsService) : ControllerBase
@@ -97,6 +97,19 @@ public class OrganizationsController(IOrganizationsService organizationsService)
         CancellationToken cancellationToken = default)
     {
         return organizationsService.GetPermissions(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
+    [HttpPost("login")]
+    public Task Login(
+        [FromBody] SetPermissionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.SetPermissions(
             request with
             {
                 UserId = HttpContext.User.GetId(),
