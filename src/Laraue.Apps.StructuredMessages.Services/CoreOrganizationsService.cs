@@ -136,16 +136,18 @@ public class CoreOrganizationsService(
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        // Set organization permissions
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.AccessLevel, permissions.OrganizationAccessLevel),
                 cancellationToken);
-        
+
+        // Set spaces permissions
         await context.SpaceOrganizationUsers
             .Where(x => x.OrganizationUserId == organizationUserId)
             .ExecuteDeleteAsync(cancellationToken);
-
+        
         var spaceLevels = permissions.SpacesAccessLevels;
         if (spaceLevels.DirectAccess is not null)
         {
@@ -169,6 +171,36 @@ public class CoreOrganizationsService(
             };
             
             context.SpaceOrganizationUsers.Add(spacePermission);
+        }
+        
+        // Set epics permissions
+        await context.EpicOrganizationUsers
+            .Where(x => x.OrganizationUserId == organizationUserId)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        var epicLevels = permissions.EpicsAccessLevels;
+        if (epicLevels.DirectAccess is not null)
+        {
+            var epicPermissions = epicLevels.DirectAccess
+                .Select(x => new EpicOrganizationUser
+                {
+                    AccessLevel = x.Value,
+                    OrganizationUserId = organizationUserId,
+                    EpicId = x.Key,
+                });
+            
+            context.EpicOrganizationUsers.AddRange(epicPermissions);
+        }
+        else 
+        {
+            var epicPermission = new EpicOrganizationUser
+            {
+                AccessLevel = spaceLevels.AccessLevel,
+                OrganizationUserId = organizationUserId,
+                EpicId = null,
+            };
+            
+            context.EpicOrganizationUsers.Add(epicPermission);
         }
         
         await context.SaveChangesAsync(cancellationToken);

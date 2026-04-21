@@ -3,6 +3,7 @@
 [Flags]
 public enum AccessLevel : byte
 {
+    None = 0,
     Read = 1,
     Create = 2,
     Update = 4,

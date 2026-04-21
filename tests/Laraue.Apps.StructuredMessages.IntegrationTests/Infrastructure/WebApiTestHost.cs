@@ -52,6 +52,7 @@ public class WebApiTestHostScope : IDisposable
         
         // Cleanup before test run
         Database.SpaceOrganizationUsers.ExecuteDelete();
+        Database.EpicOrganizationUsers.ExecuteDelete();
         Database.Users.ExecuteDelete();
     }
 
