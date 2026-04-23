@@ -2,7 +2,7 @@
 
 public static class IdService
 {
-    private const long NullId = 0;
+    public const long NullId = 0;
 
     public static long? ToNullableId(long? id)
     {

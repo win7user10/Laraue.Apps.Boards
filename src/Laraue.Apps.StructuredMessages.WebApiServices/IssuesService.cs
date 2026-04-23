@@ -394,8 +394,7 @@ public class IssuesService(
         var sender = UserInitialsUtility.GetInitials(
             result.TelegramUsername,
             result.TelegramFirstName,
-            result.TelegramLastName,
-            result.TelegramId);;
+            result.TelegramLastName);;
 
         return new MessageDetailDto
         {
@@ -544,8 +543,7 @@ public class IssuesService(
         var senderData = UserInitialsUtility.GetInitials(
             source.TelegramUsername,
             source.TelegramFirstName,
-            source.TelegramLastName,
-            source.TelegramId);
+            source.TelegramLastName);
 
         return new MessageListDto
         {

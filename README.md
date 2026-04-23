@@ -1,2 +1,12 @@
-# Laraue.Apps.StructuredMessages
-The concept to store use messages and help to structure them somehow
+# Laraue.Apps.Boards
+The backend for Task-management system.
+
+### Matter decisions and why they were taken
+Nullable Identifier in Organization, Space, Epic
+
+## App layers
+Below is explanation about project structure
+
+### Laraue.Apps.StructuredMessages.DataAccess
+The layer that contains models and enums associated with these models
+

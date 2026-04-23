@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+[Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/user")]
 public class UserController(DatabaseContext context) : ControllerBase
@@ -32,8 +32,7 @@ public class UserController(DatabaseContext context) : ControllerBase
         var initials = UserInitialsUtility.GetInitials(
             user.Username,
             user.FirstName,
-            user.LastName,
-            user.TelegramId);
+            user.LastName);
 
         user.Initials = initials.Initial;
         return user;

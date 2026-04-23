@@ -342,7 +342,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var request = new SetPermissionsRequest
         {
             OrganizationUserId = organizationUser.Id,
-            Permissions = new Permissions
+            UserPermissions = new UserPermissions
             {
                 OrganizationAccessLevel = AccessLevel.None,
                 EpicsAccessLevels = new AccessLevels
@@ -364,7 +364,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.SetPermissions(request));
+            .Execute(x => x.SetUserPermissions(request));
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
         organizationUser = Assert.Single(organizationUsers);
@@ -404,7 +404,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var request = new SetPermissionsRequest
         {
             OrganizationUserId = organizationUser.Id,
-            Permissions = new Permissions
+            UserPermissions = new UserPermissions
             {
                 OrganizationAccessLevel = AccessLevel.None,
                 EpicsAccessLevels = new AccessLevels
@@ -420,7 +420,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.SetPermissions(request));
+            .Execute(x => x.SetUserPermissions(request));
         
         var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
         organizationUser = Assert.Single(organizationUsers);
@@ -460,7 +460,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var request = new SetPermissionsRequest
         {
             OrganizationUserId = organizationUser.Id,
-            Permissions = new Permissions
+            UserPermissions = new UserPermissions
             {
                 OrganizationAccessLevel = AccessLevel.None,
                 EpicsAccessLevels = new AccessLevels
@@ -476,7 +476,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
             .WithUserAuthorization(userIdToReceivePermissions)
-            .Execute(x => x.SetPermissions(request)));
+            .Execute(x => x.SetUserPermissions(request)));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }
     
@@ -500,7 +500,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var permissions = await _organizationsController
             .WithUserAuthorization(ownerId)
             .Execute(x => x.GetPermissions(
-                new GetPermissionsRequest
+                new GetUserPermissionsRequest
                 {
                     OrganizationUserId = organizationUser.Id
                 }));
@@ -556,7 +556,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var permissions = await _organizationsController
             .WithUserAuthorization(ownerId)
             .Execute(x => x.GetPermissions(
-                new GetPermissionsRequest
+                new GetUserPermissionsRequest
                 {
                     OrganizationUserId = organizationUser.Id
                 }));

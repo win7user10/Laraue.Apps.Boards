@@ -25,12 +25,6 @@ public interface ICoreOrganizationsService
         long id,
         CancellationToken cancellationToken);
     
-    Task<bool> HasAccess(
-        long organizationId,
-        Guid userId,
-        AccessLevel accessLevel,
-        CancellationToken cancellationToken);
-    
     Task AddMember(
         long organizationId,
         Guid userId,
@@ -40,13 +34,17 @@ public interface ICoreOrganizationsService
         string code,
         CancellationToken cancellationToken);
     
-    Task SetPermissions(
+    Task SetUserPermissions(
         long organizationUserId,
-        Permissions permissions,
+        UserPermissions userPermissions,
         CancellationToken cancellationToken);
     
-    Task<Permissions> GetPermissions(
+    Task<UserPermissions> GetUserPermissions(
         long organizationUserId,
+        CancellationToken cancellationToken);
+    
+    Task<PermittableEntities> GetPermittableEntities(
+        long organizationId,
         CancellationToken cancellationToken);
 }
 
@@ -71,6 +69,14 @@ public class CoreOrganizationsService(
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
             JoinCode = StringGenerator.GenerateJoinCode(),
+            Users = new List<OrganizationUser>
+            {
+                new ()
+                {
+                    AccessLevel = AccessLevel.Manage,
+                    UserId = ownerId,
+                }
+            }
         };
         
         context.Organizations.Add(entity);
@@ -102,18 +108,6 @@ public class CoreOrganizationsService(
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public Task<bool> HasAccess(
-        long organizationId,
-        Guid userId,
-        AccessLevel accessLevel,
-        CancellationToken cancellationToken)
-    {
-        return context.Organizations
-            .Where(x => x.OwnerId == userId)
-            .Where(x => x.Id == organizationId)
-            .AnyAsyncEF(cancellationToken);
-    }
-
     public Task AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)
     {
         context.OrganizationUsers.Add(new OrganizationUser
@@ -133,9 +127,9 @@ public class CoreOrganizationsService(
             .FirstOrDefaultAsyncEF(cancellationToken))?.Id;
     }
 
-    public async Task SetPermissions(
+    public async Task SetUserPermissions(
         long organizationUserId,
-        Permissions permissions,
+        UserPermissions userPermissions,
         CancellationToken cancellationToken)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -144,7 +138,7 @@ public class CoreOrganizationsService(
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.AccessLevel, permissions.OrganizationAccessLevel),
+                .SetProperty(p => p.AccessLevel, userPermissions.OrganizationAccessLevel),
                 cancellationToken);
 
         // Set spaces permissions
@@ -152,7 +146,7 @@ public class CoreOrganizationsService(
             .Where(x => x.OrganizationUserId == organizationUserId)
             .ExecuteDeleteAsync(cancellationToken);
         
-        var spaceLevels = permissions.SpacesAccessLevels;
+        var spaceLevels = userPermissions.SpacesAccessLevels;
         if (spaceLevels.DirectAccess is not null)
         {
             var spacePermissions = spaceLevels.DirectAccess
@@ -182,7 +176,7 @@ public class CoreOrganizationsService(
             .Where(x => x.OrganizationUserId == organizationUserId)
             .ExecuteDeleteAsync(cancellationToken);
         
-        var epicLevels = permissions.EpicsAccessLevels;
+        var epicLevels = userPermissions.EpicsAccessLevels;
         if (epicLevels.DirectAccess is not null)
         {
             var epicPermissions = epicLevels.DirectAccess
@@ -211,7 +205,7 @@ public class CoreOrganizationsService(
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<Permissions> GetPermissions(long organizationUserId, CancellationToken cancellationToken)
+    public async Task<UserPermissions> GetUserPermissions(long organizationUserId, CancellationToken cancellationToken)
     {
         var organizationAccessLevel = await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
@@ -238,11 +232,30 @@ public class CoreOrganizationsService(
             x => x.EpicId,
             x => x.AccessLevel);
         
-        return new Permissions
+        return new UserPermissions
         {
             OrganizationAccessLevel = organizationAccessLevel,
             SpacesAccessLevels = spaceAccessLevels,
             EpicsAccessLevels = epicAccessLevels,
+        };
+    }
+
+    public async Task<PermittableEntities> GetPermittableEntities(
+        long organizationId,
+        CancellationToken cancellationToken)
+    {
+        var epics = await context.Epics
+            .Where(x => x.OrganizationId == organizationId)
+            .ToDictionaryAsyncEF(x => x.Id, x => x.Name, cancellationToken);
+        
+        var spaces = await context.Spaces
+            .Where(x => x.OrganizationId == organizationId)
+            .ToDictionaryAsyncEF(x => x.Id, x => x.Name, cancellationToken);
+
+        return new PermittableEntities
+        {
+            Epics = epics,
+            Spaces = spaces,
         };
     }
 
@@ -262,7 +275,7 @@ public class CoreOrganizationsService(
     }
 }
 
-public record Permissions
+public record UserPermissions
 {
     public AccessLevel OrganizationAccessLevel { get; set; }
     public required AccessLevels SpacesAccessLevels { get; set; }
@@ -276,4 +289,10 @@ public record AccessLevels
 {
     public AccessLevel AccessLevel { get; init; }
     public Dictionary<long, AccessLevel>? DirectAccess { get; init; }
+}
+
+public record PermittableEntities
+{
+    public required Dictionary<long, string> Spaces { get; init; }
+    public required Dictionary<long, string> Epics { get; init; }
 }

@@ -11,8 +11,12 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IOrganizationsService
 {
-    Task<GetOrganizationsResponse> GetOrganizations(
+    Task<OrganizationDto[]> GetOrganizations(
         GetOrganizationsRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<OrganizationDto> GetOrganization(
+        GetOrganizationRequest request,
         CancellationToken cancellationToken);
     
     Task<long> Create(
@@ -31,67 +35,92 @@ public interface IOrganizationsService
         JoinOrganizationRequest request,
         CancellationToken cancellationToken);
     
-    Task SetPermissions(
+    Task SetUserPermissions(
         SetPermissionsRequest request,
         CancellationToken cancellationToken);
     
-    Task<Permissions> GetPermissions(
-        GetPermissionsRequest request,
+    Task<UserPermissions> GetUserPermissions(
+        GetUserPermissionsRequest request,
         CancellationToken cancellationToken);
     
     Task<string> Login(
         LoginRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<OrganizationMember[]> GetOrganizationMembers(
+        GetOrganizationMembersRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<PermittableEntities> GetPermittableEntities(
+        GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(
     ICoreOrganizationsService coreOrganizationsService,
     DatabaseContext context,
-    IAuthService authService)
+    IAuthService authService,
+    IOrganizationAccessService organizationAccessService)
     : IOrganizationsService
 {
-    public async Task<GetOrganizationsResponse> GetOrganizations(
+    private static readonly OrganizationDto PersonalOrganization = new()
+    {
+        Id = IdService.NullId,
+        Name = "Personal",
+        Color = Palette.DefaultUserColor,
+        AccessLevel = AccessLevel.Read,
+        SpacesCount = 0,
+    };
+    
+    public async Task<OrganizationDto[]> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken)
     {
-        var allOrganizations = await AvailableOrganizations(request.UserId)
-            .OrderBy(x => x.Name)
+        var allOrganizations = await organizationAccessService.GetAvailable(
+            request.UserId,
+            organizations => organizations
+                .OrderBy(x => x.Organization.Name)
+                .Select(x => new OrganizationDto
+                {
+                    Id = x.Organization.Id,
+                    AccessLevel = x.AccessLevel,
+                    Name = x.Organization.Name,
+                    Color = x.Organization.Color,
+                    SpacesCount = x.Organization.Spaces!.Count
+                })
+                .ToListAsyncEF(cancellationToken));
+
+        var personalOrganizationSpacesCount = await context.Spaces
+            .Where(x => x.CreatorId == request.UserId)
+            .Where(x => x.OrganizationId == null)
+            .CountAsyncEF(cancellationToken);
+        
+        allOrganizations.Insert(0, PersonalOrganization with
+        {
+            SpacesCount = personalOrganizationSpacesCount,
+        });
+
+        return allOrganizations.ToArray();
+    }
+
+    public async Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
+    {
+        if (request.AuthData.OrganizationType == OrganizationType.Personal)
+            return PersonalOrganization;
+        
+        return await context.Organizations
+            .Where(o => o.Id == request.AuthData.OrganizationId)
             .Select(x => new OrganizationDto
             {
                 Id = x.Id,
-                AccessLevel = x.Users!.FirstOrDefault(u => u.UserId == request.UserId) != null
-                    ? x.Users!.FirstOrDefault(u => u.UserId == request.UserId)!.AccessLevel
+                AccessLevel = x.Users!.FirstOrDefault(u => u.UserId == request.AuthData.UserId) != null
+                    ? x.Users!.FirstOrDefault(u => u.UserId == request.AuthData.UserId)!.AccessLevel
                     : AccessLevel.Manage,
                 Name = x.Name,
                 Color = x.Color,
                 SpacesCount = x.Spaces!.Count
             })
-            .ToArrayAsyncEF(cancellationToken);
-
-        var noSpacesCount = await context.Spaces
-            .Where(x => x.CreatorId == request.UserId)
-            .Where(x => x.OrganizationId == null)
-            .CountAsyncEF(cancellationToken);
-
-        return new GetOrganizationsResponse
-        {
-            Organizations = allOrganizations,
-            PersonalOrganizationSpacesCount = noSpacesCount
-        };
-    }
-
-    private IQueryable<Organization> AvailableOrganizations(Guid userId)
-    {
-        var userOrganizationsQuery = context.OrganizationUsers
-            .Where(x => x.UserId == userId)
-            .Select(x => x.Organization!);
-
-        var userOwnedOrganizationsQuery = context.Organizations
-            .Where(x => x.OwnerId == userId)
-            .Select(x => x);
-        
-        return userOrganizationsQuery
-            .Union(userOwnedOrganizationsQuery);
+            .FirstOrThrowNotFoundEFAsync(cancellationToken);
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -105,12 +134,11 @@ public class OrganizationsService(
 
     public async Task Update(EditOrganizationRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreOrganizationsService.HasAccess(
-            request.Id,
+        await organizationAccessService.HasAccessOrThrow(
             request.UserId,
+            request.Id,
             AccessLevel.Update,
-            cancellationToken))
-            throw new NotFoundException();
+            cancellationToken);
 
         await coreOrganizationsService.Update(
             request.Id,
@@ -122,12 +150,11 @@ public class OrganizationsService(
 
     public async Task Delete(DeleteOrganizationRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreOrganizationsService.HasAccess(
-            request.Id,
+        await organizationAccessService.HasAccessOrThrow(
             request.UserId,
+            request.Id,
             AccessLevel.Delete,
-            cancellationToken))
-            throw new NotFoundException();
+            cancellationToken);
         
         await coreOrganizationsService.Delete(request.Id, cancellationToken);
     }
@@ -147,7 +174,7 @@ public class OrganizationsService(
             cancellationToken);
     }
 
-    public async Task SetPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
+    public async Task SetUserPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
     {
         // TODO - check that passed permissions are correct, check access to passed items
         var organizationUser = await context.OrganizationUsers
@@ -155,44 +182,96 @@ public class OrganizationsService(
             .Select(x => new { x.OrganizationId })
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
         
-        if (!await coreOrganizationsService.HasAccess(
-            organizationUser.OrganizationId,
+        await organizationAccessService.HasAccessOrThrow(
             request.UserId,
+            organizationUser.OrganizationId,
             AccessLevel.Manage,
-            cancellationToken))
-            throw new NotFoundException();
+            cancellationToken);
         
-        await coreOrganizationsService.SetPermissions(
+        await coreOrganizationsService.SetUserPermissions(
             request.OrganizationUserId,
-            request.Permissions,
+            request.UserPermissions,
             cancellationToken);
     }
 
-    public async Task<Permissions> GetPermissions(GetPermissionsRequest request, CancellationToken cancellationToken)
+    public async Task<UserPermissions> GetUserPermissions(GetUserPermissionsRequest request, CancellationToken cancellationToken)
     {
         var organizationUser = await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
             .Select(x => new { x.OrganizationId })
             .FirstOrThrowNotFoundEFAsync(cancellationToken);
         
-        if (!await coreOrganizationsService.HasAccess(
-            organizationUser.OrganizationId,
+        await organizationAccessService.HasAccessOrThrow(
             request.UserId,
+            organizationUser.OrganizationId,
             AccessLevel.Manage,
-            cancellationToken))
-            throw new NotFoundException();
+            cancellationToken);
         
-        return await coreOrganizationsService.GetPermissions(
+        return await coreOrganizationsService.GetUserPermissions(
             request.OrganizationUserId,
             cancellationToken);
     }
 
     public async Task<string> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        await AvailableOrganizations(request.UserId)
-            .AnyOrThrowNotFoundEFAsync(x => x.Id == request.OrganizationId, cancellationToken);
+        await organizationAccessService.HasAccessOrThrow(
+            request.UserId,
+            request.OrganizationId,
+            AccessLevel.Read,
+            cancellationToken);
 
         return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
+    }
+
+    public async Task<OrganizationMember[]> GetOrganizationMembers(
+        GetOrganizationMembersRequest request,
+        CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData.UserId,
+            request.AuthData.OrganizationId,
+            AccessLevel.Read,
+            cancellationToken);
+
+        var data = await context.OrganizationUsers
+            .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
+            .Select(x => new OrganizationMember
+            {
+                Color = Palette.DefaultUserColor,
+                FirstName = x.User!.TelegramFirstName,
+                LastName = x.User.TelegramLastName,
+                OrganizationUserId = x.Id,
+                Username = x.User.TelegramUserName,
+                Initials = null,
+                IsOwner = x.Organization!.OwnerId == x.UserId,
+                AccessLevel = x.AccessLevel,
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        foreach (var item in data)
+        {
+            item.Initials = UserInitialsUtility.GetInitials(
+                item.Username,
+                item.FirstName,
+                item.LastName).Initial;
+        }
+        
+        return data;
+    }
+
+    public async Task<PermittableEntities> GetPermittableEntities(
+        GetPermittableEntitiesRequest request,
+        CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData.UserId,
+            request.AuthData.OrganizationId,
+            AccessLevel.Manage,
+            cancellationToken);
+
+        return await coreOrganizationsService.GetPermittableEntities(
+            request.AuthData.OrganizationId,
+            cancellationToken);
     }
 }
 
@@ -232,6 +311,11 @@ public record GetOrganizationsRequest
     public Guid UserId { get; set; }
 }
 
+public record GetOrganizationRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+}
+
 public record OrganizationDto
 {
     public long Id { get; set; }
@@ -239,12 +323,6 @@ public record OrganizationDto
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
     public required AccessLevel AccessLevel { get; set; }
-}
-
-public record GetOrganizationsResponse
-{
-    public required OrganizationDto[] Organizations { get; set; }
-    public required int PersonalOrganizationSpacesCount { get; set; }
 }
 
 public record JoinOrganizationRequest
@@ -257,10 +335,10 @@ public record SetPermissionsRequest
 {
     public Guid UserId { get; set; }
     public long OrganizationUserId { get; set; }
-    public required Permissions Permissions { get; set; }
+    public required UserPermissions UserPermissions { get; set; }
 }
 
-public record GetPermissionsRequest
+public record GetUserPermissionsRequest
 {
     public Guid UserId { get; set; }
     public long OrganizationUserId { get; set; }
@@ -270,4 +348,26 @@ public record LoginRequest
 {
     public Guid UserId { get; set; }
     public long OrganizationId { get; set; }
+}
+
+public record GetOrganizationMembersRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+}
+
+public record OrganizationMember
+{
+    public long OrganizationUserId { get; set; }
+    public string? Username { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public required string Color { get; set; }
+    public string? Initials { get; set; }
+    public required bool IsOwner { get; set; }
+    public required AccessLevel AccessLevel { get; set; }
+}
+
+public record GetPermittableEntitiesRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
 }

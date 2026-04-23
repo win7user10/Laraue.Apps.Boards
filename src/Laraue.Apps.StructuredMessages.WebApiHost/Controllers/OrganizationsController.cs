@@ -53,7 +53,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     }
     
     [HttpGet]
-    public Task<GetOrganizationsResponse> GetOrganizations(
+    public Task<OrganizationDto[]> GetOrganizations(
         CancellationToken cancellationToken = default)
     {
         return organizationsService.GetOrganizations(
@@ -78,32 +78,6 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             cancellationToken);
     }
     
-    [HttpPost("permissions")]
-    public Task SetPermissions(
-        [FromBody] SetPermissionsRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return organizationsService.SetPermissions(
-            request with
-            {
-                UserId = HttpContext.User.GetId(),
-            },
-            cancellationToken);
-    }
-    
-    [HttpGet("permissions")]
-    public Task<Permissions> GetPermissions(
-        [FromQuery] GetPermissionsRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return organizationsService.GetPermissions(
-            request with
-            {
-                UserId = HttpContext.User.GetId(),
-            },
-            cancellationToken);
-    }
-    
     [HttpPost("login")]
     public Task<string> Login(
         [FromBody] LoginRequest request,
@@ -113,6 +87,76 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             request with
             {
                 UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("permissions/{organizationUserId:long}")]
+    public Task<UserPermissions> GetUserPermissions(
+        long organizationUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetUserPermissions(
+            new GetUserPermissionsRequest
+            {
+                OrganizationUserId = organizationUserId,
+                UserId = HttpContext.User.GetId(),
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPost("permissions/{organizationUserId:long}")]
+    public Task SetUserPermissions(
+        long organizationUserId,
+        [FromBody] SetPermissionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.SetUserPermissions(
+            request with
+            {
+                UserId = HttpContext.User.GetId(),
+                OrganizationUserId = organizationUserId
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("permittable-entities")]
+    public Task<PermittableEntities> GetPermittableEntities(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetPermittableEntities(
+            new GetPermittableEntitiesRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("current")]
+    public Task<OrganizationDto> GetOrganization(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetOrganization(
+            new GetOrganizationRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("members")]
+    public Task<OrganizationMember[]> GetOrganizationMembers(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetOrganizationMembers(
+            new GetOrganizationMembersRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }

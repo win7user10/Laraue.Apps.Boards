@@ -20,6 +20,9 @@ public class Epic
     /// </summary>
     public long? SpaceId { get; set; }
     public Space? Space { get; set; }
+    
+    public long? OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
 
     /// <summary>
     /// Epic creation date.

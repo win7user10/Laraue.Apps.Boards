@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+[Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/user-preferences")]
 public class UserPreferencesController(IUserPreferencesService service) : ControllerBase
