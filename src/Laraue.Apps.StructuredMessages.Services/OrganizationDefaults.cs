@@ -14,7 +14,7 @@ public class OrganizationDefaults
     {
         var organizationUser = new OrganizationUser
         {
-            AccessLevel = AccessLevel.Manage,
+            AccessLevel = AccessLevel.Read | AccessLevel.Create | AccessLevel.Update | AccessLevel.Delete | AccessLevel.Manage,
             UserId = userId,
         };
         

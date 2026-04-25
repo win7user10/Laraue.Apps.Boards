@@ -46,11 +46,6 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
         return WithAuthorizationToken(bearer);
     }
 
-    public Proxy<TController> WithPersonalOrganizationAuthorization(Guid userId)
-    {
-        return WithOrganizationAuthorization(0, userId);
-    }
-
     public Proxy<TController> WithAuthorizationToken(string token)
     {
         const string headerName = "Authorization";

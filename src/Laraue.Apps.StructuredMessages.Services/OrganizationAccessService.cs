@@ -2,7 +2,7 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.Exceptions.Web;
-using Microsoft.EntityFrameworkCore;
+using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -46,14 +46,11 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
         AccessLevel accessLevel,
         CancellationToken cancellationToken)
     {
-        if (organizationId == IdService.NullId)
-            return Task.FromResult(accessLevel <= AccessLevel.Read);
-        
         return GetAvailable(userId, organizations =>
         {
             return organizations
                 .Where(x => x.OrganizationId == organizationId)
-                .AnyAsync(x => x.AccessLevel >= accessLevel, cancellationToken);
+                .AnyAsyncEF(x => x.AccessLevel.HasFlag(accessLevel), cancellationToken);
         });
     }
 }

@@ -16,7 +16,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
 
     [Fact]
-    public async Task CreateOrganization_ShouldCreateNewOrganization_Always()
+    public async Task CreateOrganization_ShouldCreateNewOrganizationWithDefaults_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -40,6 +40,33 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal(8, organization.JoinCode.Length);
         Assert.True(organization.CreatedAt != default);
         Assert.True(organization.UpdatedAt != default);
+        
+        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
+        var organizationUser = Assert.Single(organizationUsers);
+        Assert.Equal(userId, organizationUser.UserId);
+        Assert.Equal(organization.Id, organizationUser.OrganizationId);
+        Assert.Equal(AccessLevel.Read | AccessLevel.Create | AccessLevel.Update | AccessLevel.Delete | AccessLevel.Manage, organizationUser.AccessLevel);
+        
+        var spaces = await testScope.Database.Spaces.ToListAsyncEF();
+        var space = Assert.Single(spaces);
+        Assert.Equal("Default Space", space.Name);
+        Assert.False(string.IsNullOrEmpty(space.Color));
+        Assert.Equal(userId, space.CreatorId);
+        Assert.Equal(organization.Id, space.OrganizationId);
+        Assert.True(space.CreatedAt != default);
+        Assert.True(space.UpdatedAt != default);
+        Assert.True(space.IsDefault);
+        
+        var epics = await testScope.Database.Epics.ToListAsyncEF();
+        var epic = Assert.Single(epics);
+        Assert.Equal("Backlog", epic.Name);
+        Assert.False(string.IsNullOrEmpty(epic.Color));
+        Assert.Equal(userId, epic.UserId);
+        Assert.Equal(space.Id, epic.SpaceId);
+        Assert.True(epic.CreatedAt != default);
+        Assert.True(epic.UpdatedAt != default);
+        Assert.True(epic.TouchedAt != default);
+        Assert.True(epic.IsDefault);
     }
     
     [Fact]
@@ -48,66 +75,36 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var user2Id = await testScope.CreateUser();
-
-        testScope.Database.Organizations.AddRange(
-            new Organization
-            {
-                Name = "Org 1",
-                OwnerId = userId,
-                Color = "#ffffff",
-                Spaces = new List<Space>
-                {
-                    new()
-                    {
-                        Name = "Space 1",
-                        CreatorId = userId,
-                    }
-                },
-                Users = new List<OrganizationUser>
-                {
-                    new ()
-                    {
-                        UserId = user2Id,
-                        AccessLevel = AccessLevel.Update,
-                    }
-                }
-            },
-            new Organization
-            {
-                Name = "Org 2",
-                OwnerId = user2Id,
-                Color = "#000000",
-                Spaces = new List<Space>
-                {
-                    new()
-                    {
-                        Name = "Space 2",
-                        CreatorId = userId,
-                    }
-                }
-            });
         
-        await testScope.Database.SaveChangesAsync();
+        await new OrganizationInitializer(testScope.Database, userId)
+            .WithName("Org 1")
+            .WithColor("#ffffff")
+            .AddUser(user2Id, builder => builder
+                .SetOrganizationAccessLevel(AccessLevel.Update))
+            .Initialize();
+        
+        await new OrganizationInitializer(testScope.Database, user2Id)
+            .WithName("Org 2")
+            .WithColor("#000000")
+            .Initialize();
         
         // First user see only owned organization
-        var userOrganizationsResponse = await _organizationsController
+        var organizations = await _organizationsController
             .WithUserAuthorization(userId)
             .Execute(x => x.GetOrganizations());
-        var organizations = userOrganizationsResponse!.Organizations;
-        var organization = Assert.Single(organizations);
+        var organization = Assert.Single(organizations!);
         
-        Assert.Equal(AccessLevel.Manage, organization.AccessLevel);
+        Assert.Equal(AccessLevel.All, organization.AccessLevel);
         Assert.Equal("Org 1", organization.Name);
         Assert.Equal("#ffffff", organization.Color);
         Assert.Equal(1, organization.SpacesCount);
         
         // Second user see owned organization and organization where he was added
-        var user2OrganizationsResponse = await _organizationsController
+        organizations = await _organizationsController
             .WithUserAuthorization(user2Id)
             .Execute(x => x.GetOrganizations());
         
-        organizations = user2OrganizationsResponse!.Organizations;
-        Assert.Equal(2, organizations.Length);
+        Assert.Equal(2, organizations!.Length);
         var (organization1, organization2) = (organizations[0], organizations[1]);
         
         Assert.Equal(AccessLevel.Update, organization1.AccessLevel);
@@ -115,7 +112,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal("#ffffff", organization1.Color);
         Assert.Equal(1, organization1.SpacesCount);
         
-        Assert.Equal(AccessLevel.Manage, organization2.AccessLevel);
+        Assert.Equal(AccessLevel.All, organization2.AccessLevel);
         Assert.Equal("Org 2", organization2.Name);
         Assert.Equal("#000000", organization2.Color);
         Assert.Equal(1, organization2.SpacesCount);
@@ -128,29 +125,16 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var userId = await testScope.CreateUser();
         var nonPermittedUserId = await testScope.CreateUser();
 
-        testScope.Database.Organizations.Add(
-            new Organization
-            {
-                Name = "Org 1",
-                OwnerId = userId,
-                Color = "#ffffff",
-                Spaces = new List<Space>
-                {
-                    new()
-                    {
-                        Name = "Space 1",
-                        CreatorId = userId,
-                    }
-                }
-            });
+        await new OrganizationInitializer(testScope.Database, userId)
+            .Initialize();
         
         await testScope.Database.SaveChangesAsync();
         
-        var organizationsResponse = await _organizationsController
+        var organizations = await _organizationsController
             .WithUserAuthorization(nonPermittedUserId)
             .Execute(x => x.GetOrganizations());
         
-        Assert.Empty(organizationsResponse!.Organizations);
+        Assert.Empty(organizations!);
     }
     
     [Fact]
@@ -160,17 +144,11 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var userId = await testScope.CreateUser();
 
         var date1 = new DateTime(2020, 01, 01, 0, 0, 0, DateTimeKind.Utc);
-        var entity = new Organization
-        {
-            Name = "Org 1",
-            OwnerId = userId,
-            Color = "#ffffff",
-            CreatedAt = date1,
-            UpdatedAt = date1,
-        };
-        
-        testScope.Database.Organizations.Add(entity);
-        await testScope.Database.SaveChangesAsync();
+        var entity = await new OrganizationInitializer(testScope.Database, userId)
+            .WithName("Org 1")
+            .WithColor("#ffffff")
+            .WithTimestamp(date1)
+            .Initialize();
         
         await _organizationsController
             .WithUserAuthorization(userId)
@@ -226,14 +204,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
 
-        var entity = new Organization
-        {
-            Name = "Org 1",
-            OwnerId = userId,
-        };
-        
-        testScope.Database.Organizations.Add(entity);
-        await testScope.Database.SaveChangesAsync();
+        var entity = await new OrganizationInitializer(testScope.Database, userId).Initialize();
         
         await _organizationsController
             .WithUserAuthorization(userId)
@@ -325,26 +296,19 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var ownerId = await testScope.CreateUser();
         var userIdToReceivePermissions = await testScope.CreateUser();
 
-        var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
-        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
-        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(userIdToReceivePermissions)
+            .Initialize();
         
-        var organization = new Organization
-        {
-            OwnerId = ownerId,
-            Users = new List<OrganizationUser> { organizationUser },
-            Spaces = new List<Space> { space }
-        };
-        
-        testScope.Database.Add(organization);
-        await testScope.Database.SaveChangesAsync();
+        var space = organization.Spaces![0];
+        var epic = space.Epics![0];
+        var organizationUser = organization.Users![1];
 
         var request = new SetPermissionsRequest
         {
-            OrganizationUserId = organizationUser.Id,
             UserPermissions = new UserPermissions
             {
-                OrganizationAccessLevel = AccessLevel.None,
+                OrganizationAccessLevel = AccessLevel.Read,
                 EpicsAccessLevels = new AccessLevels
                 {
                     DirectAccess = new Dictionary<long, AccessLevel>
@@ -364,14 +328,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.SetUserPermissions(request));
+            .Execute(x => x.SetUserPermissions(organizationUser.Id, request));
         
-        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
-        organizationUser = Assert.Single(organizationUsers);
-        Assert.Equal(AccessLevel.None, organizationUser.AccessLevel);
+        organizationUser = await testScope.Database.OrganizationUsers.FirstAsyncEF(x => x.Id == organizationUser.Id);
+        Assert.Equal(AccessLevel.Read, organizationUser.AccessLevel);
         
-        var spaceOrganizationUsers = await testScope.Database.SpaceOrganizationUsers.ToListAsyncEF();
-        var spaceOrganizationUser = Assert.Single(spaceOrganizationUsers);
+        var spaceOrganizationUser = await testScope.Database.SpaceOrganizationUsers.FirstAsyncEF(x => x.OrganizationUserId == organizationUser.Id);
         Assert.Equal(AccessLevel.Update, spaceOrganizationUser.AccessLevel);
         Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
         Assert.Equal(space.Id, spaceOrganizationUser.SpaceId);
@@ -389,21 +351,15 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var userIdToReceivePermissions = await testScope.CreateUser();
-
-        var organizationUser = new OrganizationUser { UserId = userIdToReceivePermissions };
         
-        var organization = new Organization
-        {
-            OwnerId = ownerId,
-            Users = new List<OrganizationUser> { organizationUser },
-        };
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(userIdToReceivePermissions)
+            .Initialize();
         
-        testScope.Database.Add(organization);
-        await testScope.Database.SaveChangesAsync();
+        var organizationUser = organization.Users![1];
 
         var request = new SetPermissionsRequest
         {
-            OrganizationUserId = organizationUser.Id,
             UserPermissions = new UserPermissions
             {
                 OrganizationAccessLevel = AccessLevel.None,
@@ -420,14 +376,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.SetUserPermissions(request));
+            .Execute(x => x.SetUserPermissions(organizationUser.Id, request));
         
-        var organizationUsers = await testScope.Database.OrganizationUsers.ToListAsyncEF();
-        organizationUser = Assert.Single(organizationUsers);
+        organizationUser = await testScope.Database.OrganizationUsers.FirstAsyncEF(x => x.Id == organizationUser.Id);
         Assert.Equal(AccessLevel.None, organizationUser.AccessLevel);
         
-        var spaceOrganizationUsers = await testScope.Database.SpaceOrganizationUsers.ToListAsyncEF();
-        var spaceOrganizationUser = Assert.Single(spaceOrganizationUsers);
+        var spaceOrganizationUser = await testScope.Database.SpaceOrganizationUsers.FirstAsyncEF(x => x.OrganizationUserId == organizationUser.Id);
         Assert.Equal(AccessLevel.Read, spaceOrganizationUser.AccessLevel);
         Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
         Assert.Null(spaceOrganizationUser.SpaceId);
@@ -459,7 +413,6 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
 
         var request = new SetPermissionsRequest
         {
-            OrganizationUserId = organizationUser.Id,
             UserPermissions = new UserPermissions
             {
                 OrganizationAccessLevel = AccessLevel.None,
@@ -476,7 +429,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
             .WithUserAuthorization(userIdToReceivePermissions)
-            .Execute(x => x.SetUserPermissions(request)));
+            .Execute(x => x.SetUserPermissions(organizationUser.Id, request)));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }
     
@@ -486,24 +439,15 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var organizationUserId = await testScope.CreateUser();
+        
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(organizationUserId)
+            .Initialize();
 
-        var organizationUser = new OrganizationUser { UserId = organizationUserId };
-        var organization = new Organization
-        {
-            OwnerId = ownerId,
-            Users = new List<OrganizationUser> { organizationUser },
-        };
-        
-        testScope.Database.Add(organization);
-        await testScope.Database.SaveChangesAsync();
-        
+        var organizationUser = organization.Users![1];
         var permissions = await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.GetPermissions(
-                new GetUserPermissionsRequest
-                {
-                    OrganizationUserId = organizationUser.Id
-                }));
+            .Execute(x => x.GetUserPermissions(organizationUser.Id));
         
         Assert.NotNull(permissions);
         Assert.Equal(AccessLevel.None, permissions.OrganizationAccessLevel);
@@ -524,42 +468,20 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var ownerId = await testScope.CreateUser();
         var organizationUserId = await testScope.CreateUser();
 
-        var organizationUser = new OrganizationUser { UserId = organizationUserId, AccessLevel = AccessLevel.Read };
-        var epic = new Epic { Name = "Epic 1", UserId = ownerId };
-        var space = new Space { Name = "Space 1", CreatorId = ownerId, Epics = new List<Epic> { epic } };
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(organizationUserId, builder => builder
+                .SetOrganizationAccessLevel(AccessLevel.Read)
+                .SetSpacesAccessLevel(AccessLevel.Create)
+                .SetDefaultSpaceBacklogAccessLevel(AccessLevel.Delete))
+            .Initialize();
         
-        var organization = new Organization
-        {
-            OwnerId = ownerId,
-            Users = new List<OrganizationUser> { organizationUser },
-            Spaces = new List<Space> { space },
-        };
-
-        var spaceOrganizationUser = new SpaceOrganizationUser
-        {
-            OrganizationUser = organizationUser,
-            AccessLevel = AccessLevel.Create,
-        };
-        
-        var epicOrganizationUser = new EpicOrganizationUser
-        {
-            OrganizationUser = organizationUser,
-            AccessLevel = AccessLevel.Delete,
-            Epic = epic,
-        };
-        
-        testScope.Database.Add(organization);
-        testScope.Database.Add(spaceOrganizationUser);
-        testScope.Database.Add(epicOrganizationUser);
-        await testScope.Database.SaveChangesAsync();
+        var organizationUser = organization.Users![1];
+        var space = organization.Spaces![0];
+        var epic = space.Epics![0];
         
         var permissions = await _organizationsController
             .WithUserAuthorization(ownerId)
-            .Execute(x => x.GetPermissions(
-                new GetUserPermissionsRequest
-                {
-                    OrganizationUserId = organizationUser.Id
-                }));
+            .Execute(x => x.GetUserPermissions(organizationUser.Id));
         
         Assert.NotNull(permissions);
         Assert.Equal(AccessLevel.Read, permissions.OrganizationAccessLevel);
@@ -583,16 +505,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var ownerId = await testScope.CreateUser();
         var organizationUserId = await testScope.CreateUser();
 
-        var organizationUser = new OrganizationUser { UserId = organizationUserId, AccessLevel = AccessLevel.Read };
-        
-        var organization = new Organization
-        {
-            OwnerId = ownerId,
-            Users = new List<OrganizationUser> { organizationUser },
-        };
-        
-        testScope.Database.Add(organization);
-        await testScope.Database.SaveChangesAsync();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId).Initialize();
         
         var organizationAuthToken = await _organizationsController
             .WithUserAuthorization(ownerId)
@@ -607,14 +520,14 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         // Spaces are available with organization token
         var getSpacesResponse = await _spacesController
             .WithAuthorizationToken(organizationAuthToken)
-            .Execute(x => x.Get());
+            .Execute(x => x.GetAll());
         
         Assert.NotNull(getSpacesResponse);
         
         // And not available with user token
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _spacesController
             .WithUserAuthorization(organizationUserId)
-            .Execute(x => x.Get()));
+            .Execute(x => x.GetAll()));
         Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
     }
 }

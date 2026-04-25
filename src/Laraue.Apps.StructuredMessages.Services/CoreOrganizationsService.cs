@@ -90,11 +90,27 @@ public class CoreOrganizationsService(
                 cancellationToken);
     }
 
-    public Task Delete(long id, CancellationToken cancellationToken)
+    public async Task Delete(long id, CancellationToken cancellationToken)
     {
-        return context.Organizations
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var spaceIds = context.Spaces
+            .Where(c => c.OrganizationId == id)
+            .Select(x => (long?)x.Id);
+
+        await context.Epics
+            .Where(x => spaceIds.Contains(x.SpaceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.Spaces
+            .Where(c => c.OrganizationId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.Organizations
             .Where(c => c.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public Task AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)

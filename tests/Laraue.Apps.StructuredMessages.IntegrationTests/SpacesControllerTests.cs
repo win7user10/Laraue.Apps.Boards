@@ -15,9 +15,10 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, userId).Initialize();
         
         var spaceId = await _epicsController
-            .WithPersonalOrganizationAuthorization(userId)
+            .WithOrganizationAuthorization(organization.Id, userId)
             .Execute(x => x.Create(
                 new CreateSpaceRequest
                 {
@@ -27,7 +28,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
 
         var spaces = await testScope.Database.Spaces.ToListAsyncEF();
         
-        var space = Assert.Single(spaces);
+        var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
         Assert.Equal(userId, space.CreatorId);
