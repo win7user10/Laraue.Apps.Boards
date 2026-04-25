@@ -2,7 +2,8 @@
 The backend for Task-management system.
 
 ### Matter decisions and why they were taken
-Nullable Identifier in Organization, Space, Epic
+#### About nullable identifier
+##### There should be also default space in each organization
 
 ## App layers
 Below is explanation about project structure

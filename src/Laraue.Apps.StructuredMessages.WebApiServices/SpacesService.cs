@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.Exceptions.Web;
@@ -9,7 +8,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface ISpacesService
 {
-    Task<GetSpacesResponse> GetSpaces(
+    Task<SpaceDto[]> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken);
     
@@ -26,40 +25,36 @@ public interface ISpacesService
         CancellationToken cancellationToken);
 }
 
-public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext context)
+public class SpacesService(
+    ICoreSpacesService coreSpacesService,
+    ISpacesAccessService spacesAccessService)
     : ISpacesService
 {
-    public async Task<GetSpacesResponse> GetSpaces(
+    public async Task<SpaceDto[]> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        var spaces = await context.Spaces
-            .Where(x => x.CreatorId == request.UserId)
-            .Select(x => new SpaceDto
-            {
-                Id = x.Id,
-                Name = x.Name,
-                Color = x.Color,
-                EpicsCount = x.Epics!.Count
-            })
-            .ToArrayAsyncEF(cancellationToken);
-
-        var noEpicsCount = await context.Epics
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == null)
-            .CountAsyncEF(cancellationToken);
-
-        return new GetSpacesResponse
-        {
-            Spaces = spaces,
-            NoSpaceEpicsCount = noEpicsCount
-        };
+        var spacesCount = await spacesAccessService.GetAvailable(
+            request.AuthData,
+            items => items
+                .Select(x => new SpaceDto
+                {
+                    Id = x.Space.Id,
+                    Name = x.Space.Name,
+                    Color = x.Space.Color,
+                    EpicsCount = x.Space.Epics!.Count
+                })
+                .ToArrayAsyncLinqToDB(cancellationToken),
+            cancellationToken);
+        
+        return spacesCount;
     }
 
     public Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
     {
         return coreSpacesService.Create(
-            request.UserId,
+            request.AuthData.OrganizationId,
+            request.AuthData.UserId,
             request.Name,
             request.Color,
             cancellationToken);
@@ -97,7 +92,7 @@ public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext
 
 public record CreateSpaceRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -128,7 +123,7 @@ public record DeleteSpaceRequest
 
 public record GetSpacesRequest
 {
-    public Guid UserId { get; set; }
+    public required OrganizationAuthData AuthData { get; set; }
 }
 
 public record SpaceDto
@@ -137,10 +132,4 @@ public record SpaceDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int EpicsCount { get; set; }
-}
-
-public record GetSpacesResponse
-{
-    public required SpaceDto[] Spaces { get; set; }
-    public required int NoSpaceEpicsCount { get; set; }
 }

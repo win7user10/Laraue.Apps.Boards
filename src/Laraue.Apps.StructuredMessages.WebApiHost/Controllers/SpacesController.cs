@@ -17,7 +17,7 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
         return spacesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -52,13 +52,13 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     }
     
     [HttpGet]
-    public Task<GetSpacesResponse> Get(
+    public Task<SpaceDto[]> GetAll(
         CancellationToken cancellationToken = default)
     {
         return spacesService.GetSpaces(
             new GetSpacesRequest
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

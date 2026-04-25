@@ -51,7 +51,7 @@ public interface IOrganizationsService
         GetOrganizationMembersRequest request,
         CancellationToken cancellationToken);
     
-    Task<PermittableEntities> GetPermittableEntities(
+    Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
 }
@@ -63,15 +63,6 @@ public class OrganizationsService(
     IOrganizationAccessService organizationAccessService)
     : IOrganizationsService
 {
-    private static readonly OrganizationDto PersonalOrganization = new()
-    {
-        Id = IdService.NullId,
-        Name = "Personal",
-        Color = Palette.DefaultUserColor,
-        AccessLevel = AccessLevel.Read,
-        SpacesCount = 0,
-    };
-    
     public async Task<OrganizationDto[]> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken)
@@ -79,10 +70,11 @@ public class OrganizationsService(
         var allOrganizations = await organizationAccessService.GetAvailable(
             request.UserId,
             organizations => organizations
-                .OrderBy(x => x.Organization.Name)
+                .OrderByDescending(x => x.Organization!.Type)
+                .ThenBy(x => x.Organization!.Name)
                 .Select(x => new OrganizationDto
                 {
-                    Id = x.Organization.Id,
+                    Id = x.Organization!.Id,
                     AccessLevel = x.AccessLevel,
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
@@ -90,24 +82,11 @@ public class OrganizationsService(
                 })
                 .ToListAsyncEF(cancellationToken));
 
-        var personalOrganizationSpacesCount = await context.Spaces
-            .Where(x => x.CreatorId == request.UserId)
-            .Where(x => x.OrganizationId == null)
-            .CountAsyncEF(cancellationToken);
-        
-        allOrganizations.Insert(0, PersonalOrganization with
-        {
-            SpacesCount = personalOrganizationSpacesCount,
-        });
-
         return allOrganizations.ToArray();
     }
 
     public async Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
     {
-        if (request.AuthData.OrganizationType == OrganizationType.Personal)
-            return PersonalOrganization;
-        
         return await context.Organizations
             .Where(o => o.Id == request.AuthData.OrganizationId)
             .Select(x => new OrganizationDto
@@ -259,7 +238,7 @@ public class OrganizationsService(
         return data;
     }
 
-    public async Task<PermittableEntities> GetPermittableEntities(
+    public async Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken)
     {

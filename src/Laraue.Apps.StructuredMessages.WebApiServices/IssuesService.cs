@@ -120,32 +120,17 @@ public class IssuesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = IdService.ToNullableId(request.CategoryId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-
-        var statusIds = new List<long?>();
-        if (categoryId is null)
-            statusIds.Add(null);
-        else
-        {
-            statusIds = await context.Statuses
-                .Where(x => x.Epic!.SpaceId == spaceId)
-                .Where(x => x.EpicId == categoryId.Value)
-                .Where(x => x.Epic!.UserId == request.UserId)
-                .Select(x => (long?)x.Id)
-                .ToListAsyncEF(cancellationToken);
-        }
-
-        if (statusIds.Count == 0)
-            throw new NotFoundException();
+        var statusIds = await context.Statuses
+            .Where(x => x.EpicId == request.EpicId)
+            .Select(x => x.Id)
+            .ToListAsyncEF(cancellationToken);
 
         var result = new List<ColumnMessages>();
         foreach (var statusId in statusIds)
         {
             var query = context
                 .Issues
-                .Where(x => x.UserId == request.UserId)
-                .Where(x => x.SpaceId == spaceId)
+                .Where(x => x.UserId == request.AuthData!.UserId)
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
@@ -174,7 +159,7 @@ public class IssuesService(
             
             result.Add(new ColumnMessages
             {
-                StatusId = IdService.ToNotNullableId(statusId),
+                StatusId = statusId,
                 Items = mappedStatusResult,
             });
         }
@@ -583,9 +568,8 @@ public record GetMessageRequest
 
 public record GetBoardRequest
 {
-    public Guid UserId { get; set; }
-    public long CategoryId { get; set; }
-    public long SpaceId { get; set; }
+    public OrganizationAuthData? AuthData { get; set; }
+    public long EpicId { get; set; }
     public int Take { get; init; }
     public string? SearchString { get; init; }
 }

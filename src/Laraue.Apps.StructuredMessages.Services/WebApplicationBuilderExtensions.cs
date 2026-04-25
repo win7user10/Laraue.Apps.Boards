@@ -38,6 +38,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<ICoreStatusService, CoreStatusService>()
                 .AddScoped<ICoreUserPreferencesService, CoreUserPreferencesService>()
                 .AddScoped<ICoreSpacesService, CoreSpacesService>()
+                .AddScoped<ISpacesAccessService, SpacesAccessService>()
                 .AddScoped<ICoreOrganizationsService, CoreOrganizationsService>()
                 .AddScoped<IOrganizationAccessService, OrganizationAccessService>()
                 .AddSingleton<IFileStorage, FileStorage>();

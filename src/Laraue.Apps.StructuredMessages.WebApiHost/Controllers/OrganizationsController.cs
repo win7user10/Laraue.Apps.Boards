@@ -124,7 +124,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     
     [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
     [HttpGet("permittable-entities")]
-    public Task<PermittableEntities> GetPermittableEntities(
+    public Task<PermittableSpace[]> GetPermittableEntities(
         CancellationToken cancellationToken = default)
     {
         return organizationsService.GetPermittableEntities(

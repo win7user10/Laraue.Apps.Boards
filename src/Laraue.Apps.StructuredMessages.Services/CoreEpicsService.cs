@@ -11,12 +11,12 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreEpicsService
 {
-    Task<MessageCategoryListDto[]> GetList(
-        Guid userId,
-        CancellationToken cancellationToken);
-    
     Task<long> Create(
-        CreateMessageCategoryRequest request,
+        long spaceId,
+        Guid userId,
+        string name,
+        string color,
+        Status[]? statuses,
         CancellationToken cancellationToken);
     
     Task<bool> UserHasAccessToEpic(
@@ -41,38 +41,28 @@ public interface ICoreEpicsService
 public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
     : ICoreEpicsService
 {
-    public Task<MessageCategoryListDto[]> GetList(
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        return context.Epics
-            .Where(x => x.UserId == userId)
-            .Select(x => new MessageCategoryListDto
-            {
-                Name = x.Name,
-                Id = x.Id
-            })
-            .ToArrayAsyncEF(cancellationToken);
-    }
-
     public async Task<long> Create(
-        CreateMessageCategoryRequest request,
+        long spaceId,
+        Guid userId,
+        string name,
+        string color,
+        Status[]? statuses,
         CancellationToken cancellationToken)
     {
         var dateTime = dateTimeProvider.UtcNow;
         
         var category = new Epic
         {
-            Name = request.Name,
-            UserId = request.UserId,
-            Color = request.Color ?? Palette.RandomColor(),
+            Name = name,
+            UserId = userId,
+            Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
             TouchedAt = dateTime,
-            SpaceId = request.SpaceId,
+            SpaceId = spaceId,
         };
         
-        var statuses = request.Statuses ?? [
+        statuses ??= [
             new Status
             {
                 Name = CardsDefaults.DefaultStatusName,
@@ -178,12 +168,6 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
     }
 }
 
-public class MessageCategoryListDto
-{
-    public long Id { get; set; }
-    public required string Name { get; set; }
-}
-
 public class ChangeStatusesOrderRequest
 {
     public required long CategoryId { get; set; }
@@ -192,15 +176,6 @@ public class ChangeStatusesOrderRequest
     /// Order map, status id -> order value.
     /// </summary>
     public required IReadOnlyDictionary<long, int> Order { get; set; }
-}
-
-public class CreateMessageCategoryRequest
-{
-    public required string Name { get; set; }
-    public string? Color { get; set; }
-    public required Guid UserId { get; set; }
-    public required long? SpaceId { get; set; }
-    public Status[]? Statuses { get; set; }
 }
 
 public class Status

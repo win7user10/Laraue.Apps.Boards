@@ -43,7 +43,7 @@ public interface ICoreOrganizationsService
         long organizationUserId,
         CancellationToken cancellationToken);
     
-    Task<PermittableEntities> GetPermittableEntities(
+    Task<PermittableSpace[]> GetPermittableEntities(
         long organizationId,
         CancellationToken cancellationToken);
 }
@@ -59,25 +59,14 @@ public class CoreOrganizationsService(
         string color,
         CancellationToken cancellationToken)
     {
-        var dateTime = dateTimeProvider.UtcNow;
-        
-        var entity = new Organization
-        {
-            OwnerId = ownerId,
-            Name = name,
-            Color = color,
-            CreatedAt = dateTime,
-            UpdatedAt = dateTime,
-            JoinCode = StringGenerator.GenerateJoinCode(),
-            Users = new List<OrganizationUser>
-            {
-                new ()
-                {
-                    AccessLevel = AccessLevel.Manage,
-                    UserId = ownerId,
-                }
-            }
-        };
+        var timestamp = dateTimeProvider.UtcNow;
+
+        var entity = OrganizationDefaults.GetNewOrganizationEntity(
+            ownerId,
+            name,
+            color,
+            timestamp,
+            OrganizationType.Organization);
         
         context.Organizations.Add(entity);
         await context.SaveChangesAsync(cancellationToken);
@@ -240,23 +229,30 @@ public class CoreOrganizationsService(
         };
     }
 
-    public async Task<PermittableEntities> GetPermittableEntities(
+    public async Task<PermittableSpace[]> GetPermittableEntities(
         long organizationId,
         CancellationToken cancellationToken)
     {
-        var epics = await context.Epics
-            .Where(x => x.OrganizationId == organizationId)
-            .ToDictionaryAsyncEF(x => x.Id, x => x.Name, cancellationToken);
-        
         var spaces = await context.Spaces
             .Where(x => x.OrganizationId == organizationId)
             .ToDictionaryAsyncEF(x => x.Id, x => x.Name, cancellationToken);
+        
+        var epics = await context.Epics
+            .Where(x => x.Space!.OrganizationId == organizationId)
+            .Select(x => new { x.Id, x.Name, x.SpaceId })
+            .ToArrayAsyncEF(cancellationToken);
+        
+        var epicsBySpaces = epics
+            .GroupBy(x => x.SpaceId)
+            .ToDictionary(x => x.Key, x => x
+                .ToDictionary(y => y.Id, y => y.Name));
 
-        return new PermittableEntities
-        {
-            Epics = epics,
-            Spaces = spaces,
-        };
+        return spaces
+            .Select(s => new PermittableSpace(
+                s.Key,
+                s.Value,
+                epicsBySpaces[s.Key]))
+            .ToArray();
     }
 
     private static AccessLevels ToAccessLevels<T>(T[] permissions, Func<T, long?> getItemId, Func<T, AccessLevel> getAccessLevel)
@@ -291,8 +287,4 @@ public record AccessLevels
     public Dictionary<long, AccessLevel>? DirectAccess { get; init; }
 }
 
-public record PermittableEntities
-{
-    public required Dictionary<long, string> Spaces { get; init; }
-    public required Dictionary<long, string> Epics { get; init; }
-}
+public record PermittableSpace(long Id, string Name, Dictionary<long, string> Epics);

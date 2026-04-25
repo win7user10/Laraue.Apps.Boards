@@ -60,6 +60,7 @@ public class EpicsService(
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
                 TouchedAt = x.TouchedAt,
+                IsDefault = x.IsDefault,
             })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -105,23 +106,20 @@ public class EpicsService(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue && !await coreSpacesService
+        if (!await coreSpacesService
             .UserHasAccessToSpace(
                 request.UserId,
-                spaceId.Value,
+                request.SpaceId,
                 AccessLevel.Create,
                 cancellationToken))
             throw new NotFoundException("Space is not found");
         
         return await coreEpicsService.Create(
-            new CreateMessageCategoryRequest
-            {
-                UserId = request.UserId,
-                Name = request.Name,
-                Color = request.Color,
-                SpaceId = spaceId,
-            },
+            request.SpaceId,
+            request.UserId,
+            request.Name,
+            request.Color,
+            statuses: null,
             cancellationToken);
     }
 
@@ -182,6 +180,7 @@ public record EpicCountDto
     public required string? Color { get; set; }
     public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
+    public required bool IsDefault { get; set; }
 }
 
 public record GetCategoryRequest

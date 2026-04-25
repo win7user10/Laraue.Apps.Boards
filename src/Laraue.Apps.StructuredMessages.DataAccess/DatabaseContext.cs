@@ -71,5 +71,13 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
         {
             entity.HasKey(x => x.UserId);
         });
+        
+        modelBuilder.Entity<Organization>(entity =>
+        {
+            entity
+                .HasIndex(x => new { x.OwnerId, x.Type })
+                .HasFilter("type = 1")
+                .IsUnique();
+        });
     }
 }

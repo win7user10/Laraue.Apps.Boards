@@ -31,8 +31,11 @@ public class Space
     /// </summary>
     public DateTime UpdatedAt { get; set; }
     
+    public bool IsDefault { get; set; }
+    
     /// <summary>
     /// Epics linked to the space.
     /// </summary>
     public IList<Epic>? Epics { get; set; }
+    public IList<SpaceOrganizationUser>? Users { get; set; }
 }

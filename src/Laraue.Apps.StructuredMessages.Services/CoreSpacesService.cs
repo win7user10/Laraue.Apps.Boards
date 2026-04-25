@@ -11,6 +11,7 @@ namespace Laraue.Apps.StructuredMessages.Services;
 public interface ICoreSpacesService
 {
     Task<long> Create(
+        long organizationId,
         Guid creatorId,
         string name,
         string color,
@@ -38,6 +39,7 @@ public class CoreSpacesService(
     : ICoreSpacesService
 {
     public async Task<long> Create(
+        long organizationId,
         Guid creatorId,
         string name,
         string color,
@@ -52,6 +54,11 @@ public class CoreSpacesService(
             Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
+            OrganizationId = organizationId,
+            Epics = new List<Epic>
+            {
+                OrganizationDefaults.GetNewBacklogEpicEntity(creatorId, dateTime)
+            }
         };
         
         context.Spaces.Add(entity);

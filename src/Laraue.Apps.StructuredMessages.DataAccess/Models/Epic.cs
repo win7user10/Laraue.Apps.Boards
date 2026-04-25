@@ -20,9 +20,6 @@ public class Epic
     /// </summary>
     public long? SpaceId { get; set; }
     public Space? Space { get; set; }
-    
-    public long? OrganizationId { get; set; }
-    public Organization? Organization { get; set; }
 
     /// <summary>
     /// Epic creation date.
@@ -39,6 +36,8 @@ public class Epic
     /// Property to sort epics.
     /// </summary>
     public DateTime TouchedAt { get; set; }
+    
+    public bool IsDefault { get; set; }
 
     public IList<Issue>? Issues { get; set; }
     public IList<Status>? Statuses { get; set; }

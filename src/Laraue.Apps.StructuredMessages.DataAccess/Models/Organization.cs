@@ -55,6 +55,6 @@ public class Organization
 
 public enum OrganizationType
 {
-    Personal,
-    Organization,
+    Organization = 0,
+    Personal = 1,
 }
