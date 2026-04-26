@@ -35,8 +35,8 @@ public interface IIssuesService
         DeleteMessageRequest request,
         CancellationToken ct);
     
-    Task<long> CreateMessage(
-        CreateMessageRequest request,
+    Task<long> Create(
+        CreateIssueRequest request,
         CancellationToken ct);
     
     Task EditMessage(
@@ -70,7 +70,7 @@ public class IssuesService(
 
         var query = context
             .Issues
-            .Where(x => x.SpaceId == spaceId)
+            .Where(x => x.Status!.Epic!.SpaceId == spaceId)
             .Where(x => x.UserId == request.UserId)
             .Where(x => x.StatusId == statusId);
         
@@ -206,7 +206,7 @@ public class IssuesService(
         
         var counts = (await context.Issues
             .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == spaceId)
+            .Where(x => x.Status!.Epic!.SpaceId == spaceId)
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
@@ -245,21 +245,11 @@ public class IssuesService(
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.IssueId, ct))
             throw new NotFoundException("Card not found");
         
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessLevel.Create, ct))
-            throw new NotFoundException("Space not found");
-        
-        var epicId = IdService.ToNullableId(request.EpicId);
-        if (epicId.HasValue && !await epicsService.UserHasAccessToEpic(request.UserId, request.EpicId, ct))
-            throw new NotFoundException("Epic not found");
-        
         if (!await statusService.UserHasAccessToStatus(request.UserId, request.StatusId, ct))
             throw new NotFoundException("Status not found");
         
         await messageService.Move(
             request.IssueId,
-            request.SpaceId,
-            request.EpicId,
             request.StatusId,
             ct);
     }
@@ -267,33 +257,23 @@ public class IssuesService(
     public async Task DeleteMessage(DeleteMessageRequest request, CancellationToken ct)
     {
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+            throw new NotFoundException($"Issue is not found: {request.MessageId}");
 
         await messageService.DeleteMessage(request.MessageId, ct);
     }
 
-    public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
+    public async Task<long> Create(CreateIssueRequest request, CancellationToken ct)
     {
-        var categoryId = IdService.ToNullableId(request.CategoryId);
-        var statusId = IdService.ToNullableId(request.StatusId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-
-        if (categoryId.HasValue
-            && !await epicsService.UserHasAccessToEpic(
-                request.UserId, request.CategoryId, ct))
-                    throw new BadRequestException(
-                        nameof(categoryId),
-                        "Category is not found");
+        var validationData = await context.Statuses
+            .Where(s => s.Id == request.StatusId)
+            .Select(x => new { x.EpicId, x.Epic!.SpaceId })
+            .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", ct);
         
-        if (spaceId.HasValue
-            && !await coreSpacesService.UserHasAccessToSpace(
-                request.UserId,
-                request.SpaceId,
-                AccessLevel.Create,
-                ct))
-            throw new BadRequestException(
-                nameof(categoryId),
-                "Space is not found");
+        if (!await epicsService.UserHasAccessToEpic(request.UserId, validationData.EpicId, ct))
+            throw new NotFoundException($"Status: {request.StatusId} is not found");
+        
+        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, AccessLevel.Create, ct))
+            throw new NotFoundException($"Status: {request.StatusId} is not found");
 
         return await messageService.Create(
             new SaveMessageRequest
@@ -301,9 +281,7 @@ public class IssuesService(
                 CreatedAt = dateTimeProvider.UtcNow,
                 Text = request.Content,
                 UserId = request.UserId,
-                CategoryId = categoryId,
-                StatusId = statusId,
-                SpaceId = spaceId,
+                StatusId = request.StatusId,
             },
             ct);
     }
@@ -311,7 +289,7 @@ public class IssuesService(
     public async Task EditMessage(EditMessageRequest request, CancellationToken ct)
     {
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+            throw new NotFoundException($"Issue is not found: {request.MessageId}");
         
         await messageService.Update(
             request.MessageId,
@@ -327,13 +305,11 @@ public class IssuesService(
         var query = context.Issues
             .Where(x => x.UserId == request.UserId);
         
-        var categoryId = IdService.ToNullableId(request.EpicId);
-        if (categoryId.HasValue)
-            query = query.Where(x => x.EpicId == categoryId);
+        if (request.EpicId.HasValue)
+            query = query.Where(x => x.Status!.EpicId == request.EpicId);
         
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue)
-            query = query.Where(x => x.SpaceId == spaceId);
+        if (request.SpaceId.HasValue)
+            query = query.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
         
         if (!string.IsNullOrEmpty(request.SearchString))
             query = query
@@ -356,7 +332,7 @@ public class IssuesService(
     {
         if (!await messageService.UserHasAccessToMessage(
             request.UserId, request.MessageId, cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Issue is not found: {request.MessageId}");
 
         var result = await context.Issues
             .Where(x => x.Id == request.MessageId)
@@ -365,13 +341,13 @@ public class IssuesService(
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
-                CategoryName = x.Epic!.Name,
+                CategoryName = x.Status!.Epic!.Name,
                 StatusName = x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
-                CategoryColor = x.Epic.Color,
+                CategoryColor = x.Status.Epic.Color,
                 StatusColor = x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
@@ -514,8 +490,8 @@ public class IssuesService(
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = IdService.ToNotNullableId(x.EpicId),
-            StatusId = IdService.ToNotNullableId(x.StatusId),
+            CategoryId = x.Status!.EpicId,
+            StatusId = x.StatusId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,
@@ -547,8 +523,6 @@ public record MoveCardRequest
 {
     public Guid UserId { get; set; }
     public long IssueId { get; set; }
-    public long SpaceId { get; set; }
-    public long EpicId { get; set; }
     public long StatusId { get; set; }
 }
 
@@ -636,11 +610,9 @@ public record DeleteMessageRequest
     public long MessageId { get; set; }
 }
 
-public record CreateMessageRequest
+public record CreateIssueRequest
 {
     public Guid UserId { get; set; }
-    public long SpaceId { get; set; }
-    public long CategoryId { get; set; }
     public long StatusId { get; set; }
     public required string Content { get; set; }
 }

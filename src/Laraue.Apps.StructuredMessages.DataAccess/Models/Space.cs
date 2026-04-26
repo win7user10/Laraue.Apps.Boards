@@ -18,7 +18,7 @@ public class Space
     public Guid CreatorId { get; set; }
     public User? Creator { get; set; }
     
-    public long? OrganizationId { get; set; }
+    public long OrganizationId { get; set; }
     public Organization? Organization { get; set; }
     
     /// <summary>

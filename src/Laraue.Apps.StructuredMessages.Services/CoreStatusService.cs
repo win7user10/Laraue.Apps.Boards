@@ -87,7 +87,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         var categoryData = await context.Statuses
             .Where(x => x.Id == request.Id)
             .Select(x => new { MessageCategoryId = x.EpicId })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"Status: {request.Id} is not found", cancellationToken);
         
         var newStatusId = await context.Statuses
             .Where(x => x.EpicId == categoryData.MessageCategoryId)

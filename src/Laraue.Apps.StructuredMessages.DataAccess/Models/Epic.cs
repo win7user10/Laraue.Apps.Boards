@@ -18,7 +18,7 @@ public class Epic
     /// <summary>
     /// The space the epic belongs to.
     /// </summary>
-    public long? SpaceId { get; set; }
+    public long SpaceId { get; set; }
     public Space? Space { get; set; }
 
     /// <summary>

@@ -30,23 +30,11 @@ public class Issue
     /// </summary>
     public Guid UserId { get; set; }
     public User? User { get; set; }
-    
-    /// <summary>
-    /// Message category.
-    /// </summary>
-    public long? EpicId { get; set; }
-    public Epic? Epic { get; set; }
-    
-    /// <summary>
-    /// The space the issue belongs to.
-    /// </summary>
-    public long? SpaceId { get; set; }
-    public Space? Space { get; set; }
 
     /// <summary>
     /// Actual message status.
     /// </summary>
-    public long? StatusId { get; set; }
+    public long StatusId { get; set; }
     public Status? Status { get; set; }
     
     public TelegramMessage? TelegramMessage { get; set; }

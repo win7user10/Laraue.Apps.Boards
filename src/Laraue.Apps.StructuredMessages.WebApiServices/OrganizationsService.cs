@@ -78,7 +78,8 @@ public class OrganizationsService(
                     AccessLevel = x.AccessLevel,
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
-                    SpacesCount = x.Organization.Spaces!.Count
+                    SpacesCount = x.Organization.Spaces!.Count,
+                    IsPersonal = x.Organization.Type == OrganizationType.Personal,
                 })
                 .ToListAsyncEF(cancellationToken));
 
@@ -97,9 +98,10 @@ public class OrganizationsService(
                     : AccessLevel.Manage,
                 Name = x.Name,
                 Color = x.Color,
-                SpacesCount = x.Spaces!.Count
+                SpacesCount = x.Spaces!.Count,
+                IsPersonal = x.Type == OrganizationType.Personal,
             })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken);
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -145,7 +147,7 @@ public class OrganizationsService(
             cancellationToken);
         
         if (organizationId == null)
-            throw new NotFoundException();
+            throw new NotFoundException($"Organization is not found: {request.JoinCode}");
 
         await coreOrganizationsService.AddMember(
             organizationId.Value,
@@ -159,7 +161,7 @@ public class OrganizationsService(
         var organizationUser = await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
             .Select(x => new { x.OrganizationId })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
         await organizationAccessService.HasAccessOrThrow(
             request.UserId,
@@ -178,7 +180,7 @@ public class OrganizationsService(
         var organizationUser = await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
             .Select(x => new { x.OrganizationId })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
         await organizationAccessService.HasAccessOrThrow(
             request.UserId,
@@ -302,6 +304,7 @@ public record OrganizationDto
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
     public required AccessLevel AccessLevel { get; set; }
+    public required bool IsPersonal { get; set; }
 }
 
 public record JoinOrganizationRequest

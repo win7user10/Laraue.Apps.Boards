@@ -88,11 +88,9 @@ public class CoreSpacesService(
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         await context.Issues
-            .Where(x => x.SpaceId == id)
+            .Where(x => x.Status!.Epic!.SpaceId == id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.SpaceId, (long?)null)
-                .SetProperty(p => p.EpicId, (long?)null)
-                .SetProperty(p => p.StatusId, (long?)null),
+                .SetProperty(p => p.StatusId, null),
                 cancellationToken);
         
         await context.Statuses

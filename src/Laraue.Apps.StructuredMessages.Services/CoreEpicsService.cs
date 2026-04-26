@@ -130,9 +130,8 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         await context.Issues
-            .Where(x => x.EpicId == request.Id)
+            .Where(x => x.Status!.EpicId == request.Id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.EpicId, (long?)null)
                 .SetProperty(p => p.StatusId, (long?)null),
                 cancellationToken);
         

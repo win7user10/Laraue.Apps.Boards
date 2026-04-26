@@ -82,10 +82,10 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     
     [HttpPost]
     public Task<long> Create(
-        [FromBody] CreateMessageRequest request,
+        [FromBody] CreateIssueRequest request,
         CancellationToken cancellationToken)
     {
-        return messagesService.CreateMessage(
+        return messagesService.Create(
             request with
             {
                 UserId = HttpContext.User.GetId(),

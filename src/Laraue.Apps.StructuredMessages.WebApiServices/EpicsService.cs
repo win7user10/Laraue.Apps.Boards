@@ -64,17 +64,9 @@ public class EpicsService(
             })
             .ToArrayAsyncEF(cancellationToken);
 
-        var backlogCount = await context
-            .Issues
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == spaceId)
-            .Where(x => x.EpicId == null)
-            .CountAsyncEF(cancellationToken);
-
         return new EpicCountResult
         {
             Categories = result,
-            BacklogCount = backlogCount
         };
     }
 
@@ -99,7 +91,7 @@ public class EpicsService(
                     })
                     .ToArray(),
             })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"Epic: {request.CategoryId} is not found", cancellationToken);
     }
 
     public async Task<long> CreateCategory(
@@ -112,7 +104,7 @@ public class EpicsService(
                 request.SpaceId,
                 AccessLevel.Create,
                 cancellationToken))
-            throw new NotFoundException("Space is not found");
+            throw new NotFoundException($"Space: {request.SpaceId} is not found");
         
         return await coreEpicsService.Create(
             request.SpaceId,
@@ -129,7 +121,7 @@ public class EpicsService(
     {
         if (!await coreEpicsService
             .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Epic is not found: {request.CategoryId}");
         
         await coreEpicsService.ChangeStatusesOrder(
             new Services.ChangeStatusesOrderRequest
@@ -144,7 +136,7 @@ public class EpicsService(
     {
         if (!await coreEpicsService
             .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Epic is not found: {request.Id}");
 
         await coreEpicsService.Update(
             request.Id,
@@ -158,7 +150,7 @@ public class EpicsService(
     {
         if (!await coreEpicsService
                 .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Epic is not found: {request.Id}");
         
         await coreEpicsService.Delete(
             new DeleteRequest { Id = request.Id },
@@ -168,7 +160,6 @@ public class EpicsService(
 
 public class EpicCountResult
 {
-    public int BacklogCount { get; set; }
     public required EpicCountDto[] Categories { get; set; }
 }
 

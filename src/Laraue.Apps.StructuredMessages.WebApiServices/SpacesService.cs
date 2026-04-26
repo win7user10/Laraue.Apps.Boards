@@ -67,7 +67,7 @@ public class SpacesService(
             request.Id,
             AccessLevel.Update,
             cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Space is not found: {request.Id}");
 
         await coreSpacesService.Update(
             request.Id,
@@ -84,7 +84,7 @@ public class SpacesService(
             request.Id,
             AccessLevel.Delete,
             cancellationToken))
-            throw new NotFoundException();
+            throw new NotFoundException($"Space is not found: {request.Id}");
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
     }

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260423185841_InsertDefaultEntities")]
-    partial class InsertDefaultEntities
+    [Migration("20260426072934_NotNulaableEpicSpaceInEntities")]
+    partial class NotNulaableEpicSpaceInEntities
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -55,11 +55,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
 
-                    b.Property<long?>("OrganizationId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("organization_id");
-
-                    b.Property<long?>("SpaceId")
+                    b.Property<long>("SpaceId")
                         .HasColumnType("bigint")
                         .HasColumnName("space_id");
 
@@ -77,9 +73,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_epics");
-
-                    b.HasIndex("OrganizationId")
-                        .HasDatabaseName("ix_epics_organization_id");
 
                     b.HasIndex("SpaceId")
                         .HasDatabaseName("ix_epics_space_id");
@@ -141,7 +134,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long?>("EpicId")
+                    b.Property<long>("EpicId")
                         .HasColumnType("bigint")
                         .HasColumnName("epic_id");
 
@@ -149,11 +142,11 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
 
-                    b.Property<long?>("SpaceId")
+                    b.Property<long>("SpaceId")
                         .HasColumnType("bigint")
                         .HasColumnName("space_id");
 
-                    b.Property<long?>("StatusId")
+                    b.Property<long>("StatusId")
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
 
@@ -318,7 +311,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
 
-                    b.Property<long?>("OrganizationId")
+                    b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
 
@@ -741,14 +734,11 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", b =>
                 {
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", "Organization")
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .HasConstraintName("fk_epics_organizations_organization_id");
-
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
                         .WithMany("Epics")
                         .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_epics_spaces_space_id");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "User")
@@ -758,8 +748,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_epics_users_user_id");
 
-                    b.Navigation("Organization");
-
                     b.Navigation("Space");
 
                     b.Navigation("User");
@@ -768,7 +756,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.EpicOrganizationUser", b =>
                 {
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", "Epic")
-                        .WithMany()
+                        .WithMany("Users")
                         .HasForeignKey("EpicId")
                         .HasConstraintName("fk_epic_organization_users_epics_epic_id");
 
@@ -789,6 +777,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Epic", "Epic")
                         .WithMany("Issues")
                         .HasForeignKey("EpicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_issues_epics_epic_id");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", "Organization")
@@ -799,11 +789,15 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
                         .WithMany()
                         .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_issues_spaces_space_id");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", "Status")
                         .WithMany("Issues")
                         .HasForeignKey("StatusId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_issues_statuses_status_id");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.TelegramMessage", "TelegramMessage")
@@ -876,6 +870,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", "Organization")
                         .WithMany("Spaces")
                         .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_spaces_organizations_organization_id");
 
                     b.Navigation("Creator");
@@ -893,7 +889,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasConstraintName("fk_space_organization_users_organization_users_organization_us");
 
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
-                        .WithMany()
+                        .WithMany("Users")
                         .HasForeignKey("SpaceId")
                         .HasConstraintName("fk_space_organization_users_spaces_space_id");
 
@@ -978,6 +974,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("Issues");
 
                     b.Navigation("Statuses");
+
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>
@@ -990,6 +988,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", b =>
                 {
                     b.Navigation("Epics");
+
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Status", b =>

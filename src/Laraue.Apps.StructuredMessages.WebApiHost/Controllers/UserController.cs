@@ -27,7 +27,7 @@ public class UserController(DatabaseContext context) : ControllerBase
                 TelegramId = x.TelegramId,
                 Palette = Palette.Colors
             })
-            .FirstOrThrowNotFoundEFAsync(ct);
+            .FirstOrThrowNotFoundEFAsync("User is not found", ct);
 
         var initials = UserInitialsUtility.GetInitials(
             user.Username,
