@@ -118,7 +118,7 @@ public class OrganizationsService(
         await organizationAccessService.HasAccessOrThrow(
             request.UserId,
             request.Id,
-            AccessLevel.Update,
+            AccessLevel.Manage,
             cancellationToken);
 
         await coreOrganizationsService.Update(
@@ -134,7 +134,7 @@ public class OrganizationsService(
         await organizationAccessService.HasAccessOrThrow(
             request.UserId,
             request.Id,
-            AccessLevel.Delete,
+            AccessLevel.Manage,
             cancellationToken);
         
         await coreOrganizationsService.Delete(request.Id, cancellationToken);
@@ -148,6 +148,12 @@ public class OrganizationsService(
         
         if (organizationId == null)
             throw new NotFoundException($"Organization is not found: {request.JoinCode}");
+        
+        if (await coreOrganizationsService.HasMember(
+            organizationId.Value,
+            request.UserId,
+            cancellationToken))
+            throw new NotAcceptableException("User is already member of this organization");
 
         await coreOrganizationsService.AddMember(
             organizationId.Value,
@@ -198,7 +204,7 @@ public class OrganizationsService(
         await organizationAccessService.HasAccessOrThrow(
             request.UserId,
             request.OrganizationId,
-            AccessLevel.Read,
+            AccessLevel.ReadItems,
             cancellationToken);
 
         return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
@@ -211,7 +217,7 @@ public class OrganizationsService(
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData.UserId,
             request.AuthData.OrganizationId,
-            AccessLevel.Read,
+            AccessLevel.ReadItems,
             cancellationToken);
 
         var data = await context.OrganizationUsers

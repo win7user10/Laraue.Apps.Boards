@@ -25,6 +25,11 @@ public interface ICoreOrganizationsService
         long id,
         CancellationToken cancellationToken);
     
+    Task<bool> HasMember(
+        long organizationId,
+        Guid userId,
+        CancellationToken cancellationToken);
+    
     Task AddMember(
         long organizationId,
         Guid userId,
@@ -111,6 +116,14 @@ public class CoreOrganizationsService(
             .ExecuteDeleteAsync(cancellationToken);
         
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public Task<bool> HasMember(long organizationId, Guid userId, CancellationToken cancellationToken)
+    {
+        return context.OrganizationUsers
+            .Where(x => x.OrganizationId == organizationId)
+            .Where(x => x.UserId == userId)
+            .AnyAsyncEF(cancellationToken);
     }
 
     public Task AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)

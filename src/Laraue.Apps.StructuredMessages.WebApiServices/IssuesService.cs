@@ -58,30 +58,35 @@ public class IssuesService(
     ICoreEpicsService epicsService,
     IDateTimeProvider dateTimeProvider,
     ICoreSpacesService coreSpacesService,
-    ICoreStatusService statusService)
+    ICoreStatusService statusService,
+    IIssuesAccessService issuesAccessService)
     : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
         GetMessagesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = IdService.ToNullableId(request.StatusId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
+        var result = await issuesAccessService.GetAvailable(
+            request.AuthData,
+            (issues) =>
+            {
+                var query = issues
+                    .Where(i => i.Status!.Epic!.SpaceId == request.SpaceId)
+                    .Where(i => i.StatusId == request.StatusId);
+                
+                if (!string.IsNullOrEmpty(request.SearchString))
+                    query = query
+                        .Where(x => EF.Functions.ILike(
+                            x.Content!,
+                            request.SearchString.AsSearchable()));
 
-        var query = context
-            .Issues
-            .Where(x => x.Status!.Epic!.SpaceId == spaceId)
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.StatusId == statusId);
+                var ordered = query.OrderByDescending(x => x.Id);
+                var projected = ProjectToTemporaryDto(ordered);
+                return ToBatchResult(projected, request);
+            },
+            cancellationToken);
         
-        if (!string.IsNullOrEmpty(request.SearchString))
-            query = query
-                .Where(x => EF.Functions.ILike(
-                    x.Content!,
-                    request.SearchString.AsSearchable()));
 
-        var result = await ToBatchResult(ProjectToTemporaryDto(query
-            .OrderByDescending(x => x.Id)), request);
         var projected = result.Data
             .Select(Map)
             .ToArray();
@@ -103,7 +108,7 @@ public class IssuesService(
         var requested = await queryable
             .Skip(request.Skip)
             .Take(request.Take + 1)
-            .ToListAsyncEF();
+            .ToListAsyncLinqToDB();
         
         var hasNext = request.Take < requested.Count;
         var result = requested.Take(request.Take).ToArray();
@@ -272,7 +277,7 @@ public class IssuesService(
         if (!await epicsService.UserHasAccessToEpic(request.UserId, validationData.EpicId, ct))
             throw new NotFoundException($"Status: {request.StatusId} is not found");
         
-        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, AccessLevel.Create, ct))
+        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, AccessLevel.CreateItems, ct))
             throw new NotFoundException($"Status: {request.StatusId} is not found");
 
         return await messageService.Create(
@@ -528,7 +533,7 @@ public record MoveCardRequest
 
 public record GetMessagesRequest : BatchRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long SpaceId { get; set; }
     public long StatusId { get; set; }
     public string? SearchString { get; set; }

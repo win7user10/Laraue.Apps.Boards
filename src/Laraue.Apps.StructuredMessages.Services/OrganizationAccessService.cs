@@ -37,7 +37,7 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
     {
         var hasAccess = await HasAccess(userId, organizationId, accessLevel, cancellationToken);
         if (!hasAccess)
-            throw new NotFoundException($"Organization is not found: {organizationId}");
+            throw new NotFoundException($"Organization: {organizationId} or permissions: {accessLevel} is not allowed");
     }
     
     private Task<bool> HasAccess(

@@ -15,6 +15,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     private string _organizationName = "TestOrganization";
     private string _organizationColor = "#ffffff";
     private DateTime _timestamp = DateTime.UtcNow;
+    private OrganizationType _type = OrganizationType.Organization;
 
     public OrganizationInitializer WithName(string name)
     {
@@ -37,6 +38,13 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         return this;
     }
 
+    public OrganizationInitializer WithType(OrganizationType type)
+    {
+        _type = type;
+
+        return this;
+    }
+
     public async Task<Organization> Initialize()
     {
         var organization = OrganizationDefaults.GetNewOrganizationEntity(
@@ -44,7 +52,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             _organizationName,
             _organizationColor,
             _timestamp,
-            OrganizationType.Organization);
+            _type);
 
         organization.Users = new List<OrganizationUser>();
         foreach (var user in _organizationUsers)

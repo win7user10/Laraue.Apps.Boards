@@ -4,10 +4,10 @@
 public enum AccessLevel : byte
 {
     None = 0,
-    Read = 1,
-    Create = 2,
-    Update = 4,
-    Delete = 8,
+    ReadItems = 1,
+    CreateItems = 2,
+    UpdateItems = 4,
+    DeleteItems = 8,
     Manage = 16,
-    All = Read | Create | Update | Delete | Manage
+    All = ReadItems | CreateItems | UpdateItems | DeleteItems | Manage
 }

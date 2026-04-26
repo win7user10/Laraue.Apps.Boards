@@ -33,8 +33,11 @@ public static class WebApplicationBuilderExtensions
         {
             builder.Services
                 .AddSingleton<IDateTimeProvider, DateTimeProvider>()
+                .AddScoped<IAccessService, AccessService>()
                 .AddScoped<ICoreIssuesService, CoreIssuesService>()
+                .AddScoped<IIssuesAccessService, IssuesAccessService>()
                 .AddScoped<ICoreEpicsService, CoreEpicsService>()
+                .AddScoped<IEpicsAccessService, EpicsAccessService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
                 .AddScoped<ICoreUserPreferencesService, CoreUserPreferencesService>()
                 .AddScoped<ICoreSpacesService, CoreSpacesService>()

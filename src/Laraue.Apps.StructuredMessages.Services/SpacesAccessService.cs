@@ -23,7 +23,7 @@ public interface ISpacesAccessService
         CancellationToken cancellationToken);
 }
 
-public class SpacesAccessService(DatabaseContext context) : ISpacesAccessService
+public class SpacesAccessService(DatabaseContext context, IAccessService accessService) : ISpacesAccessService
 {
     public async Task<T> GetAvailable<T>(
         OrganizationAuthData authData,
@@ -32,27 +32,20 @@ public class SpacesAccessService(DatabaseContext context) : ISpacesAccessService
     {
         if (authData.OrganizationType is OrganizationType.Personal)
             return await map(GetAllSpacesQuery(authData));
-
-        var organizationPermission = await context.OrganizationUsers
-            .Where(o => o.OrganizationId == authData.OrganizationId)
-            .Where(o => o.UserId == authData.UserId)
-            .Select(o => o.AccessLevel)
-            .FirstOrDefaultAsyncEF(cancellationToken);
         
-        // The whole organization is available with all spaces
-        if (organizationPermission >= AccessLevel.Read)
+        var organizationPermission = await accessService
+            .GetGlobalOrganizationAccess(authData, cancellationToken);
+        
+        // The whole organization is available to read with all spaces
+        if (organizationPermission.HasFlag(AccessLevel.ReadItems))
             return await map(GetAllSpacesQuery(authData));
 
-        var globalSpacePermission = await context.SpaceOrganizationUsers
-            .Where(o => o.OrganizationUser!.OrganizationId == authData.OrganizationId)
-            .Where(o => o.OrganizationUser!.UserId == authData.UserId)
-            .Where(o => o.SpaceId == null)
-            .Select(o => new { o.AccessLevel })
-            .FirstOrDefaultAsyncEF(cancellationToken);
+        var globalSpacePermission = await accessService
+            .GetGlobalOrganizationAccess(authData, cancellationToken);
         
         // All spaces are available
-        if (globalSpacePermission is not null)
-            return await map(GetAllSpacesQuery(authData, globalSpacePermission.AccessLevel));
+        if (globalSpacePermission.HasFlag(AccessLevel.ReadItems))
+            return await map(GetAllSpacesQuery(authData, globalSpacePermission));
 
         // Part of spaces are available
         return await map(context.SpaceOrganizationUsers
@@ -65,7 +58,7 @@ public class SpacesAccessService(DatabaseContext context) : ISpacesAccessService
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)
-            .Select(s => new SpaceWithAccessLevel(s, s.IsDefault ? AccessLevel.Update : AccessLevel.Manage));
+            .Select(s => new SpaceWithAccessLevel(s, s.IsDefault ? AccessLevel.UpdateItems : AccessLevel.Manage));  // TODO - Incorrect, level can be inherited. Why manage???
     }
     
     private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData, AccessLevel accessLevel)

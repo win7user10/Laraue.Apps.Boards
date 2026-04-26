@@ -65,7 +65,7 @@ public class SpacesService(
         if (!await coreSpacesService.UserHasAccessToSpace(
             request.UserId,
             request.Id,
-            AccessLevel.Update,
+            AccessLevel.UpdateItems,
             cancellationToken))
             throw new NotFoundException($"Space is not found: {request.Id}");
 
@@ -82,7 +82,7 @@ public class SpacesService(
         if (!await coreSpacesService.UserHasAccessToSpace(
             request.UserId,
             request.Id,
-            AccessLevel.Delete,
+            AccessLevel.DeleteItems,
             cancellationToken))
             throw new NotFoundException($"Space is not found: {request.Id}");
         

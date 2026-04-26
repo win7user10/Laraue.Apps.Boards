@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -70,5 +71,14 @@ public class WebApiTestHostScope : IDisposable
         await Database.SaveChangesAsync();
         
         return user.Id;
+    }
+
+    public Task<Organization> InitializePersonalOrganization(Guid userId, DateTime? timestamp = null)
+    {
+        return new OrganizationInitializer(Database, userId)
+            .WithName("Personal")
+            .WithType(OrganizationType.Personal)
+            .WithTimestamp(timestamp ?? DateTime.UtcNow)
+            .Initialize();
     }
 }

@@ -41,7 +41,7 @@ public class UserPreferencesService(ICoreUserPreferencesService coreService, ICo
         if (value.HasValue && !await spacesService.UserHasAccessToSpace(
             userId,
             spaceId,
-            AccessLevel.Read,
+            AccessLevel.ReadItems,
             cancellationToken))
             return;
         
