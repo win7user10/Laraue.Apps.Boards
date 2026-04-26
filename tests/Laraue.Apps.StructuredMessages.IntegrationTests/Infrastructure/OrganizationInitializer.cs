@@ -17,6 +17,8 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     private DateTime _timestamp = DateTime.UtcNow;
     private OrganizationType _type = OrganizationType.Organization;
 
+    private List<SpaceBuilder> _spaces = new ();
+
     public OrganizationInitializer WithName(string name)
     {
         _organizationName = name;
@@ -53,6 +55,18 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             _organizationColor,
             _timestamp,
             _type);
+
+        foreach (var space in _spaces)
+        {
+            organization.Spaces!.Add(new Space
+            {
+                Name = space.SpaceName,
+                Color = space.SpaceColor,
+                CreatedAt = space.Timestamp,
+                UpdatedAt = space.Timestamp,
+                CreatorId = space.CreatorId,
+            });
+        }
 
         organization.Users = new List<OrganizationUser>();
         foreach (var user in _organizationUsers)
@@ -125,6 +139,16 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         return this;
     }
 
+    public OrganizationInitializer AddSpace(Guid creatorId, Action<SpaceBuilder> spaceBuilder)
+    {
+        var builder = new SpaceBuilder(creatorId, _timestamp);
+        spaceBuilder(builder);
+        
+        _spaces.Add(builder);
+
+        return this;
+    }
+
     public class PermissionBuilder
     {
         public AccessLevel OrganizationAccessLevel { get; private set; }
@@ -149,6 +173,35 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             EpicAccessLevels.TryAdd(0, new TestAccessLevels());
             EpicAccessLevels[0].DirectAccess[0] = accessLevel;
             
+            return this;
+        }
+    }
+
+    public class SpaceBuilder(Guid creatorId, DateTime timestamp)
+    {
+        public string SpaceName { get; private set; } = "AdditionalSpace";
+        public string SpaceColor { get; private set; }  = "#ffffff";
+        public DateTime Timestamp { get; private set; }  = timestamp;
+        public Guid CreatorId { get; private set; }  = creatorId;
+        
+        public SpaceBuilder WithName(string name)
+        {
+            SpaceName = name;
+
+            return this;
+        }
+        
+        public SpaceBuilder WithColor(string color)
+        {
+            SpaceColor = color;
+
+            return this;
+        }
+        
+        public SpaceBuilder WithTimestamp(DateTime timestamp)
+        {
+            Timestamp = timestamp;
+
             return this;
         }
     }

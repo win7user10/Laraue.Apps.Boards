@@ -1,8 +1,5 @@
 ﻿using System.Net;
-using Laraue.Apps.StructuredMessages.DataAccess.Enums;
-using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
-using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
@@ -13,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
     private readonly Proxy<OrganizationsController> _organizationsController = host.Controller<OrganizationsController>();
-    private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
+    private readonly Proxy<PersonalSpacesController> _spacesController = host.Controller<PersonalSpacesController>();
     
     [Fact]
     public async Task User_ShouldUpdatePersonalOrganization_Always()

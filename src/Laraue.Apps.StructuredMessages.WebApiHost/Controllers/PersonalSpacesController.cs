@@ -7,7 +7,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/spaces")]
-public class SpacesController(ISpacesService spacesService) : ControllerBase
+public class PersonalSpacesController(ISpacesService spacesService) : ControllerBase
 {
     [HttpPost]
     public Task<long> Create(
@@ -25,8 +25,8 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     [HttpPut("{id:long}")]
     public Task Update(
         long id,
-        [FromBody] EditSpaceRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateSpaceRequest request,
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Update(
             request with

@@ -17,7 +17,7 @@ public interface ISpacesService
         CancellationToken cancellationToken);
     
     Task Update(
-        EditSpaceRequest request,
+        UpdateSpaceRequest request,
         CancellationToken cancellationToken);
     
     Task Delete(
@@ -60,7 +60,7 @@ public class SpacesService(
             cancellationToken);
     }
 
-    public async Task Update(EditSpaceRequest request, CancellationToken cancellationToken)
+    public async Task Update(UpdateSpaceRequest request, CancellationToken cancellationToken)
     {
         if (!await coreSpacesService.UserHasAccessToSpace(
             request.UserId,
@@ -102,7 +102,7 @@ public record CreateSpaceRequest
     public required string Color { get; set; }
 }
 
-public record EditSpaceRequest
+public record UpdateSpaceRequest
 {
     public long Id { get; set; }
     public Guid UserId { get; set; }
