@@ -7,10 +7,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 
 public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 {
-    private readonly Dictionary<Guid, Action<PermissionBuilder>> _organizationUsers = new()
-    {
-        [ownerId] = builder => builder.SetOrganizationAccessLevel(AccessLevel.All)
-    };
+    private readonly Dictionary<Guid, Action<PermissionBuilder>> _organizationUsers = new();
     
     private string _organizationName = "TestOrganization";
     private string _organizationColor = "#ffffff";
@@ -65,10 +62,13 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
                 CreatedAt = space.Timestamp,
                 UpdatedAt = space.Timestamp,
                 CreatorId = space.CreatorId,
+                Epics = new List<Epic>
+                {
+                    OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
+                }
             });
         }
 
-        organization.Users = new List<OrganizationUser>();
         foreach (var user in _organizationUsers)
         {
             var builder = new PermissionBuilder();
@@ -77,10 +77,11 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             var organizationUser = new OrganizationUser
             {
                 AccessLevel = builder.OrganizationAccessLevel,
+                AdminAccessLevel = builder.OrganizationAdminAccessLevel,
                 UserId = user.Key
             };
             
-            organization.Users.Add(organizationUser);
+            organization.Users!.Add(organizationUser);
             
             // Set global space permissions
             context.Add(new SpaceOrganizationUser
@@ -139,6 +140,11 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         return this;
     }
 
+    public OrganizationInitializer AddSpace(Guid creatorId)
+    {
+        return AddSpace(creatorId, _ => {});
+    }
+
     public OrganizationInitializer AddSpace(Guid creatorId, Action<SpaceBuilder> spaceBuilder)
     {
         var builder = new SpaceBuilder(creatorId, _timestamp);
@@ -152,12 +158,19 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     public class PermissionBuilder
     {
         public AccessLevel OrganizationAccessLevel { get; private set; }
+        public AdminAccessLevel OrganizationAdminAccessLevel { get; private set; }
         public TestAccessLevels SpaceAccessLevels { get; private set; } = new();
         public Dictionary<int, TestAccessLevels> EpicAccessLevels { get; private set; } = new();
     
         public PermissionBuilder SetOrganizationAccessLevel(AccessLevel accessLevel)
         {
             OrganizationAccessLevel = accessLevel;
+            return this;
+        }
+        
+        public PermissionBuilder SetOrganizationAccessLevel(AdminAccessLevel adminAccessLevel)
+        {
+            OrganizationAdminAccessLevel = adminAccessLevel;
             return this;
         }
     

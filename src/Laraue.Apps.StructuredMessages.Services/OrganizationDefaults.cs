@@ -14,7 +14,8 @@ public class OrganizationDefaults
     {
         var organizationUser = new OrganizationUser
         {
-            AccessLevel = AccessLevel.ReadItems | AccessLevel.CreateItems | AccessLevel.UpdateItems | AccessLevel.DeleteItems | AccessLevel.Manage,
+            AccessLevel = AccessLevel.All,
+            AdminAccessLevel = AdminAccessLevel.All,
             UserId = userId,
         };
         
@@ -57,6 +58,20 @@ public class OrganizationDefaults
             UpdatedAt = timestamp,
             UserId = userId,
             IsDefault = true,
+            Statuses = new List<DataAccess.Models.Status>()
+            {
+                GetNewStatusEntity(),
+            }
+        };
+    }
+
+    public static DataAccess.Models.Status GetNewStatusEntity()
+    {
+        return new()
+        {
+            Name = "New",
+            Color = Palette.RandomColor(),
+            SortOrder = 0,
         };
     }
 }

@@ -27,7 +27,8 @@ public interface ISpacesService
 
 public class SpacesService(
     ICoreSpacesService coreSpacesService,
-    ISpacesAccessService spacesAccessService)
+    ISpacesAccessService spacesAccessService,
+    IOrganizationAccessService organizationAccessService)
     : ISpacesService
 {
     public async Task<SpaceDto[]> GetSpaces(
@@ -50,9 +51,14 @@ public class SpacesService(
         return spacesCount;
     }
 
-    public Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
+    public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
     {
-        return coreSpacesService.Create(
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AccessLevel.CreateItems,
+            cancellationToken);
+
+        return await coreSpacesService.Create(
             request.AuthData.OrganizationId,
             request.AuthData.UserId,
             request.Name,
@@ -62,12 +68,10 @@ public class SpacesService(
 
     public async Task Update(UpdateSpaceRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreSpacesService.UserHasAccessToSpace(
-            request.UserId,
-            request.Id,
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
             AccessLevel.UpdateItems,
-            cancellationToken))
-            throw new NotFoundException($"Space is not found: {request.Id}");
+            cancellationToken); // Wrong. Update should be available on space level (when managed is active??). It's strange
 
         await coreSpacesService.Update(
             request.Id,
@@ -79,12 +83,11 @@ public class SpacesService(
 
     public async Task Delete(DeleteSpaceRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreSpacesService.UserHasAccessToSpace(
-            request.UserId,
+        await spacesAccessService.HasAccessOrThrow(
+            request.AuthData,
             request.Id,
             AccessLevel.DeleteItems,
-            cancellationToken))
-            throw new NotFoundException($"Space is not found: {request.Id}");
+            cancellationToken);
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
     }
@@ -104,8 +107,9 @@ public record CreateSpaceRequest
 
 public record UpdateSpaceRequest
 {
+    public OrganizationAuthData AuthData { get; set; } = new();
+    
     public long Id { get; set; }
-    public Guid UserId { get; set; }
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -117,8 +121,8 @@ public record UpdateSpaceRequest
 
 public record DeleteSpaceRequest
 {
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
-    public Guid UserId { get; set; }
 }
 
 public record GetSpacesRequest

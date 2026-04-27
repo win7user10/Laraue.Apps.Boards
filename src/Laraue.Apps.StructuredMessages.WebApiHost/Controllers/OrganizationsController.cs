@@ -101,7 +101,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             new GetUserPermissionsRequest
             {
                 OrganizationUserId = organizationUserId,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -116,7 +116,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
         return organizationsService.SetUserPermissions(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
                 OrganizationUserId = organizationUserId
             },
             cancellationToken);

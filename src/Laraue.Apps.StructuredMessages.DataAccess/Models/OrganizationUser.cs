@@ -13,4 +13,5 @@ public class OrganizationUser
     public User? User { get; set; }
     
     public AccessLevel AccessLevel { get; set; }
+    public AdminAccessLevel AdminAccessLevel { get; set; }
 }

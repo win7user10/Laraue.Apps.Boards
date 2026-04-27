@@ -72,4 +72,27 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
     }
+    
+    [Fact]
+    public async Task User_ShouldDeletePersonalSpace_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        
+        var organization = await new OrganizationInitializer(testScope.Database, userId)
+            .WithType(OrganizationType.Personal)
+            .AddSpace(userId)
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        await _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Delete(spaceId));
+
+        var spaces = await testScope.Database.Spaces.ToListAsyncEF();
+        
+        var space = spaces.FirstOrDefault(x => x.Id == spaceId);
+        Assert.Null(space);
+    }
 }

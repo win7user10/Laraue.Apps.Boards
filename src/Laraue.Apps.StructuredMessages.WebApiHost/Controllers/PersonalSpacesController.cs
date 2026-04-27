@@ -32,7 +32,7 @@ public class PersonalSpacesController(ISpacesService spacesService) : Controller
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -40,13 +40,13 @@ public class PersonalSpacesController(ISpacesService spacesService) : Controller
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Delete(
             new DeleteSpaceRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

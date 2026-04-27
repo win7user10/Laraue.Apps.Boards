@@ -8,6 +8,5 @@ public enum AccessLevel : byte
     CreateItems = 2,
     UpdateItems = 4,
     DeleteItems = 8,
-    Manage = 16,
-    All = ReadItems | CreateItems | UpdateItems | DeleteItems | Manage
+    All = ReadItems | CreateItems | UpdateItems | DeleteItems
 }

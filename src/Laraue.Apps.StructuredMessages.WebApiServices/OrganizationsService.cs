@@ -69,7 +69,7 @@ public class OrganizationsService(
     {
         var allOrganizations = await organizationAccessService.GetAvailable(
             request.UserId,
-            organizations => organizations
+            organizationUsers => organizationUsers
                 .OrderByDescending(x => x.Organization!.Type)
                 .ThenBy(x => x.Organization!.Name)
                 .Select(x => new OrganizationDto
@@ -80,28 +80,30 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     SpacesCount = x.Organization.Spaces!.Count,
                     IsPersonal = x.Organization.Type == OrganizationType.Personal,
+                    AdminAccessLevel = x.AdminAccessLevel,
                 })
                 .ToListAsyncEF(cancellationToken));
 
         return allOrganizations.ToArray();
     }
 
-    public async Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
+    public Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
     {
-        return await context.Organizations
-            .Where(o => o.Id == request.AuthData.OrganizationId)
-            .Select(x => new OrganizationDto
-            {
-                Id = x.Id,
-                AccessLevel = x.Users!.FirstOrDefault(u => u.UserId == request.AuthData.UserId) != null
-                    ? x.Users!.FirstOrDefault(u => u.UserId == request.AuthData.UserId)!.AccessLevel
-                    : AccessLevel.Manage,
-                Name = x.Name,
-                Color = x.Color,
-                SpacesCount = x.Spaces!.Count,
-                IsPersonal = x.Type == OrganizationType.Personal,
-            })
-            .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken);
+        return organizationAccessService.GetAvailable(
+            request.AuthData.UserId,
+            organizations => organizations
+                .Where(o => o.Id == request.AuthData.OrganizationId)
+                .Select(x => new OrganizationDto
+                {
+                    Id = x.Organization!.Id,
+                    AccessLevel = x.AccessLevel,
+                    Name = x.Organization.Name,
+                    Color = x.Organization.Color,
+                    SpacesCount = x.Organization.Spaces!.Count,
+                    IsPersonal = x.Organization.Type == OrganizationType.Personal,
+                    AdminAccessLevel = x.AdminAccessLevel,
+                })
+                .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -116,9 +118,12 @@ public class OrganizationsService(
     public async Task Update(EditOrganizationRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
-            request.UserId,
-            request.Id,
-            AccessLevel.Manage,
+            new OrganizationAuthData
+            {
+                OrganizationId = request.Id,
+                UserId = request.UserId,
+            },
+            AdminAccessLevel.UpdateOrganization,
             cancellationToken);
 
         await coreOrganizationsService.Update(
@@ -132,9 +137,12 @@ public class OrganizationsService(
     public async Task Delete(DeleteOrganizationRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
-            request.UserId,
-            request.Id,
-            AccessLevel.Manage,
+            new OrganizationAuthData
+            {
+                OrganizationId = request.Id,
+                UserId = request.UserId,
+            },
+            AdminAccessLevel.DeleteOrganization,
             cancellationToken);
         
         await coreOrganizationsService.Delete(request.Id, cancellationToken);
@@ -166,13 +174,13 @@ public class OrganizationsService(
         // TODO - check that passed permissions are correct, check access to passed items
         var organizationUser = await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
+            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
             .Select(x => new { x.OrganizationId })
             .FirstOrThrowNotFoundEFAsync($"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
         await organizationAccessService.HasAccessOrThrow(
-            request.UserId,
-            organizationUser.OrganizationId,
-            AccessLevel.Manage,
+            request.AuthData,
+            AdminAccessLevel.ManagePermissions,
             cancellationToken);
         
         await coreOrganizationsService.SetUserPermissions(
@@ -183,16 +191,16 @@ public class OrganizationsService(
 
     public async Task<UserPermissions> GetUserPermissions(GetUserPermissionsRequest request, CancellationToken cancellationToken)
     {
-        var organizationUser = await context.OrganizationUsers
-            .Where(x => x.Id == request.OrganizationUserId)
-            .Select(x => new { x.OrganizationId })
-            .FirstOrThrowNotFoundEFAsync($"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
-        
         await organizationAccessService.HasAccessOrThrow(
-            request.UserId,
-            organizationUser.OrganizationId,
-            AccessLevel.Manage,
+            request.AuthData,
+            AdminAccessLevel.ManagePermissions,
             cancellationToken);
+        
+        await context.OrganizationUsers
+            .Where(x => x.Id == request.OrganizationUserId)
+            .AnyOrThrowNotFoundEFAsync(
+                x => x.OrganizationId == request.AuthData.OrganizationId,
+                $"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
         return await coreOrganizationsService.GetUserPermissions(
             request.OrganizationUserId,
@@ -202,9 +210,12 @@ public class OrganizationsService(
     public async Task<string> Login(LoginRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
-            request.UserId,
-            request.OrganizationId,
-            AccessLevel.ReadItems,
+            new OrganizationAuthData
+            {
+                OrganizationId = request.OrganizationId,
+                UserId = request.UserId,
+            },
+            AccessLevel.None,
             cancellationToken);
 
         return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
@@ -215,8 +226,7 @@ public class OrganizationsService(
         CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
-            request.AuthData.UserId,
-            request.AuthData.OrganizationId,
+            request.AuthData,
             AccessLevel.ReadItems,
             cancellationToken);
 
@@ -251,9 +261,8 @@ public class OrganizationsService(
         CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
-            request.AuthData.UserId,
-            request.AuthData.OrganizationId,
-            AccessLevel.Manage,
+            request.AuthData,
+            AdminAccessLevel.ManagePermissions,
             cancellationToken);
 
         return await coreOrganizationsService.GetPermittableEntities(
@@ -310,6 +319,7 @@ public record OrganizationDto
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
     public required AccessLevel AccessLevel { get; set; }
+    public required AdminAccessLevel AdminAccessLevel { get; set; }
     public required bool IsPersonal { get; set; }
 }
 
@@ -321,14 +331,14 @@ public record JoinOrganizationRequest
 
 public record SetPermissionsRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long OrganizationUserId { get; set; }
     public required UserPermissions UserPermissions { get; set; }
 }
 
 public record GetUserPermissionsRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new ();
     public long OrganizationUserId { get; set; }
 }
 

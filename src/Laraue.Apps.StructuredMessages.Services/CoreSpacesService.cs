@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DateTime.Services.Abstractions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -87,10 +88,31 @@ public class CoreSpacesService(
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        var defaultSpace = await context.Spaces
+            .Where(x => x.Id == id)
+            .Select(x => x.Organization!)
+            .Select(o => o.Spaces!.First(y => y.IsDefault))
+            .Select(s => new
+            {
+                SpaceId = s.Id, 
+                NewStatusId = (long?)s.Epics!.FirstOrDefault(e => e.IsDefault)!.Statuses!.OrderBy(o => o.SortOrder).FirstOrDefault()!.Id, // Status should be taken from FE in future iterations
+            })
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        if (defaultSpace is null)
+            throw new NotFoundException($"Default Organization Space for Space:{id} is not found");
+            
+        if (defaultSpace.SpaceId == id)
+            throw new BadRequestException(nameof(id), $"Removing default Space:{id} is not allowed");
+        
+        // The situation should not happen in real App as soon as Backlog Epic is always required for Space. This line will be dropped when status id will be taken from FE. 
+        if (defaultSpace.NewStatusId is null)
+            throw new BadRequestException(nameof(id), $"Backlog or default status for Backlog was not found in Default Space to move issues from deleting Space:{id}");
+        
         await context.Issues
             .Where(x => x.Status!.Epic!.SpaceId == id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.StatusId, null),
+                .SetProperty(p => p.StatusId, defaultSpace.NewStatusId),
                 cancellationToken);
         
         await context.Statuses

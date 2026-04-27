@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
@@ -13,9 +14,13 @@ public interface IOrganizationAccessService
         Func<IQueryable<OrganizationUser>, Task<T>> map);
     
     Task HasAccessOrThrow(
-        Guid userId,
-        long organizationId,
+        OrganizationAuthData authData,
         AccessLevel accessLevel,
+        CancellationToken cancellationToken);
+    
+    Task HasAccessOrThrow(
+        OrganizationAuthData authData,
+        AdminAccessLevel accessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -30,16 +35,28 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
     }
 
     public async Task HasAccessOrThrow(
-        Guid userId,
-        long organizationId,
+        OrganizationAuthData authData,
         AccessLevel accessLevel,
         CancellationToken cancellationToken)
     {
-        var hasAccess = await HasAccess(userId, organizationId, accessLevel, cancellationToken);
+        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, accessLevel, cancellationToken);
         if (!hasAccess)
-            throw new NotFoundException($"Organization: {organizationId} or permissions: {accessLevel} is not allowed");
+            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {accessLevel} is missing");
     }
-    
+
+    public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)
+    {
+        var result = await GetAvailable(authData.UserId, (organizationUsers) =>
+        {
+            return organizationUsers
+                .Where(ou => ou.OrganizationId == authData.OrganizationId)
+                .AnyAsyncEF(ou => ou.AdminAccessLevel.HasFlag(accessLevel), cancellationToken);
+        });
+        
+        if (!result)
+            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {accessLevel} is missing");
+    }
+
     private Task<bool> HasAccess(
         Guid userId,
         long organizationId,

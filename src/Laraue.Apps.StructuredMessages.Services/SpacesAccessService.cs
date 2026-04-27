@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
@@ -17,7 +18,7 @@ public interface ISpacesAccessService
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
-        Guid userId,
+        OrganizationAuthData authData,
         long spaceId,
         AccessLevel accessLevel,
         CancellationToken cancellationToken);
@@ -31,46 +32,61 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         CancellationToken cancellationToken)
     {
         if (authData.OrganizationType is OrganizationType.Personal)
-            return await map(GetAllSpacesQuery(authData));
+            return await map(GetPersonalSpacesQuery(authData));
         
-        var organizationPermission = await accessService
+        var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
-        
-        // The whole organization is available to read with all spaces
-        if (organizationPermission.HasFlag(AccessLevel.ReadItems))
-            return await map(GetAllSpacesQuery(authData));
 
-        var globalSpacePermission = await accessService
+        var globalSpaceAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
-        
-        // All spaces are available
-        if (globalSpacePermission.HasFlag(AccessLevel.ReadItems))
-            return await map(GetAllSpacesQuery(authData, globalSpacePermission));
 
-        // Part of spaces are available
-        return await map(context.SpaceOrganizationUsers
-            .Where(o => o.OrganizationUser!.OrganizationId == authData.OrganizationId)
-            .Where(o => o.OrganizationUser!.UserId == authData.UserId)
-            .Select(o => new SpaceWithAccessLevel(o.Space!, o.AccessLevel)));
+        var topLevelAccess = globalOrganizationAccess & globalSpaceAccess;
+        return await map(GetAllSpacesQuery(authData, topLevelAccess));
     }
 
-    private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData)
+    public async Task HasAccessOrThrow(
+        OrganizationAuthData authData,
+        long spaceId,
+        AccessLevel accessLevel,
+        CancellationToken cancellationToken)
+    {
+        if (authData.OrganizationType is OrganizationType.Personal)
+            return;
+        
+        var globalOrganizationAccess = await accessService
+            .GetGlobalOrganizationAccess(authData, cancellationToken);
+        
+        if (globalOrganizationAccess.HasFlag(accessLevel))
+            return;
+        
+        var globalSpaceAccess = await accessService
+            .GetGlobalOrganizationAccess(authData, cancellationToken);
+        
+        if (globalSpaceAccess.HasFlag(accessLevel))
+            return;
+
+        await context.SpaceOrganizationUsers
+            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
+            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
+            .AnyOrThrowNotFoundEFAsync(
+                sos => sos.AccessLevel.HasFlag(accessLevel),
+                $"Space: {spaceId} is unavailable or permission: {accessLevel} is missing",
+                cancellationToken);
+    }
+
+    private IQueryable<SpaceWithAccessLevel> GetPersonalSpacesQuery(OrganizationAuthData authData)
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)
-            .Select(s => new SpaceWithAccessLevel(s, s.IsDefault ? AccessLevel.UpdateItems : AccessLevel.Manage));  // TODO - Incorrect, level can be inherited. Why manage???
+            .Select(s => new SpaceWithAccessLevel(s, AccessLevel.All));
     }
     
-    private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData, AccessLevel accessLevel)
+    private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData, AccessLevel topLevelAccess)
     {
-        return context.Spaces
-            .Where(s => s.OrganizationId == authData.OrganizationId)
-            .Select(s => new SpaceWithAccessLevel(s, accessLevel));
-    }
-
-    public Task HasAccessOrThrow(Guid userId, long spaceId, AccessLevel accessLevel, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
+        return context.SpaceOrganizationUsers
+            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
+            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
+            .Select(sos => new SpaceWithAccessLevel(sos.Space!, topLevelAccess & sos.AccessLevel));
     }
 }
 
