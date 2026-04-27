@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -35,7 +34,7 @@ public class SpacesService(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        var spacesCount = await spacesAccessService.GetAvailable(
+        var spaces = await spacesAccessService.GetAvailable(
             request.AuthData,
             items => items
                 .Select(x => new SpaceDto
@@ -48,7 +47,7 @@ public class SpacesService(
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
         
-        return spacesCount;
+        return spaces;
     }
 
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)

@@ -31,11 +31,11 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         Func<IQueryable<SpaceWithAccessLevel>, Task<T>> map,
         CancellationToken cancellationToken)
     {
-        if (authData.OrganizationType is OrganizationType.Personal)
-            return await map(GetPersonalSpacesQuery(authData));
-        
         var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
+        
+        if (globalOrganizationAccess == AccessLevel.All)
+            return await map(GetFullAccessSpacesQuery(authData));
 
         var globalSpaceAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
@@ -50,9 +50,6 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         AccessLevel accessLevel,
         CancellationToken cancellationToken)
     {
-        if (authData.OrganizationType is OrganizationType.Personal)
-            return;
-        
         var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
@@ -74,7 +71,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
                 cancellationToken);
     }
 
-    private IQueryable<SpaceWithAccessLevel> GetPersonalSpacesQuery(OrganizationAuthData authData)
+    private IQueryable<SpaceWithAccessLevel> GetFullAccessSpacesQuery(OrganizationAuthData authData)
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)

@@ -28,15 +28,15 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         OrganizationAuthData authData,
         Func<IQueryable<Epic>, Task<T>> map, CancellationToken cancellationToken)
     {
-        if (authData.OrganizationType is OrganizationType.Personal)
-            return await map(GetAllEpicsQuery(authData, AccessLevel.All));
-        
-        var organizationPermission = await accessService
+        var globalOrganizationPermission = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
+        if (globalOrganizationPermission == AccessLevel.All)
+            return await map(GetAllEpicsQuery(authData, AccessLevel.All));
+        
         // All organization is available to read at least
-        if (organizationPermission.HasFlag(AccessLevel.ReadItems))
-            return await map(GetAllEpicsQuery(authData, organizationPermission));
+        if (globalOrganizationPermission.HasFlag(AccessLevel.ReadItems))
+            return await map(GetAllEpicsQuery(authData, globalOrganizationPermission));
 
         var globalSpacePermission = await accessService
             .GetGlobalSpacesAccess(authData, cancellationToken);
