@@ -76,7 +76,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
             var organizationUser = new OrganizationUser
             {
-                AccessLevel = builder.OrganizationAccessLevel,
+                ItemsAccessLevel = builder.OrganizationItemsAccessLevel,
                 AdminAccessLevel = builder.OrganizationAdminAccessLevel,
                 UserId = user.Key
             };
@@ -86,7 +86,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             // Set global space permissions
             context.Add(new SpaceOrganizationUser
             {
-                AccessLevel = builder.SpaceAccessLevels.AccessLevel,
+                ItemsAccessLevel = builder.SpaceAccessLevels.ItemsAccessLevel,
                 OrganizationUser = organizationUser
             });
             
@@ -98,7 +98,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
                 {
                     new()
                     {
-                        AccessLevel = accessLevel.Value,
+                        ItemsAccessLevel = accessLevel.Value,
                         OrganizationUser = organizationUser,
                     }
                 };
@@ -114,7 +114,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
                     {
                         new()
                         {
-                            AccessLevel = epicAccessLevels.Value,
+                            ItemsAccessLevel = epicAccessLevels.Value,
                             OrganizationUser = organizationUser,
                         }
                     };
@@ -157,14 +157,14 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
     public class PermissionBuilder
     {
-        public AccessLevel OrganizationAccessLevel { get; private set; }
+        public ItemsAccessLevel OrganizationItemsAccessLevel { get; private set; }
         public AdminAccessLevel OrganizationAdminAccessLevel { get; private set; }
         public TestAccessLevels SpaceAccessLevels { get; private set; } = new();
         public Dictionary<int, TestAccessLevels> EpicAccessLevels { get; private set; } = new();
     
-        public PermissionBuilder SetOrganizationAccessLevel(AccessLevel accessLevel)
+        public PermissionBuilder SetOrganizationAccessLevel(ItemsAccessLevel itemsAccessLevel)
         {
-            OrganizationAccessLevel = accessLevel;
+            OrganizationItemsAccessLevel = itemsAccessLevel;
             return this;
         }
         
@@ -174,17 +174,17 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             return this;
         }
     
-        public PermissionBuilder SetSpacesAccessLevel(AccessLevel accessLevel)
+        public PermissionBuilder SetSpacesAccessLevel(ItemsAccessLevel itemsAccessLevel)
         {
-            SpaceAccessLevels.AccessLevel = accessLevel;
+            SpaceAccessLevels.ItemsAccessLevel = itemsAccessLevel;
             
             return this;
         }
     
-        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(AccessLevel accessLevel)
+        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(ItemsAccessLevel itemsAccessLevel)
         {
             EpicAccessLevels.TryAdd(0, new TestAccessLevels());
-            EpicAccessLevels[0].DirectAccess[0] = accessLevel;
+            EpicAccessLevels[0].DirectAccess[0] = itemsAccessLevel;
             
             return this;
         }
@@ -221,7 +221,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
     public class TestAccessLevels
     {
-        public AccessLevel AccessLevel { get; set; }
-        public Dictionary<int, AccessLevel> DirectAccess { get; set; } = new();
+        public ItemsAccessLevel ItemsAccessLevel { get; set; }
+        public Dictionary<int, ItemsAccessLevel> DirectAccess { get; set; } = new();
     }
 }

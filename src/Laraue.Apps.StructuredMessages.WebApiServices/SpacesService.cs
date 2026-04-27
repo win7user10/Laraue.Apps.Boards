@@ -54,7 +54,7 @@ public class SpacesService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AccessLevel.CreateItems,
+            ItemsAccessLevel.Create,
             cancellationToken);
 
         return await coreSpacesService.Create(
@@ -69,7 +69,7 @@ public class SpacesService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AccessLevel.UpdateItems,
+            ItemsAccessLevel.Update,
             cancellationToken); // Wrong. Update should be available on space level (when managed is active??). It's strange
 
         await coreSpacesService.Update(
@@ -85,7 +85,7 @@ public class SpacesService(
         await spacesAccessService.HasAccessOrThrow(
             request.AuthData,
             request.Id,
-            AccessLevel.DeleteItems,
+            ItemsAccessLevel.Delete,
             cancellationToken);
         
         await coreSpacesService.Delete(request.Id, cancellationToken);

@@ -15,5 +15,5 @@ public class SpaceOrganizationUser
     public long OrganizationUserId { get; set; }
     public OrganizationUser? OrganizationUser { get; set; }
     
-    public AccessLevel AccessLevel { get; set; }
+    public ItemsAccessLevel ItemsAccessLevel { get; set; }
 }

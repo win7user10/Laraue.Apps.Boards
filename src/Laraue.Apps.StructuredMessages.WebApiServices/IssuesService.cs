@@ -277,7 +277,7 @@ public class IssuesService(
         if (!await epicsService.UserHasAccessToEpic(request.UserId, validationData.EpicId, ct))
             throw new NotFoundException($"Status: {request.StatusId} is not found");
         
-        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, AccessLevel.CreateItems, ct))
+        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, ItemsAccessLevel.Create, ct))
             throw new NotFoundException($"Status: {request.StatusId} is not found");
 
         return await messageService.Create(

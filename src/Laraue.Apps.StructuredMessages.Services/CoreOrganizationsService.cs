@@ -156,7 +156,7 @@ public class CoreOrganizationsService(
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.AccessLevel, userPermissions.OrganizationAccessLevel),
+                .SetProperty(p => p.ItemsAccessLevel, userPermissions.OrganizationItemsAccessLevel),
                 cancellationToken);
 
         // Set spaces permissions
@@ -170,7 +170,7 @@ public class CoreOrganizationsService(
             var spacePermissions = spaceLevels.DirectAccess
                 .Select(x => new SpaceOrganizationUser
                 {
-                    AccessLevel = x.Value,
+                    ItemsAccessLevel = x.Value,
                     OrganizationUserId = organizationUserId,
                     SpaceId = x.Key,
                 });
@@ -181,7 +181,7 @@ public class CoreOrganizationsService(
         {
             var spacePermission = new SpaceOrganizationUser
             {
-                AccessLevel = spaceLevels.AccessLevel,
+                ItemsAccessLevel = spaceLevels.ItemsAccessLevel,
                 OrganizationUserId = organizationUserId,
                 SpaceId = null,
             };
@@ -200,7 +200,7 @@ public class CoreOrganizationsService(
             var epicPermissions = epicLevels.DirectAccess
                 .Select(x => new EpicOrganizationUser
                 {
-                    AccessLevel = x.Value,
+                    ItemsAccessLevel = x.Value,
                     OrganizationUserId = organizationUserId,
                     EpicId = x.Key,
                 });
@@ -211,7 +211,7 @@ public class CoreOrganizationsService(
         {
             var epicPermission = new EpicOrganizationUser
             {
-                AccessLevel = epicLevels.AccessLevel,
+                ItemsAccessLevel = epicLevels.ItemsAccessLevel,
                 OrganizationUserId = organizationUserId,
                 EpicId = null,
             };
@@ -227,17 +227,17 @@ public class CoreOrganizationsService(
     {
         var organizationAccessLevel = await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
-            .Select(x => x.AccessLevel)
+            .Select(x => x.ItemsAccessLevel)
             .FirstOrDefaultAsyncEF(cancellationToken);
         
         var spacePermissions = await context.SpaceOrganizationUsers
             .Where(x => x.OrganizationUserId == organizationUserId)
-            .Select(x => new { x.SpaceId, x.AccessLevel })
+            .Select(x => new { x.SpaceId, AccessLevel = x.ItemsAccessLevel })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicPermissions = await context.EpicOrganizationUsers
             .Where(x => x.OrganizationUserId == organizationUserId)
-            .Select(x => new { x.EpicId, x.AccessLevel })
+            .Select(x => new { x.EpicId, AccessLevel = x.ItemsAccessLevel })
             .ToArrayAsyncEF(cancellationToken);
 
         var spaceAccessLevels = ToAccessLevels(
@@ -252,7 +252,7 @@ public class CoreOrganizationsService(
         
         return new UserPermissions
         {
-            OrganizationAccessLevel = organizationAccessLevel,
+            OrganizationItemsAccessLevel = organizationAccessLevel,
             SpacesAccessLevels = spaceAccessLevels,
             EpicsAccessLevels = epicAccessLevels,
         };
@@ -284,13 +284,13 @@ public class CoreOrganizationsService(
             .ToArray();
     }
 
-    private static AccessLevels ToAccessLevels<T>(T[] permissions, Func<T, long?> getItemId, Func<T, AccessLevel> getAccessLevel)
+    private static AccessLevels ToAccessLevels<T>(T[] permissions, Func<T, long?> getItemId, Func<T, ItemsAccessLevel> getAccessLevel)
     {
         if (permissions.Length == 0)
             return new AccessLevels();
         
         if (permissions.Length == 1 && getItemId(permissions[0]) is null)
-            return new AccessLevels { AccessLevel = getAccessLevel(permissions[0]) };
+            return new AccessLevels { ItemsAccessLevel = getAccessLevel(permissions[0]) };
 
         return new AccessLevels
         {
@@ -302,7 +302,7 @@ public class CoreOrganizationsService(
 
 public record UserPermissions
 {
-    public AccessLevel OrganizationAccessLevel { get; set; }
+    public ItemsAccessLevel OrganizationItemsAccessLevel { get; set; }
     public required AccessLevels SpacesAccessLevels { get; set; }
     public required AccessLevels EpicsAccessLevels { get; set; }
 }
@@ -312,8 +312,8 @@ public record UserPermissions
 /// </summary>
 public record AccessLevels
 {
-    public AccessLevel AccessLevel { get; init; }
-    public Dictionary<long, AccessLevel>? DirectAccess { get; init; }
+    public ItemsAccessLevel ItemsAccessLevel { get; init; }
+    public Dictionary<long, ItemsAccessLevel>? DirectAccess { get; init; }
 }
 
 public record PermittableSpace(long Id, string Name, Dictionary<long, string> Epics);

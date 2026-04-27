@@ -12,6 +12,6 @@ public class OrganizationUser
     public Guid UserId { get; set; }
     public User? User { get; set; }
     
-    public AccessLevel AccessLevel { get; set; }
+    public ItemsAccessLevel ItemsAccessLevel { get; set; }
     public AdminAccessLevel AdminAccessLevel { get; set; }
 }

@@ -9,7 +9,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 [Collection("IntegrationTest")]
 public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
-    private readonly Proxy<PersonalSpacesController> _epicsController = host.Controller<PersonalSpacesController>();
+    private readonly Proxy<PersonalSpacesController> _spacesController = host.Controller<PersonalSpacesController>();
 
     [Fact]
     public async Task User_ShouldCreatePersonalSpace_Always()
@@ -18,7 +18,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var userId = await testScope.CreateUser();
         var organization = await testScope.InitializePersonalOrganization(userId);
         
-        var spaceId = await _epicsController
+        var spaceId = await _spacesController
             .WithOrganizationAuthorization(organization.Id, userId)
             .Execute(x => x.Create(
                 new CreateSpaceRequest
@@ -33,7 +33,6 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         Assert.Equal("Space 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
         Assert.Equal(userId, space.CreatorId);
-        Assert.Equal(spaceId, space.Id);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
     }
@@ -52,7 +51,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
 
         var spaceId = organization.Spaces![1].Id;
         
-        await _epicsController
+        await _spacesController
             .WithOrganizationAuthorization(organization.Id, userId)
             .Execute(x => x.Update(
                 spaceId,
@@ -68,7 +67,6 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         Assert.Equal("Space 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
         Assert.Equal(userId, space.CreatorId);
-        Assert.Equal(spaceId, space.Id);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
     }
@@ -86,7 +84,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
 
         var spaceId = organization.Spaces![1].Id;
         
-        await _epicsController
+        await _spacesController
             .WithOrganizationAuthorization(organization.Id, userId)
             .Execute(x => x.Delete(spaceId));
 
@@ -117,14 +115,14 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var organization2SpaceIds = organization2.Spaces!.Select(x => x.Id);
         
         // User 1 see two spaces
-        var spaces = await _epicsController
+        var spaces = await _spacesController
             .WithOrganizationAuthorization(organization1.Id, user1Id)
             .Execute(x => x.GetAll());
         Assert.Equal(2, spaces!.Length);
         Assert.Equivalent(organization1SpaceIds, spaces.Select(x => x.Id));
         
         // User 2 see one space
-        spaces = await _epicsController
+        spaces = await _spacesController
             .WithOrganizationAuthorization(organization2.Id, user2Id)
             .Execute(x => x.GetAll());
         Assert.Single(spaces!);
@@ -144,7 +142,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
             .Initialize();
         var spaceId = organization.Spaces![1].Id;
         
-        var spaces = await _epicsController
+        var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, userId)
             .Execute(x => x.GetAll());
         

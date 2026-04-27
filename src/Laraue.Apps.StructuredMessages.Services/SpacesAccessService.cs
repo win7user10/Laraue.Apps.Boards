@@ -20,7 +20,7 @@ public interface ISpacesAccessService
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long spaceId,
-        AccessLevel accessLevel,
+        ItemsAccessLevel itemsAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -34,7 +34,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
-        if (globalOrganizationAccess == AccessLevel.All)
+        if (globalOrganizationAccess == ItemsAccessLevel.All)
             return await map(GetFullAccessSpacesQuery(authData));
 
         var globalSpaceAccess = await accessService
@@ -47,27 +47,27 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
     public async Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long spaceId,
-        AccessLevel accessLevel,
+        ItemsAccessLevel itemsAccessLevel,
         CancellationToken cancellationToken)
     {
         var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
-        if (globalOrganizationAccess.HasFlag(accessLevel))
+        if (globalOrganizationAccess.HasFlag(itemsAccessLevel))
             return;
         
         var globalSpaceAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
-        if (globalSpaceAccess.HasFlag(accessLevel))
+        if (globalSpaceAccess.HasFlag(itemsAccessLevel))
             return;
 
         await context.SpaceOrganizationUsers
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .AnyOrThrowNotFoundEFAsync(
-                sos => sos.AccessLevel.HasFlag(accessLevel),
-                $"Space: {spaceId} is unavailable or permission: {accessLevel} is missing",
+                sos => sos.ItemsAccessLevel.HasFlag(itemsAccessLevel),
+                $"Space: {spaceId} is unavailable or permission: {itemsAccessLevel} is missing",
                 cancellationToken);
     }
 
@@ -75,16 +75,16 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)
-            .Select(s => new SpaceWithAccessLevel(s, AccessLevel.All));
+            .Select(s => new SpaceWithAccessLevel(s, ItemsAccessLevel.All));
     }
     
-    private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData, AccessLevel topLevelAccess)
+    private IQueryable<SpaceWithAccessLevel> GetAllSpacesQuery(OrganizationAuthData authData, ItemsAccessLevel topLevelItemsAccess)
     {
         return context.SpaceOrganizationUsers
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Select(sos => new SpaceWithAccessLevel(sos.Space!, topLevelAccess & sos.AccessLevel));
+            .Select(sos => new SpaceWithAccessLevel(sos.Space!, topLevelItemsAccess & sos.ItemsAccessLevel));
     }
 }
 
-public record SpaceWithAccessLevel(Space Space, AccessLevel AccessLevel);
+public record SpaceWithAccessLevel(Space Space, ItemsAccessLevel ItemsAccessLevel);

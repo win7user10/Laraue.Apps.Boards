@@ -1,7 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
-using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
@@ -15,7 +14,7 @@ public interface IOrganizationAccessService
     
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
-        AccessLevel accessLevel,
+        ItemsAccessLevel itemsAccessLevel,
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
@@ -36,12 +35,12 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
 
     public async Task HasAccessOrThrow(
         OrganizationAuthData authData,
-        AccessLevel accessLevel,
+        ItemsAccessLevel itemsAccessLevel,
         CancellationToken cancellationToken)
     {
-        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, accessLevel, cancellationToken);
+        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, itemsAccessLevel, cancellationToken);
         if (!hasAccess)
-            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {accessLevel} is missing");
+            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {itemsAccessLevel} is missing");
     }
 
     public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)
@@ -60,14 +59,14 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
     private Task<bool> HasAccess(
         Guid userId,
         long organizationId,
-        AccessLevel accessLevel,
+        ItemsAccessLevel itemsAccessLevel,
         CancellationToken cancellationToken)
     {
         return GetAvailable(userId, organizations =>
         {
             return organizations
                 .Where(x => x.OrganizationId == organizationId)
-                .AnyAsyncEF(x => x.AccessLevel.HasFlag(accessLevel), cancellationToken);
+                .AnyAsyncEF(x => x.ItemsAccessLevel.HasFlag(itemsAccessLevel), cancellationToken);
         });
     }
 }
