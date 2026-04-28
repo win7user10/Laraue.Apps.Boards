@@ -27,7 +27,7 @@ public interface IEpicsService
         CancellationToken cancellationToken);
     
     Task Edit(
-        EditCategoryRequest request,
+        UpdateEpicRequest request,
         CancellationToken cancellationToken);
     
     Task Delete(
@@ -132,7 +132,7 @@ public class EpicsService(
             cancellationToken);
     }
 
-    public async Task Edit(EditCategoryRequest request, CancellationToken cancellationToken)
+    public async Task Edit(UpdateEpicRequest request, CancellationToken cancellationToken)
     {
         if (!await coreEpicsService
             .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
@@ -215,7 +215,7 @@ public record ChangeStatusesOrderRequest
     public required IReadOnlyDictionary<long, int> Order { get; set; }
 }
 
-public record EditCategoryRequest
+public record UpdateEpicRequest
 {
     public Guid UserId { get; set; }
     

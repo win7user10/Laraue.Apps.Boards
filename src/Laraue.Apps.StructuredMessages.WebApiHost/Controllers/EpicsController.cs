@@ -63,9 +63,9 @@ public class EpicsController(IEpicsService categoriesService)
     }
     
     [HttpPut("{id:long}")]
-    public Task Edit(
+    public Task Update(
         long id,
-        [FromBody] EditCategoryRequest request,
+        [FromBody] UpdateEpicRequest request,
         CancellationToken cancellationToken = default)
     {
         return categoriesService.Edit(

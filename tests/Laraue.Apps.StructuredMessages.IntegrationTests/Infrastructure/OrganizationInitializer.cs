@@ -55,7 +55,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
         foreach (var space in _spaces)
         {
-            organization.Spaces!.Add(new Space
+            var spaceEntity = new Space
             {
                 Name = space.SpaceName,
                 Color = space.SpaceColor,
@@ -66,7 +66,22 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
                 {
                     OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
                 }
-            });
+            };
+
+            foreach (var epic in space.Epics)
+            {
+                spaceEntity.Epics.Add(new Epic
+                {
+                    Name = epic.EpicName,
+                    Color = epic.EpicColor,
+                    CreatedAt = epic.Timestamp,
+                    UpdatedAt = epic.Timestamp,
+                    TouchedAt = epic.Timestamp,
+                    UserId = epic.CreatorId,
+                });
+            }
+            
+            organization.Spaces!.Add(spaceEntity);
         }
 
         foreach (var user in _organizationUsers)
@@ -203,7 +218,8 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         public string SpaceColor { get; private set; }  = "#ffffff";
         public DateTime Timestamp { get; private set; }  = timestamp;
         public Guid CreatorId { get; private set; }  = creatorId;
-        
+        public List<EpicBuilder> Epics { get;} = new();
+
         public SpaceBuilder WithName(string name)
         {
             SpaceName = name;
@@ -219,6 +235,49 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         }
         
         public SpaceBuilder WithTimestamp(DateTime timestamp)
+        {
+            Timestamp = timestamp;
+
+            return this;
+        }
+
+        public SpaceBuilder AddEpic(Guid creatorId)
+        {
+            return AddEpic(creatorId, _ => {});
+        }
+
+        public SpaceBuilder AddEpic(Guid creatorId, Action<EpicBuilder> epicBuilder)
+        {
+            var builder = new EpicBuilder(creatorId, Timestamp);
+            epicBuilder(builder);
+            Epics.Add(builder);
+
+            return this;
+        }
+    }
+    
+    public class EpicBuilder(Guid creatorId, DateTime timestamp)
+    {
+        public string EpicName { get; private set; } = "AdditionalEpic";
+        public string EpicColor { get; private set; }  = "#121212";
+        public DateTime Timestamp { get; private set; }  = timestamp;
+        public Guid CreatorId { get; private set; }  = creatorId;
+        
+        public EpicBuilder WithName(string name)
+        {
+            EpicName = name;
+
+            return this;
+        }
+        
+        public EpicBuilder WithColor(string color)
+        {
+            EpicColor = color;
+
+            return this;
+        }
+        
+        public EpicBuilder WithTimestamp(DateTime timestamp)
         {
             Timestamp = timestamp;
 
