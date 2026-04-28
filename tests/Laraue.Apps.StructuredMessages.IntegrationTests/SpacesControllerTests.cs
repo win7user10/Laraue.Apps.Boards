@@ -29,7 +29,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
                     Color = "#ffffff"
                 }));
 
-        var spaces = await testScope.Database.Spaces.ToListAsyncEF();
+        var spaces = await testScope.Database.Spaces.Include(x => x.Epics).ToListAsyncEF();
         
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space 1", space.Name);
@@ -37,6 +37,10 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         Assert.Equal(userId, space.CreatorId);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
+        Assert.False(space.IsDefault);
+        
+        var epic = Assert.Single(space.Epics!);
+        Assert.True(epic.IsDefault);
     }
     
     [Fact]

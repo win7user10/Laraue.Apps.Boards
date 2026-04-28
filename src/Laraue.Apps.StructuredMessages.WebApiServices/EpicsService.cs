@@ -23,7 +23,7 @@ public interface IEpicsService
         CancellationToken cancellationToken);
     
     Task<long> CreateCategory(
-        CreateCategoryRequest request,
+        CreateEpicRequest request,
         CancellationToken cancellationToken);
     
     Task Edit(
@@ -95,7 +95,7 @@ public class EpicsService(
     }
 
     public async Task<long> CreateCategory(
-        CreateCategoryRequest request,
+        CreateEpicRequest request,
         CancellationToken cancellationToken)
     {
         if (!await coreSpacesService
@@ -195,7 +195,7 @@ public class StatusDto
     public required int SortOrder { get; set; }
 }
 
-public record CreateCategoryRequest
+public record CreateEpicRequest
 {
     public Guid UserId { get; set; }
     

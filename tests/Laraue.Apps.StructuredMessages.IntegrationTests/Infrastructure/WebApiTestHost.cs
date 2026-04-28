@@ -73,12 +73,15 @@ public class WebApiTestHostScope : IDisposable
         return user.Id;
     }
 
-    public Task<Organization> InitializePersonalOrganization(Guid userId, DateTime? timestamp = null)
+    public Task<Organization> InitializePersonalOrganization(Guid userId, Action<OrganizationInitializer>? setupInitializer = null)
     {
-        return new OrganizationInitializer(Database, userId)
+        var initializer = new OrganizationInitializer(Database, userId)
             .WithName("Personal")
             .WithType(OrganizationType.Personal)
-            .WithTimestamp(timestamp ?? DateTime.UtcNow)
-            .Initialize();
+            .WithTimestamp(DateTime.UtcNow);
+
+        setupInitializer?.Invoke(initializer);
+        
+        return initializer.Initialize();
     }
 }

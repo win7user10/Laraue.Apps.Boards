@@ -34,9 +34,9 @@ public class EpicsController(IEpicsService categoriesService)
             cancellationToken);
 
     [HttpPost]
-    public Task<long> CreateCategory(
-        [FromBody] CreateCategoryRequest request,
-        CancellationToken cancellationToken)
+    public Task<long> Create(
+        [FromBody] CreateEpicRequest request,
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.CreateCategory(
             request with
@@ -50,7 +50,7 @@ public class EpicsController(IEpicsService categoriesService)
     public Task ChangeStatusesOrder(
         [FromRoute] long id,
         [FromBody] IReadOnlyDictionary<long, int> order,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.ChangeStatusesOrder(
             new ChangeStatusesOrderRequest
@@ -66,7 +66,7 @@ public class EpicsController(IEpicsService categoriesService)
     public Task Edit(
         long id,
         [FromBody] EditCategoryRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.Edit(
             request with
@@ -81,7 +81,7 @@ public class EpicsController(IEpicsService categoriesService)
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.Delete(
             new DeleteCategoryRequest

@@ -19,7 +19,10 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
         
         var timestamp = DateTime.UtcNow;
         var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(userId, timestamp);
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            setup => setup
+                .WithTimestamp(timestamp));
 
         await _organizationsController
             .WithUserAuthorization(userId)
