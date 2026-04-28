@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.Exceptions.Web;
 
@@ -24,23 +25,24 @@ public interface IStatusesService
 }
 
 public class StatusesService(
-    ICoreEpicsService epicsesService,
-    ICoreStatusService statusService) : IStatusesService
+    ICoreStatusService statusService,
+    IEpicsAccessService epicsAccessService)
+    : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await epicsesService
-            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
-            throw new BadRequestException(
-                nameof(request.CategoryId),
-                "Invalid category");
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.EpicId,
+            ItemAccessLevel.UpdateSelf,
+            cancellationToken);
 
         return await statusService.Create(
             new CreateMessageCategoryStatusRequest
             {
-                CategoryId = request.CategoryId,
+                CategoryId = request.EpicId,
                 Name = request.Name,
                 Color = request.Color,
             },
@@ -77,11 +79,11 @@ public class StatusesService(
 
     public async Task<MessageStatusDto[]> GetStatuses(GetStatusesRequest request, CancellationToken cancellationToken)
     {
-        if (!await epicsesService.UserHasAccessToEpic(
-            request.UserId,
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
             request.EpicId,
-            cancellationToken))
-            throw new NotFoundException("Epic is not found");
+            ItemAccessLevel.ReadItems,
+            cancellationToken);
 
         return await statusService.GetStatuses(
             request.EpicId,
@@ -91,7 +93,7 @@ public class StatusesService(
 
 public record CreateStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -99,7 +101,7 @@ public record CreateStatusRequest
     [MaxLength(7)]
     public required string Color { get; set; }
     
-    public required long CategoryId { get; set; }
+    public required long EpicId { get; set; }
 }
 
 public record DeleteStatusRequest
@@ -120,6 +122,6 @@ public record EditStatusRequest
 
 public record GetStatusesRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public required long EpicId { get; set; }
 }

@@ -38,7 +38,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
             .GetGlobalSpacesAccess(authData, cancellationToken);
 
         var globalAccess = globalOrganizationAccess | globalSpaceAccess;
-        if (globalAccess.HasFlag(ItemAccessLevel.Read))
+        if (globalAccess.HasFlag(ItemAccessLevel.ReadItems))
             return await map(GetGlobalReadableSpacesQuery(authData, globalAccess));
         
         return await map(GetDirectReadableSpacesQuery(authData)); 
@@ -65,6 +65,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         await context.SpaceOrganizationUsers
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
+            .Where(sos => sos.SpaceId == spaceId)
             .AnyOrThrowNotFoundEFAsync(
                 sos => sos.ItemAccessLevel.HasFlag(itemAccessLevel),
                 $"Space: {spaceId} is unavailable or permission: {itemAccessLevel} is missing",
@@ -89,7 +90,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         return context.SpaceOrganizationUsers
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.ItemAccessLevel.HasFlag(ItemAccessLevel.Read))
+            .Where(sos => sos.ItemAccessLevel.HasFlag(ItemAccessLevel.ReadItems))
             .Select(sos => new SpaceWithAccessLevel(sos.Space!, sos.ItemAccessLevel));
     }
 }

@@ -50,7 +50,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.Create))
+            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.CreateItems))
             .Initialize();
         
         var spaceId = await _spacesController
@@ -74,7 +74,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.Read))
+            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
             .Initialize();
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _spacesController
@@ -120,7 +120,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
             .AddSpace(ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.Read))
+            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
             .Initialize();
         
         var spaces = await _spacesController
@@ -128,7 +128,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
     }
     
     [Fact]
@@ -140,7 +140,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ItemAccessLevel.Read))
+                .SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
             .Initialize();
         
         var spaces = await _spacesController
@@ -148,7 +148,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
     }
     
     [Fact]
@@ -160,7 +160,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ItemAccessLevel.Read))
+                .SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
             .Initialize();
         
         var spaces = await _spacesController
@@ -168,7 +168,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
     }
     
     [Fact]
@@ -180,9 +180,9 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await new OrganizationInitializer(testScope.Database, ownerId)
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetOrganizationAccessLevel(ItemAccessLevel.Read)
-                .SetSpacesAccessLevel(ItemAccessLevel.Create)
-                .SetSpaceAccessLevel(1, ItemAccessLevel.Update))
+                .SetOrganizationAccessLevel(ItemAccessLevel.ReadItems)
+                .SetSpacesAccessLevel(ItemAccessLevel.CreateItems)
+                .SetSpaceAccessLevel(1, ItemAccessLevel.UpdateSelf))
             .Initialize();
 
         var spaceId = organization.Spaces![1].Id;
@@ -192,6 +192,6 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         var space = spaces!.First(x => x.Id == spaceId);
-        Assert.Equal(ItemAccessLevel.Read | ItemAccessLevel.Create | ItemAccessLevel.Update, space.AccessLevel);
+        Assert.Equal(ItemAccessLevel.ReadItems | ItemAccessLevel.CreateItems | ItemAccessLevel.UpdateSelf, space.AccessLevel);
     }
 }

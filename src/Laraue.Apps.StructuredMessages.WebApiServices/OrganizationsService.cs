@@ -227,7 +227,7 @@ public class OrganizationsService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemAccessLevel.Read,
+            ItemAccessLevel.ReadItems,
             cancellationToken);
 
         var data = await context.OrganizationUsers

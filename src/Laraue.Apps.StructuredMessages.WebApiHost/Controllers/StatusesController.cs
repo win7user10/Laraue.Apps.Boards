@@ -20,7 +20,7 @@ public class StatusesController(IStatusesService statusesService)
         return statusesService.CreateStatus(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -62,7 +62,7 @@ public class StatusesController(IStatusesService statusesService)
         return statusesService.GetStatuses(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

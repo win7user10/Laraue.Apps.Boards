@@ -39,7 +39,6 @@ public class Epic
     
     public bool IsDefault { get; set; }
 
-    public IList<Issue>? Issues { get; set; }
     public IList<Status>? Statuses { get; set; }
     public IList<EpicOrganizationUser>? Users { get; set; }
 }

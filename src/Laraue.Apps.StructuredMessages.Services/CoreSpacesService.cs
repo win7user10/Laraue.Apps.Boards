@@ -26,12 +26,6 @@ public interface ICoreSpacesService
     Task Delete(
         long id,
         CancellationToken cancellationToken);
-    
-    Task<bool> UserHasAccessToSpace(
-        Guid userId,
-        long spaceId,
-        ItemAccessLevel itemAccessLevel,
-        CancellationToken cancellationToken);
 }
 
 public class CoreSpacesService(
@@ -128,17 +122,5 @@ public class CoreSpacesService(
             .ExecuteDeleteAsync(cancellationToken);
         
         await transaction.CommitAsync(cancellationToken);
-    }
-
-    public Task<bool> UserHasAccessToSpace(
-        Guid userId,
-        long spaceId,
-        ItemAccessLevel itemAccessType,
-        CancellationToken cancellationToken)
-    {
-        return context.Spaces
-            .Where(x => x.CreatorId == userId)
-            .Where(x => x.Id == spaceId)
-            .AnyAsyncEF(cancellationToken);
     }
 }

@@ -31,6 +31,6 @@ public class UserPreferencesController(IUserPreferencesService service) : Contro
         [FromRoute] long spaceId,
         CancellationToken cancellationToken)
     {
-        return service.UpdateSpace(HttpContext.User.GetId(), spaceId, cancellationToken);
+        return service.UpdateSpace(HttpContext.User.GetOrganizationAuthData(), spaceId, cancellationToken);
     }
 }

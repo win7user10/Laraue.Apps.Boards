@@ -88,7 +88,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         return messagesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

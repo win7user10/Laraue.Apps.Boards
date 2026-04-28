@@ -5,6 +5,7 @@ using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 
+[Collection("IntegrationTest")]
 public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
     private readonly Proxy<EpicsController> _epicsController = host.Controller<EpicsController>();
@@ -51,9 +52,7 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
             setup => setup
                 .AddSpace(userId, spaceBuilder =>
                     spaceBuilder
-                        .AddEpic(userId, epicBuilder => epicBuilder
-                            .WithName("My Epic")
-                            .WithColor("#111111"))));
+                        .AddEpic(userId, epicBuilder => epicBuilder.WithName("My Epic").WithColor("#111111"))));
 
         var epicId = organization.Spaces![1].Epics![1].Id;
         
@@ -83,15 +82,9 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
             setup => setup
                 .AddSpace(userId, spaceBuilder =>
                     spaceBuilder
-                        .AddEpic(userId, epicBuilder => epicBuilder
-                            .WithName("My Epic")
-                            .WithColor("#111111")
-                            .AddStatus(s => s
-                                .WithName("In Progress"))
-                            .AddIssue(
-                                userId,
-                                1,
-                                issue => issue.WithContent("Issue 1")))));
+                        .AddEpic(userId, epicBuilder => epicBuilder.WithName("My Epic").WithColor("#111111")
+                            .AddStatus(s => s.WithName("In Progress"))
+                            .AddIssue(userId, 1, issue => issue.WithContent("Issue 1")))));
 
         var exceptedNewStatusId = organization.Spaces![1].Epics![0].Statuses![0].Id;
         var epicId = organization.Spaces![1].Epics![1].Id;
@@ -105,5 +98,38 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
      
         var issue = await testScope.Database.Issues.SingleAsyncEF();
         Assert.Equal(exceptedNewStatusId, issue.StatusId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewPersonalEpics_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            setup => setup
+                .AddSpace(userId, spaceBuilder =>
+                    spaceBuilder
+                        .AddEpic(userId, epicBuilder => epicBuilder.WithName("My Epic").WithColor("#111111")
+                            .AddStatus(s => s.WithName("In Progress"))
+                            .AddIssue(userId, 1))));
+        
+        var space = organization.Spaces![1];
+        var epicId = space.Epics![1].Id;
+        
+        var epics = await _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetAll(new GetEpicsRequest
+            {
+                SpaceId = space.Id
+            }));
+        
+        Assert.Equal(2, epics!.Length);
+        var epic = epics.FirstOrDefault(e => e.Id == epicId);
+        
+        Assert.False(epic!.IsDefault);
+        Assert.Equal("#111111", epic.Color);
+        Assert.Equal(2, epic.StatusesCount);
+        Assert.Equal(1, epic.IssuesCount);
     }
 }

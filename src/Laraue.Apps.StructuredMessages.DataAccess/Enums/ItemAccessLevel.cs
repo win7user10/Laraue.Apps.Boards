@@ -4,9 +4,9 @@
 public enum ItemAccessLevel : byte
 {
     None = 0,
-    Read = 1,
-    Create = 2,
-    Update = 4,
-    Delete = 8,
-    All = Read | Create | Update | Delete
+    ReadItems = 1,
+    CreateItems = 2,
+    UpdateSelf = 4,
+    DeleteSelf = 8,
+    All = ReadItems | CreateItems | UpdateSelf | DeleteSelf
 }

@@ -11,7 +11,7 @@ public class EpicsController(IEpicsService categoriesService)
     : ControllerBase
 {
     [HttpGet]
-    public Task<EpicCountResult> GetCategoriesWithCount(
+    public Task<EpicCountDto[]> GetAll(
         [FromQuery] GetEpicsRequest request,
         CancellationToken cancellationToken = default) => 
         categoriesService.GetEpicsWithCount(
@@ -38,10 +38,10 @@ public class EpicsController(IEpicsService categoriesService)
         [FromBody] CreateEpicRequest request,
         CancellationToken cancellationToken = default)
     {
-        return categoriesService.CreateCategory(
+        return categoriesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -55,9 +55,9 @@ public class EpicsController(IEpicsService categoriesService)
         return categoriesService.ChangeStatusesOrder(
             new ChangeStatusesOrderRequest
             {
-                CategoryId = id,
+                EpicId = id,
                 Order = order,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -68,11 +68,11 @@ public class EpicsController(IEpicsService categoriesService)
         [FromBody] UpdateEpicRequest request,
         CancellationToken cancellationToken = default)
     {
-        return categoriesService.Edit(
+        return categoriesService.Update(
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -87,7 +87,7 @@ public class EpicsController(IEpicsService categoriesService)
             new DeleteCategoryRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

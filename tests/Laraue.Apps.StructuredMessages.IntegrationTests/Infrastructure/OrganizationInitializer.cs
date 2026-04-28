@@ -326,7 +326,12 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
             return this;
         }
-        
+
+        public EpicBuilder AddIssue(Guid creatorId, int statusIndex)
+        {
+            return AddIssue(creatorId, statusIndex, _ => { });
+        }
+
         public EpicBuilder AddIssue(Guid creatorId, int statusIndex, Action<IssueBuilder> issueBuilder)
         {
             var builder = new IssueBuilder(creatorId);
@@ -355,7 +360,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     public class IssueBuilder(Guid creatorId)
     {
         public Guid CreatorId { get; } = creatorId;
-        public string Content { get; private set; } = "NewIssues";
+        public string Content { get; private set; } = "IssueContent";
         
         public IssueBuilder WithContent(string name)
         {

@@ -19,8 +19,8 @@ public class IssuesAccessService(IEpicsAccessService epicsAccessService) : IIssu
         CancellationToken cancellationToken)
     {
         return epicsAccessService.GetAvailable(
-            authData, 
-            epics => map(epics.SelectMany(e => e.Issues!)),
+            authData,
+            epics => map(epics.SelectMany(e => e.Epic.Statuses!.SelectMany(i => i.Issues!))),
             cancellationToken);
     }
 }

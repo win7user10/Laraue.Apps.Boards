@@ -59,7 +59,8 @@ public class IssuesService(
     IDateTimeProvider dateTimeProvider,
     ICoreSpacesService coreSpacesService,
     ICoreStatusService statusService,
-    IIssuesAccessService issuesAccessService)
+    IIssuesAccessService issuesAccessService,
+    IEpicsAccessService epicsAccessService)
     : IIssuesService
 {
     public async Task<BatchResult<MessageListDto>> GetMessages(
@@ -273,19 +274,19 @@ public class IssuesService(
             .Where(s => s.Id == request.StatusId)
             .Select(x => new { x.EpicId, x.Epic!.SpaceId })
             .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", ct);
-        
-        if (!await epicsService.UserHasAccessToEpic(request.UserId, validationData.EpicId, ct))
-            throw new NotFoundException($"Status: {request.StatusId} is not found");
-        
-        if (!await coreSpacesService.UserHasAccessToSpace(request.UserId, validationData.SpaceId, ItemAccessLevel.Create, ct))
-            throw new NotFoundException($"Status: {request.StatusId} is not found");
+
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            validationData.EpicId,
+            ItemAccessLevel.CreateItems,
+            ct);
 
         return await messageService.Create(
             new SaveMessageRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
                 Text = request.Content,
-                UserId = request.UserId,
+                UserId = request.AuthData.UserId,
                 StatusId = request.StatusId,
             },
             ct);
@@ -617,7 +618,7 @@ public record DeleteMessageRequest
 
 public record CreateIssueRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public required string Content { get; set; }
 }

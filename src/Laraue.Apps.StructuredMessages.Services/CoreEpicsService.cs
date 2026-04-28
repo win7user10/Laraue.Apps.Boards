@@ -19,11 +19,6 @@ public interface ICoreEpicsService
         Status[]? statuses,
         CancellationToken cancellationToken);
     
-    Task<bool> UserHasAccessToEpic(
-        Guid userId,
-        long id,
-        CancellationToken cancellationToken);
-    
     Task ChangeStatusesOrder(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken);
@@ -82,14 +77,6 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         await context.SaveChangesAsync(cancellationToken);
 
         return category.Id;
-    }
-
-    public Task<bool> UserHasAccessToEpic(Guid userId, long id, CancellationToken cancellationToken)
-    {
-        return context.Epics
-            .Where(x => x.UserId == userId)
-            .Where(x => x.Id == id)
-            .AnyAsyncEF(cancellationToken);
     }
 
     public async Task ChangeStatusesOrder(

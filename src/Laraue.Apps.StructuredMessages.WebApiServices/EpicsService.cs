@@ -10,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IEpicsService
 {
-    Task<EpicCountResult> GetEpicsWithCount(
+    Task<EpicCountDto[]> GetEpicsWithCount(
         GetEpicsRequest request,
         CancellationToken cancellationToken);
     
@@ -22,11 +22,11 @@ public interface IEpicsService
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken);
     
-    Task<long> CreateCategory(
+    Task<long> Create(
         CreateEpicRequest request,
         CancellationToken cancellationToken);
     
-    Task Edit(
+    Task Update(
         UpdateEpicRequest request,
         CancellationToken cancellationToken);
     
@@ -38,36 +38,31 @@ public interface IEpicsService
 public class EpicsService(
     DatabaseContext context,
     ICoreEpicsService coreEpicsService,
-    ICoreSpacesService coreSpacesService)
+    ICoreSpacesService coreSpacesService,
+    IEpicsAccessService epicsAccessService,
+    ISpacesAccessService spacesAccessService)
     : IEpicsService
 {
-    public async Task<EpicCountResult> GetEpicsWithCount(
+    public async Task<EpicCountDto[]> GetEpicsWithCount(
         GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        
-        var result = await context
+        return await context
             .Epics
-            .Where(x => x.SpaceId == spaceId)
+            .Where(x => x.SpaceId == request.SpaceId)
             .Where(x => x.UserId == request.UserId)
             .OrderByDescending(x => x.TouchedAt)
             .Select(x => new EpicCountDto
             {
                 Id = x.Id,
                 Name = x.Name,
-                Count = x.Issues!.Count,
+                IssuesCount = x.Statuses!.SelectMany(s => s.Issues!).Count(),
                 Color = x.Color,
                 StatusesCount = x.Statuses!.Count,
                 TouchedAt = x.TouchedAt,
                 IsDefault = x.IsDefault,
             })
             .ToArrayAsyncEF(cancellationToken);
-
-        return new EpicCountResult
-        {
-            Categories = result,
-        };
     }
 
     public Task<CategoryDto> GetEpic(
@@ -94,21 +89,20 @@ public class EpicsService(
             .FirstOrThrowNotFoundEFAsync($"Epic: {request.CategoryId} is not found", cancellationToken);
     }
 
-    public async Task<long> CreateCategory(
+    public async Task<long> Create(
         CreateEpicRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await coreSpacesService
-            .UserHasAccessToSpace(
-                request.UserId,
+        await spacesAccessService
+            .HasAccessOrThrow(
+                request.AuthData,
                 request.SpaceId,
-                ItemAccessLevel.Create,
-                cancellationToken))
-            throw new NotFoundException($"Space: {request.SpaceId} is not found");
+                ItemAccessLevel.CreateItems,
+                cancellationToken);
         
         return await coreEpicsService.Create(
             request.SpaceId,
-            request.UserId,
+            request.AuthData.UserId,
             request.Name,
             request.Color,
             statuses: null,
@@ -119,24 +113,30 @@ public class EpicsService(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await coreEpicsService
-            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
-            throw new NotFoundException($"Epic is not found: {request.CategoryId}");
+        await epicsAccessService
+            .HasAccessOrThrow(
+                request.AuthData,
+                request.EpicId,
+                ItemAccessLevel.UpdateSelf,
+                cancellationToken);
         
         await coreEpicsService.ChangeStatusesOrder(
             new Services.ChangeStatusesOrderRequest
             {
-                CategoryId = request.CategoryId,
+                CategoryId = request.EpicId,
                 Order = request.Order
             },
             cancellationToken);
     }
 
-    public async Task Edit(UpdateEpicRequest request, CancellationToken cancellationToken)
+    public async Task Update(UpdateEpicRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreEpicsService
-            .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException($"Epic is not found: {request.Id}");
+        await epicsAccessService
+            .HasAccessOrThrow(
+                request.AuthData,
+                request.Id,
+                ItemAccessLevel.UpdateSelf,
+                cancellationToken);
 
         await coreEpicsService.Update(
             request.Id,
@@ -148,9 +148,12 @@ public class EpicsService(
 
     public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreEpicsService
-                .UserHasAccessToEpic(request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException($"Epic is not found: {request.Id}");
+        await epicsAccessService
+            .HasAccessOrThrow(
+                request.AuthData,
+                request.Id,
+                ItemAccessLevel.DeleteSelf,
+                cancellationToken);
         
         await coreEpicsService.Delete(
             new DeleteRequest { Id = request.Id },
@@ -158,16 +161,11 @@ public class EpicsService(
     }
 }
 
-public class EpicCountResult
-{
-    public required EpicCountDto[] Categories { get; set; }
-}
-
 public record EpicCountDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
-    public required int Count { get; set; }
+    public required int IssuesCount { get; set; }
     public required string? Color { get; set; }
     public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
@@ -197,7 +195,7 @@ public class StatusDto
 
 public record CreateEpicRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     public long SpaceId { get; set; }
     
@@ -210,14 +208,14 @@ public record CreateEpicRequest
 
 public record ChangeStatusesOrderRequest
 {
-    public Guid UserId { get; set; }
-    public required long CategoryId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public required long EpicId { get; set; }
     public required IReadOnlyDictionary<long, int> Order { get; set; }
 }
 
 public record UpdateEpicRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     public long Id { get; set; }
     
@@ -230,7 +228,7 @@ public record UpdateEpicRequest
 
 public record DeleteCategoryRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     public long Id { get; set; }
 }
