@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
+﻿using System.Net;
+using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
@@ -131,5 +132,30 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal("#111111", epic.Color);
         Assert.Equal(2, epic.StatusesCount);
         Assert.Equal(1, epic.IssuesCount);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotViewSomeonePersonalEpics_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var nonPermittedUserId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            setup => setup
+                .AddSpace(userId, spaceBuilder =>
+                    spaceBuilder
+                        .AddEpic(userId)));
+        
+        var space = organization.Spaces![1];
+
+        var epics = await _epicsController
+            .WithOrganizationAuthorization(organization.Id, nonPermittedUserId)
+            .Execute(x => x.GetAll(new GetEpicsRequest
+            {
+                SpaceId = space.Id
+            }));
+        
+        Assert.Empty(epics!);
     }
 }
