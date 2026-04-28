@@ -31,6 +31,7 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         OrganizationAuthData authData,
         Func<IQueryable<EpicWithAccessLevel>, Task<T>> map, CancellationToken cancellationToken)
     {
+        // TODO - all global permissions can live separately and requesting via one query.
         var globalOrganizationAccess = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
 
@@ -129,17 +130,30 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.ItemAccessLevel.HasFlag(ItemAccessLevel.ReadItems))
-            .SelectMany(sos => sos.Space!.Epics!.Select(e => new EpicWithAccessLevel(e, sos.ItemAccessLevel)));
+            .SelectMany(sos => sos.Space!.Epics!.Select(e => new
+            {
+                EpicId = e.Id,
+                Epic = e,
+                AccessLevel = sos.ItemAccessLevel
+            }));
 
-        var epicsFromEpics = context.EpicOrganizationUsers
-            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
-            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.ItemAccessLevel.HasFlag(ItemAccessLevel.ReadItems))
-            .Select(sos => new EpicWithAccessLevel(sos.Epic!, sos.ItemAccessLevel));
+        var all = epicsFromSpaces
+            .FullJoin(
+                context.EpicOrganizationUsers,
+                (level, user) =>
+                    level.EpicId == user.EpicId
+                    && user.OrganizationUser!.UserId == authData.UserId
+                    && user.OrganizationUser!.OrganizationId == authData.OrganizationId
+                    && user.ItemAccessLevel.HasFlag(ItemAccessLevel.ReadItems),
+                (level, user) => new EpicWithAccessLevel(
+                    level != null ? level.Epic : user.Epic,
+                    level != null && user != null
+                        ? level.AccessLevel | user.ItemAccessLevel
+                        : level != null 
+                            ? level.AccessLevel
+                            : user.ItemAccessLevel));
         
-        return epicsFromSpaces
-            .Union(epicsFromEpics)
-            .Distinct();
+        return all;
     }
 }
 

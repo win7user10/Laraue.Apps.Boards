@@ -9,7 +9,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 [Collection("IntegrationTest")]
 public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
-    private readonly Proxy<PersonalSpacesController> _spacesController = host.Controller<PersonalSpacesController>();
+    private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
 
     [Fact]
     public async Task User_ShouldCreatePersonalSpace_Always()
@@ -149,5 +149,57 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var space = spaces!.First(x => x.Id == spaceId);
         Assert.Equal("#ff11ff", space.Color);
         Assert.Equal("My Space", space.Name);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewPersonalEpics_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            setup => setup
+                .AddSpace(userId, spaceBuilder =>
+                    spaceBuilder
+                        .AddEpic(userId, epicBuilder => epicBuilder.WithName("My Epic").WithColor("#111111")
+                            .AddStatus(s => s.WithName("In Progress"))
+                            .AddIssue(userId, 1))));
+        
+        var space = organization.Spaces![1];
+        var epicId = space.Epics![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetSpaceEpics(space.Id));
+        
+        Assert.Equal(2, epics!.Length);
+        var epic = epics.FirstOrDefault(e => e.Id == epicId);
+        
+        Assert.False(epic!.IsDefault);
+        Assert.Equal("#111111", epic.Color);
+        Assert.Equal(2, epic.StatusesCount);
+        Assert.Equal(1, epic.IssuesCount);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotViewSomeonePersonalEpics_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var nonPermittedUserId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            setup => setup
+                .AddSpace(userId, spaceBuilder =>
+                    spaceBuilder
+                        .AddEpic(userId)));
+        
+        var space = organization.Spaces![1];
+
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, nonPermittedUserId)
+            .Execute(x => x.GetSpaceEpics(space.Id));
+        
+        Assert.Empty(epics!);
     }
 }

@@ -10,19 +10,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class EpicsController(IEpicsService categoriesService)
     : ControllerBase
 {
-    [HttpGet]
-    public Task<EpicCountDto[]> GetAll(
-        [FromQuery] GetEpicsRequest request,
-        CancellationToken cancellationToken = default) => 
-        categoriesService.GetEpicsWithCount(
-            request with
-            {
-                UserId = HttpContext.User.GetId()
-            },
-            cancellationToken);
-    
     [HttpGet("{id}")]
-    public Task<CategoryDto> GetCategory(
+    public Task<EpicDto> Get(
         [FromRoute] long id,
         CancellationToken cancellationToken = default) => 
         categoriesService.GetEpic(

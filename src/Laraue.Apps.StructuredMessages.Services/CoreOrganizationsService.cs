@@ -270,7 +270,7 @@ public class CoreOrganizationsService(
         
         var epics = await context.Epics
             .Where(x => x.Space!.OrganizationId == organizationId)
-            .Select(x => new { x.Id, x.Name, x.SpaceId })
+            .Select(x => new { Id = x.Id, x.Name, x.SpaceId })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicsBySpaces = epics

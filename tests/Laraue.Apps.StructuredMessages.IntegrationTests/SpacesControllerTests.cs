@@ -11,7 +11,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 [Collection("IntegrationTest")]
 public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
-    private readonly Proxy<PersonalSpacesController> _spacesController = host.Controller<PersonalSpacesController>();
+    private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
     
     [Fact]
     public async Task User_ShouldCreateSpaceInOwnedOrganization_Always()
@@ -194,4 +194,30 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var space = spaces!.First(x => x.Id == spaceId);
         Assert.Equal(ItemAccessLevel.ReadItems | ItemAccessLevel.CreateItems | ItemAccessLevel.UpdateSelf, space.AccessLevel);
     }
+    
+    [Fact]
+    public async Task User_ShouldViewEpicsInOwnedOrganization_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(participatorId)
+            .AddSpace(participatorId, s => s
+                .WithName("Space created by Participator"))
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, ownerId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        var epic = Assert.Single(epics!);
+        Assert.Equal("Backlog", epic.Name);
+        Assert.Equal(ItemAccessLevel.All, epic.AccessLevel);
+    }
+    
+    // TODO - should not view when has permissions
+    // TODO - should not view when has not permissions
 }

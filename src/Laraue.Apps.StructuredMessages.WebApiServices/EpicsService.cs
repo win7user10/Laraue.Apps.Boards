@@ -3,18 +3,17 @@ using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
-using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IEpicsService
 {
-    Task<EpicCountDto[]> GetEpicsWithCount(
+    Task<EpicCountDto[]> GetSpaceEpics(
         GetEpicsRequest request,
         CancellationToken cancellationToken);
     
-    Task<CategoryDto> GetEpic(
+    Task<EpicDto> GetEpic(
         GetCategoryRequest request,
         CancellationToken cancellationToken);
     
@@ -38,41 +37,41 @@ public interface IEpicsService
 public class EpicsService(
     DatabaseContext context,
     ICoreEpicsService coreEpicsService,
-    ICoreSpacesService coreSpacesService,
     IEpicsAccessService epicsAccessService,
     ISpacesAccessService spacesAccessService)
     : IEpicsService
 {
-    public async Task<EpicCountDto[]> GetEpicsWithCount(
+    public Task<EpicCountDto[]> GetSpaceEpics(
         GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
-        return await context
-            .Epics
-            .Where(x => x.SpaceId == request.SpaceId)
-            .Where(x => x.UserId == request.UserId)
-            .OrderByDescending(x => x.TouchedAt)
-            .Select(x => new EpicCountDto
-            {
-                Id = x.Id,
-                Name = x.Name,
-                IssuesCount = x.Statuses!.SelectMany(s => s.Issues!).Count(),
-                Color = x.Color,
-                StatusesCount = x.Statuses!.Count,
-                TouchedAt = x.TouchedAt,
-                IsDefault = x.IsDefault,
-            })
-            .ToArrayAsyncEF(cancellationToken);
+        return epicsAccessService.GetAvailable(
+            request.AuthData,
+            epics => epics
+                .Where(x => x.Epic.SpaceId == request.SpaceId)
+                .Select(x => new EpicCountDto
+                {
+                    Id = x.Epic.Id,
+                    Name = x.Epic.Name,
+                    IssuesCount = x.Epic.Statuses!.SelectMany(s => s.Issues!).Count(),
+                    Color = x.Epic.Color,
+                    StatusesCount = x.Epic.Statuses!.Count,
+                    TouchedAt = x.Epic.TouchedAt,
+                    IsDefault = x.Epic.IsDefault,
+                    AccessLevel = x.AccessLevel
+                })
+                .ToArrayAsyncLinqToDB(cancellationToken),
+            cancellationToken);
     }
 
-    public Task<CategoryDto> GetEpic(
+    public Task<EpicDto> GetEpic(
         GetCategoryRequest request,
         CancellationToken cancellationToken)
     {
         return context
             .Epics
             .Where(x => x.Id == request.CategoryId)
-            .Select(x => new CategoryDto
+            .Select(x => new EpicDto
             {
                 Color = x.Color,
                 Name = x.Name,
@@ -170,6 +169,7 @@ public record EpicCountDto
     public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
     public required bool IsDefault { get; set; }
+    public required ItemAccessLevel AccessLevel { get; set; }
 }
 
 public record GetCategoryRequest
@@ -178,7 +178,7 @@ public record GetCategoryRequest
     public required long CategoryId { get; set; }
 }
 
-public record CategoryDto
+public record EpicDto
 {
     public required string Name { get; set; }
     public required string? Color { get; set; }
@@ -235,6 +235,6 @@ public record DeleteCategoryRequest
 
 public record GetEpicsRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long SpaceId { get; set; }
 }

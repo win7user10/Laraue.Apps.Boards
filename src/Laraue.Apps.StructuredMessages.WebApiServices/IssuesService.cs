@@ -190,7 +190,7 @@ public class IssuesService(
             .Where(x => x.SpaceId == spaceId)
             .Select(x => new
             {
-                x.Id,
+                Id = x.Id,
                 x.Color,
                 x.Name,
             })

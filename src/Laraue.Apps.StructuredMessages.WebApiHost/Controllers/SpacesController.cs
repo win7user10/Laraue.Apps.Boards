@@ -7,7 +7,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/spaces")]
-public class PersonalSpacesController(ISpacesService spacesService) : ControllerBase
+public class SpacesController(ISpacesService spacesService, IEpicsService epicsService) : ControllerBase
 {
     [HttpPost]
     public Task<long> Create(
@@ -62,4 +62,16 @@ public class PersonalSpacesController(ISpacesService spacesService) : Controller
             },
             cancellationToken);
     }
+    
+    [HttpGet("{id:long}/spaces")]
+    public Task<EpicCountDto[]> GetSpaceEpics(
+        long id,
+        CancellationToken cancellationToken = default) => 
+        epicsService.GetSpaceEpics(
+            new GetEpicsRequest
+            {
+                SpaceId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
 }

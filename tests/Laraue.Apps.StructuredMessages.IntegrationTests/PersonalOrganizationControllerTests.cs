@@ -10,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
     private readonly Proxy<OrganizationsController> _organizationsController = host.Controller<OrganizationsController>();
-    private readonly Proxy<PersonalSpacesController> _spacesController = host.Controller<PersonalSpacesController>();
+    private readonly Proxy<SpacesController> _spacesController = host.Controller<SpacesController>();
     
     [Fact]
     public async Task User_ShouldUpdatePersonalOrganization_Always()
