@@ -232,11 +232,13 @@ public class CoreOrganizationsService(
         
         var spacePermissions = await context.SpaceOrganizationUsers
             .Where(x => x.OrganizationUserId == organizationUserId)
+            .Where(x => x.ItemAccessLevel > ItemAccessLevel.None)
             .Select(x => new { x.SpaceId, AccessLevel = x.ItemAccessLevel })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicPermissions = await context.EpicOrganizationUsers
             .Where(x => x.OrganizationUserId == organizationUserId)
+            .Where(x => x.ItemAccessLevel > ItemAccessLevel.None)
             .Select(x => new { x.EpicId, AccessLevel = x.ItemAccessLevel })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -295,7 +297,9 @@ public class CoreOrganizationsService(
         return new AccessLevels
         {
             DirectAccess = permissions
-                .ToDictionary(x => getItemId(x)!.Value, getAccessLevel),
+                .ToDictionary(x => getItemId(x)!.Value, getAccessLevel), 
+            // TODO - possible errors here when something will stores in DB incorrectly
+            // Right way is to merge permissions or change DTO to consume direct and global permissions separately
         };
     }
 }

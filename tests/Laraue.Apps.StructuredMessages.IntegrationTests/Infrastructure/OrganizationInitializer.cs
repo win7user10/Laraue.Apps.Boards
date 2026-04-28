@@ -132,13 +132,19 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             // Set global space permissions
             context.Add(new SpaceOrganizationUser
             {
-                ItemAccessLevel = builder.SpaceAccessLevels.ItemAccessLevel,
+                ItemAccessLevel = builder.SpacesGlobalAccessLevel,
+                OrganizationUser = organizationUser
+            });
+
+            // Set global epic permissions
+            context.Add(new EpicOrganizationUser
+            {
+                ItemAccessLevel = builder.EpicsGlobalAccessLevel,
                 OrganizationUser = organizationUser
             });
             
             // Set direct space permissions
-            var spaceAccessLevels = builder.SpaceAccessLevels.DirectAccess;
-            foreach (var accessLevel in spaceAccessLevels)
+            foreach (var accessLevel in builder.SpaceAccessLevels)
             {
                 organization.Spaces![accessLevel.Key].Users = new List<SpaceOrganizationUser>
                 {
@@ -154,7 +160,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             var epicAccessLevelsBySpaceIndex = builder.EpicAccessLevels;
             foreach (var epicAccessLevelsBySpace in epicAccessLevelsBySpaceIndex)
             {
-                foreach (var epicAccessLevels in epicAccessLevelsBySpace.Value.DirectAccess)
+                foreach (var epicAccessLevels in epicAccessLevelsBySpace.Value)
                 {
                     organization.Spaces![epicAccessLevelsBySpace.Key].Epics![epicAccessLevels.Key].Users = new List<EpicOrganizationUser>
                     {
@@ -205,8 +211,10 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     {
         public ItemAccessLevel OrganizationItemAccessLevel { get; private set; }
         public AdminAccessLevel OrganizationAdminAccessLevel { get; private set; }
-        public TestAccessLevels SpaceAccessLevels { get; private set; } = new();
-        public Dictionary<int, TestAccessLevels> EpicAccessLevels { get; private set; } = new();
+        public ItemAccessLevel SpacesGlobalAccessLevel { get; private set; } = new();
+        public DirectAccess SpaceAccessLevels { get; private set; } = new();
+        public ItemAccessLevel EpicsGlobalAccessLevel { get; private set; } = new();
+        public Dictionary<int, DirectAccess> EpicAccessLevels { get; private set; } = new();
     
         public PermissionBuilder SetOrganizationAccessLevel(ItemAccessLevel itemAccessLevel)
         {
@@ -222,22 +230,29 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
     
         public PermissionBuilder SetSpacesAccessLevel(ItemAccessLevel itemAccessLevel)
         {
-            SpaceAccessLevels.ItemAccessLevel = itemAccessLevel;
+            SpacesGlobalAccessLevel = itemAccessLevel;
             
             return this;
         }
     
         public PermissionBuilder SetSpaceAccessLevel(int index, ItemAccessLevel itemAccessLevel)
         {
-            SpaceAccessLevels.DirectAccess[index] = itemAccessLevel;
+            SpaceAccessLevels[index] = itemAccessLevel;
             
             return this;
         }
     
         public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(ItemAccessLevel itemAccessLevel)
         {
-            EpicAccessLevels.TryAdd(0, new TestAccessLevels());
-            EpicAccessLevels[0].DirectAccess[0] = itemAccessLevel;
+            EpicAccessLevels.TryAdd(0, new DirectAccess());
+            EpicAccessLevels[0][0] = itemAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetEpicsAccessLevel(ItemAccessLevel itemAccessLevel)
+        {
+            EpicsGlobalAccessLevel = itemAccessLevel;
             
             return this;
         }
@@ -370,9 +385,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         }
     }
 
-    public class TestAccessLevels
+    public class DirectAccess : Dictionary<int, ItemAccessLevel>
     {
-        public ItemAccessLevel ItemAccessLevel { get; set; }
-        public Dictionary<int, ItemAccessLevel> DirectAccess { get; set; } = new();
     }
 }
