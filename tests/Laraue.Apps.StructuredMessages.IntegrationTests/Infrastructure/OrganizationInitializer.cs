@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
+using Status = Laraue.Apps.StructuredMessages.DataAccess.Models.Status;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 
@@ -70,7 +71,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
 
             foreach (var epic in space.Epics)
             {
-                spaceEntity.Epics.Add(new Epic
+                var epicEntity = new Epic
                 {
                     Name = epic.EpicName,
                     Color = epic.EpicColor,
@@ -78,7 +79,37 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
                     UpdatedAt = epic.Timestamp,
                     TouchedAt = epic.Timestamp,
                     UserId = epic.CreatorId,
-                });
+                    Statuses = new List<Status>
+                    {
+                        OrganizationDefaults.GetNewStatusEntity(),
+                    }
+                };
+
+                foreach (var status in epic.Statuses)
+                {
+                    var statusEntity = new Status
+                    {
+                        Name = status.StatusName
+                    };
+                    
+                    epicEntity.Statuses.Add(statusEntity);
+                }
+
+                foreach (var issuesByStatusIndex in epic.Issues)
+                {
+                    var statusForIssue = epicEntity.Statuses[issuesByStatusIndex.Key];
+                    statusForIssue.Issues ??= new List<Issue>();
+                    foreach (var issue in issuesByStatusIndex.Value)
+                    {
+                        statusForIssue.Issues.Add(new Issue
+                        {
+                            Content = issue.Content,
+                            UserId = issue.CreatorId,
+                        });
+                    }
+                }
+                
+                spaceEntity.Epics.Add(epicEntity);
             }
             
             organization.Spaces!.Add(spaceEntity);
@@ -262,6 +293,8 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         public string EpicColor { get; private set; }  = "#121212";
         public DateTime Timestamp { get; private set; }  = timestamp;
         public Guid CreatorId { get; private set; }  = creatorId;
+        public List<StatusBuilder> Statuses  { get; private set; } = new ();
+        public Dictionary<int, List<IssueBuilder>> Issues  { get; private set; } = new ();
         
         public EpicBuilder WithName(string name)
         {
@@ -277,9 +310,56 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             return this;
         }
         
-        public EpicBuilder WithTimestamp(DateTime timestamp)
+        public EpicBuilder WithTimestamp(DateTime value)
         {
-            Timestamp = timestamp;
+            Timestamp = value;
+
+            return this;
+        }
+        
+        public EpicBuilder AddStatus(Action<StatusBuilder> statusBuilder)
+        {
+            var builder = new StatusBuilder();
+            statusBuilder(builder);
+            
+            Statuses.Add(builder);
+
+            return this;
+        }
+        
+        public EpicBuilder AddIssue(Guid creatorId, int statusIndex, Action<IssueBuilder> issueBuilder)
+        {
+            var builder = new IssueBuilder(creatorId);
+            issueBuilder(builder);
+
+            if (!Issues.ContainsKey(statusIndex))
+                Issues[statusIndex] = [];
+            Issues[statusIndex].Add(builder);
+
+            return this;
+        }
+    }
+
+    public class StatusBuilder
+    {
+        public string StatusName { get; private set; } = "AdditionalStatus";
+        
+        public StatusBuilder WithName(string name)
+        {
+            StatusName = name;
+
+            return this;
+        }
+    }
+
+    public class IssueBuilder(Guid creatorId)
+    {
+        public Guid CreatorId { get; } = creatorId;
+        public string Content { get; private set; } = "NewIssues";
+        
+        public IssueBuilder WithContent(string name)
+        {
+            Content = name;
 
             return this;
         }

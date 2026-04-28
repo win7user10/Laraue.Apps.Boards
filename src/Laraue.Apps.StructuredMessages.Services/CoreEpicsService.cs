@@ -129,10 +129,27 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        var defaultEpic = await context.Epics
+            .Where(x => x.Id == request.Id)
+            .Select(x => x.Space!)
+            .Select(o => o.Epics!.First(y => y.IsDefault))
+            .Select(e => new
+            {
+                EpicId = e.Id, 
+                NewStatusId = (long?)e.Statuses!.OrderBy(o => o.SortOrder).FirstOrDefault()!.Id, // Status should be taken from FE in future iterations
+            })
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        if (defaultEpic is null)
+            throw new NotFoundException($"Backlog for space with Epic:{request.Id} is not found");
+            
+        if (defaultEpic.EpicId == request.Id)
+            throw new BadRequestException(nameof(request.Id), $"Removing default Epic:{request.Id} is not allowed");
+        
         await context.Issues
             .Where(x => x.Status!.EpicId == request.Id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.StatusId, (long?)null),
+                .SetProperty(p => p.StatusId, defaultEpic.NewStatusId),
                 cancellationToken);
         
         await context.Statuses
