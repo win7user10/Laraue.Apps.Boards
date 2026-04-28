@@ -30,7 +30,7 @@ public interface ICoreSpacesService
     Task<bool> UserHasAccessToSpace(
         Guid userId,
         long spaceId,
-        ItemsAccessLevel itemsAccessLevel,
+        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -133,7 +133,7 @@ public class CoreSpacesService(
     public Task<bool> UserHasAccessToSpace(
         Guid userId,
         long spaceId,
-        ItemsAccessLevel itemsAccessType,
+        ItemAccessLevel itemAccessType,
         CancellationToken cancellationToken)
     {
         return context.Spaces

@@ -34,7 +34,7 @@ public class SpacesService(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        var spaces = await spacesAccessService.GetAvailable(
+        var spaces = await spacesAccessService.GetAvailableForRead(
             request.AuthData,
             items => items
                 .Select(x => new SpaceDto
@@ -42,7 +42,8 @@ public class SpacesService(
                     Id = x.Space.Id,
                     Name = x.Space.Name,
                     Color = x.Space.Color,
-                    EpicsCount = x.Space.Epics!.Count
+                    EpicsCount = x.Space.Epics!.Count,
+                    AccessLevel = x.ItemAccessLevel
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -54,7 +55,7 @@ public class SpacesService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemsAccessLevel.Create,
+            ItemAccessLevel.Create,
             cancellationToken);
 
         return await coreSpacesService.Create(
@@ -69,7 +70,7 @@ public class SpacesService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemsAccessLevel.Update,
+            ItemAccessLevel.Update,
             cancellationToken); // Wrong. Update should be available on space level (when managed is active??). It's strange
 
         await coreSpacesService.Update(
@@ -85,7 +86,7 @@ public class SpacesService(
         await spacesAccessService.HasAccessOrThrow(
             request.AuthData,
             request.Id,
-            ItemsAccessLevel.Delete,
+            ItemAccessLevel.Delete,
             cancellationToken);
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
@@ -135,4 +136,5 @@ public record SpaceDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int EpicsCount { get; set; }
+    public required ItemAccessLevel AccessLevel { get; set; }
 }

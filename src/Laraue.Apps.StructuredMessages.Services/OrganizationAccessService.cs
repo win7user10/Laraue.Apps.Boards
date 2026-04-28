@@ -14,7 +14,7 @@ public interface IOrganizationAccessService
     
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
-        ItemsAccessLevel itemsAccessLevel,
+        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
@@ -35,12 +35,12 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
 
     public async Task HasAccessOrThrow(
         OrganizationAuthData authData,
-        ItemsAccessLevel itemsAccessLevel,
+        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken)
     {
-        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, itemsAccessLevel, cancellationToken);
+        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, itemAccessLevel, cancellationToken);
         if (!hasAccess)
-            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {itemsAccessLevel} is missing");
+            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {itemAccessLevel} is missing");
     }
 
     public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)
@@ -59,14 +59,14 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
     private Task<bool> HasAccess(
         Guid userId,
         long organizationId,
-        ItemsAccessLevel itemsAccessLevel,
+        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken)
     {
         return GetAvailable(userId, organizations =>
         {
             return organizations
                 .Where(x => x.OrganizationId == organizationId)
-                .AnyAsyncEF(x => x.ItemsAccessLevel.HasFlag(itemsAccessLevel), cancellationToken);
+                .AnyAsyncEF(x => x.ItemAccessLevel.HasFlag(itemAccessLevel), cancellationToken);
         });
     }
 }

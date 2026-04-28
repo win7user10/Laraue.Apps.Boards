@@ -75,7 +75,7 @@ public class OrganizationsService(
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
-                    ItemsAccessLevel = x.ItemsAccessLevel,
+                    ItemAccessLevel = x.ItemAccessLevel,
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     SpacesCount = x.Organization.Spaces!.Count,
@@ -96,7 +96,7 @@ public class OrganizationsService(
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
-                    ItemsAccessLevel = x.ItemsAccessLevel,
+                    ItemAccessLevel = x.ItemAccessLevel,
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     SpacesCount = x.Organization.Spaces!.Count,
@@ -215,7 +215,7 @@ public class OrganizationsService(
                 OrganizationId = request.OrganizationId,
                 UserId = request.UserId,
             },
-            ItemsAccessLevel.None,
+            ItemAccessLevel.None,
             cancellationToken);
 
         return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
@@ -227,7 +227,7 @@ public class OrganizationsService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemsAccessLevel.Read,
+            ItemAccessLevel.Read,
             cancellationToken);
 
         var data = await context.OrganizationUsers
@@ -241,7 +241,7 @@ public class OrganizationsService(
                 Username = x.User.TelegramUserName,
                 Initials = null,
                 IsOwner = x.Organization!.OwnerId == x.UserId,
-                ItemsAccessLevel = x.ItemsAccessLevel,
+                ItemAccessLevel = x.ItemAccessLevel,
             })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -318,7 +318,7 @@ public record OrganizationDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
-    public required ItemsAccessLevel ItemsAccessLevel { get; set; }
+    public required ItemAccessLevel ItemAccessLevel { get; set; }
     public required AdminAccessLevel AdminAccessLevel { get; set; }
     public required bool IsPersonal { get; set; }
 }
@@ -362,7 +362,7 @@ public record OrganizationMember
     public required string Color { get; set; }
     public string? Initials { get; set; }
     public required bool IsOwner { get; set; }
-    public required ItemsAccessLevel ItemsAccessLevel { get; set; }
+    public required ItemAccessLevel ItemAccessLevel { get; set; }
 }
 
 public record GetPermittableEntitiesRequest

@@ -18,7 +18,7 @@ public interface IEpicsAccessService
     Task HasAccessOrThrow(
         Guid userId,
         long epicId,
-        ItemsAccessLevel itemsAccessLevel,
+        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -31,25 +31,25 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         var globalOrganizationPermission = await accessService
             .GetGlobalOrganizationAccess(authData, cancellationToken);
         
-        if (globalOrganizationPermission == ItemsAccessLevel.All)
-            return await map(GetAllEpicsQuery(authData, ItemsAccessLevel.All));
+        if (globalOrganizationPermission == ItemAccessLevel.All)
+            return await map(GetAllEpicsQuery(authData, ItemAccessLevel.All));
         
         // All organization is available to read at least
-        if (globalOrganizationPermission.HasFlag(ItemsAccessLevel.Read))
+        if (globalOrganizationPermission.HasFlag(ItemAccessLevel.Read))
             return await map(GetAllEpicsQuery(authData, globalOrganizationPermission));
 
         var globalSpacePermission = await accessService
             .GetGlobalSpacesAccess(authData, cancellationToken);
         
         // All spaces are available to read at least
-        if (globalSpacePermission.HasFlag(ItemsAccessLevel.Read))
+        if (globalSpacePermission.HasFlag(ItemAccessLevel.Read))
             return await map(GetAllEpicsQuery(authData, globalSpacePermission));
 
         var globalEpicPermission = await accessService
             .GetGlobalEpicsAccess(authData, cancellationToken);
         
         // All epics are available to read at least
-        if (globalSpacePermission.HasFlag(ItemsAccessLevel.Read))
+        if (globalSpacePermission.HasFlag(ItemAccessLevel.Read))
             return await map(GetAllEpicsQuery(authData, globalEpicPermission));
         
         // Global permissions are not set, try to compute available epics via direct permissions
@@ -71,13 +71,13 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         return await map(allAvailableEpics);
     }
 
-    public Task HasAccessOrThrow(Guid userId, long epicId, ItemsAccessLevel itemsAccessLevel, CancellationToken cancellationToken)
+    public Task HasAccessOrThrow(Guid userId, long epicId, ItemAccessLevel itemAccessLevel, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }
     
     
-    private IQueryable<Epic> GetAllEpicsQuery(OrganizationAuthData authData, ItemsAccessLevel minItemsAccessLevel)
+    private IQueryable<Epic> GetAllEpicsQuery(OrganizationAuthData authData, ItemAccessLevel minItemAccessLevel)
     {
         return context.Epics
             .Where(e => e.Space!.OrganizationId == authData.OrganizationId);

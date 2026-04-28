@@ -1,7 +1,7 @@
 ﻿namespace Laraue.Apps.StructuredMessages.DataAccess.Enums;
 
 [Flags]
-public enum ItemsAccessLevel : byte
+public enum ItemAccessLevel : byte
 {
     None = 0,
     Read = 1,

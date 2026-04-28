@@ -14,7 +14,7 @@ public class OrganizationDefaults
     {
         var organizationUser = new OrganizationUser
         {
-            ItemsAccessLevel = ItemsAccessLevel.All,
+            ItemAccessLevel = ItemAccessLevel.All,
             AdminAccessLevel = AdminAccessLevel.All,
             UserId = userId,
         };

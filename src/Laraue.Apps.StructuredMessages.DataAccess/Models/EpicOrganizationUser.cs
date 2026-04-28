@@ -15,5 +15,5 @@ public class EpicOrganizationUser
     public long OrganizationUserId { get; set; }
     public OrganizationUser? OrganizationUser { get; set; }
     
-    public ItemsAccessLevel ItemsAccessLevel { get; set; }
+    public ItemAccessLevel ItemAccessLevel { get; set; }
 }
