@@ -47,8 +47,8 @@ public class EpicsService(
     {
         return epicsAccessService.GetAvailable(
             request.AuthData,
+            new Filter { SpaceId = request.SpaceId },
             epics => epics
-                .Where(x => x.Epic.SpaceId == request.SpaceId)
                 .Select(x => new EpicCountDto
                 {
                     Id = x.Epic.Id,

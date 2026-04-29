@@ -218,6 +218,86 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         Assert.Equal(ItemAccessLevel.All, epic.AccessLevel);
     }
     
+    [Fact]
+    public async Task User_ShouldViewEpics_WhenHasOrganizationLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(participatorId, b => b.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
+            .AddSpace(ownerId, s => s.AddEpic(ownerId))
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewEpics_WhenHasSpacesLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(participatorId, b => b.SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
+            .AddSpace(ownerId, s => s.AddEpic(ownerId))
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewEpics_WhenHasSpaceLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(participatorId, b => b.SetSpaceAccessLevel(1, ItemAccessLevel.ReadItems))
+            .AddSpace(ownerId, s => s.AddEpic(ownerId))
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewEpics_WhenHasEpicsLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+            .AddUser(participatorId, b => b.SetEpicsAccessLevel(ItemAccessLevel.ReadItems))
+            .AddSpace(ownerId, s => s.AddEpic(ownerId))
+            .Initialize();
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
     // TODO - should not view when has permissions
     // TODO - should not view when has not permissions
 }
