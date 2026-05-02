@@ -7,27 +7,33 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
+/// <remarks>Use only with Linq2DB provider.</remarks>
 public interface IEpicsAccessService
 {
     /// <summary>
-    /// Returns epics available for the user.
+    /// Returns epics available to read for the user.
     /// </summary>
-    /// <remarks>Use only with Linq2DB provider.</remarks>
     Task<T> GetAvailable<T>(
         OrganizationAuthData authData,
         Func<IQueryable<EpicWithAccessLevel>, Task<T>> map,
         CancellationToken cancellationToken);
     
+    /// <summary>
+    /// Returns epics available to read for the user.
+    /// </summary>
     Task<T> GetAvailable<T>(
         OrganizationAuthData authData,
         Filter filter,
         Func<IQueryable<EpicWithAccessLevel>, Task<T>> map,
         CancellationToken cancellationToken);
     
+    /// <summary>
+    /// Returns is entity permitted for a change operation. To check access for read use one of <c>GetAvailable</c> methods.
+    /// </summary>
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long epicId,
-        ItemAccessLevel itemAccessLevel,
+        ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -51,19 +57,15 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         Func<IQueryable<EpicWithAccessLevel>, Task<T>> map,
         CancellationToken cancellationToken)
     {
-        // TODO - all global permissions can live separately and requesting via one query.
-        var globalOrganizationAccess = await accessService
-            .GetGlobalOrganizationAccess(authData, cancellationToken);
-
-        var globalSpaceAccess = await accessService
-            .GetGlobalSpacesAccess(authData, cancellationToken);
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
         
-        var globalEpicAccess = await accessService
-            .GetGlobalEpicsAccess(authData, cancellationToken);
-        
-        var globalAccess = globalOrganizationAccess | globalSpaceAccess | globalEpicAccess;
-        if (globalAccess.HasFlag(ItemAccessLevel.ReadItems))
-            return await map(GetGlobalReadableEpicsQuery(authData, globalAccess, filter));
+        var accessToViewEpic = accessLevels.EpicsAccessLevel | accessLevels.IssuesAccessLevel;
+        if (accessToViewEpic.HasFlag(ChildrenAccessLevel.Read))
+        {
+            var accessToEditEpic = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel;
+            return await map(GetGlobalReadableEpicsQuery(authData, accessToEditEpic.ToEntityAccessLevel(), filter));
+        }
         
         return await map(GetDirectReadableEpicsQuery(authData, filter));
     }
@@ -71,54 +73,43 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
     public async Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long epicId,
-        ItemAccessLevel itemAccessLevel,
+        ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken)
     {
-        var globalOrganizationAccess = await accessService
-            .GetGlobalOrganizationAccess(authData, cancellationToken);
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
         
-        if (globalOrganizationAccess.HasFlag(itemAccessLevel))
-            return;
-        
-        var globalSpaceAccess = await accessService
-            .GetGlobalSpacesAccess(authData, cancellationToken);
-        
-        if (globalSpaceAccess.HasFlag(itemAccessLevel))
-            return;
-        
-        var globalEpicAccess = await accessService
-            .GetGlobalEpicsAccess(authData, cancellationToken);
-        
-        if (globalEpicAccess.HasFlag(itemAccessLevel))
+        var globalEpicAccess = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel;
+        if (globalEpicAccess.HasFlag(childrenAccessLevel))
             return;
 
         var epic = await context.Epics
             .Select(x => new { x.SpaceId })
             .FirstOrThrowNotFoundEFAsync($"Epic: {epicId} is not found", cancellationToken);
         
-        var hasDirectAccessFromSpace = await context.SpaceOrganizationUsers
+        var hasDirectAccessFromSpace = await context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.SpaceId == epic.SpaceId)
-            .AnyAsync(sos => sos.ItemAccessLevel.HasFlag(itemAccessLevel), cancellationToken);
+            .AnyAsync(sos => sos.ChildrenEpicsAccessLevel.HasFlag(childrenAccessLevel), cancellationToken);
         
         if (hasDirectAccessFromSpace)
             return;
         
-        await context.EpicOrganizationUsers
+        await context.DirectEpicPermissions
             .Where(eou => eou.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(eou => eou.OrganizationUser!.UserId == authData.UserId)
             .Where(eou => eou.EpicId == epicId)
             .AnyOrThrowNotFoundEFAsync(
-                eou => eou.ItemAccessLevel.HasFlag(itemAccessLevel),
-                $"Space: {epic} is unavailable or permission: {itemAccessLevel} is missing",
+                eou => eou.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel),
+                $"Space: {epic} is unavailable or permission: {childrenAccessLevel} is missing",
                 cancellationToken);
     }
     
     
     private IQueryable<EpicWithAccessLevel> GetGlobalReadableEpicsQuery(
         OrganizationAuthData authData,
-        ItemAccessLevel accessLevel,
+        EntityAccessLevel accessLevel,
         Filter filter)
     {
         var query = context.Epics.AsQueryable();
@@ -128,28 +119,24 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         return query
             .Where(s => s.Space!.OrganizationId == authData.OrganizationId)
             .LeftJoin(
-                context.EpicOrganizationUsers,
+                context.DirectEpicPermissions,
                 (epic, user) => epic.Id == user.EpicId,
-                (epic, user) => new { Epic = epic, EpicOrganizationUser = (EpicOrganizationUser?)user })
+                (epic, user) => new { Epic = epic, DirectEpicPermission = (DirectEpicPermission?)user })
             .LeftJoin(
-                context.SpaceOrganizationUsers,
+                context.DirectSpacePermissions,
                 (join, user) => join.Epic.SpaceId == user.SpaceId,
                 (join, user) => new
                 {
                     join.Epic,
-                    join.EpicOrganizationUser,
-                    SpaceOrganizationUser = (SpaceOrganizationUser?)user
+                    join.DirectEpicPermission,
+                    DirectSpacePermission = (DirectSpacePermission?)user
                 })
             .Select(epicData => new EpicWithAccessLevel
             {
                 Epic = epicData.Epic,
-                AccessLevel = epicData.SpaceOrganizationUser != null && epicData.EpicOrganizationUser != null
-                    ? epicData.SpaceOrganizationUser.ItemAccessLevel | epicData.EpicOrganizationUser.ItemAccessLevel | accessLevel
-                    : epicData.SpaceOrganizationUser != null
-                        ? epicData.SpaceOrganizationUser.ItemAccessLevel | accessLevel
-                        : epicData.EpicOrganizationUser != null
-                            ? epicData.EpicOrganizationUser.ItemAccessLevel | accessLevel
-                            : accessLevel
+                EntityAccessLevel = epicData.DirectEpicPermission != null
+                    ? epicData.DirectEpicPermission.EntityAccessLevel | accessLevel
+                    : accessLevel,
             });
     }
     
@@ -161,35 +148,41 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             epicsQuery = epicsQuery.Where(e => e.Space!.Id == filter.SpaceId.Value);
         
         var all = epicsQuery
-            .LeftJoin(
+            .InnerJoin(
                 context.Spaces,
                 (e, s) => e.SpaceId == s.Id,
                 (e, s) => new { Epic = e, Space = s })
             .LeftJoin(
-                context.SpaceOrganizationUsers,
+                context.DirectSpacePermissions,
                 (e, s) =>
                     e.Space.Id == s.SpaceId
-                    && (s.ItemAccessLevel & ItemAccessLevel.ReadItems) == ItemAccessLevel.ReadItems
+                    && (
+                        (s.ChildrenEpicsAccessLevel & ChildrenAccessLevel.Read) == ChildrenAccessLevel.Read 
+                        || (s.EntityAccessLevel & EntityAccessLevel.Read) == EntityAccessLevel.Read)
                     && s.OrganizationUser!.UserId == authData.UserId
                     && s.OrganizationUser!.OrganizationId == authData.OrganizationId,
-                (e, s) => new { e.Epic, e.Space, SpaceOrganizationUser = s })
+                (e, s) => new { e.Epic, e.Space, DirectSpacePermission = s })
             .LeftJoin(
-                context.EpicOrganizationUsers,
+                context.DirectEpicPermissions,
                 (e, o) =>
                     e.Epic.Id == o.Id
-                    && (o.ItemAccessLevel & ItemAccessLevel.ReadItems) == ItemAccessLevel.ReadItems
+                    && (
+                        (o.ChildrenIssuesAccessLevel & ChildrenAccessLevel.Read) == ChildrenAccessLevel.Read 
+                        || (o.EntityAccessLevel & EntityAccessLevel.Read) == EntityAccessLevel.Read)
                     && o.OrganizationUser!.UserId == authData.UserId
                     && o.OrganizationUser!.OrganizationId == authData.OrganizationId,
-                (e, o) => new { e.Epic, e.Space, e.SpaceOrganizationUser, EpicOrganizationUser = o })
-            .Where(x => x.EpicOrganizationUser != null ||  x.SpaceOrganizationUser != null)
+                (e, o) => new
+                {
+                    e.Epic,
+                    e.Space,
+                    DirectSpacePermission = (DirectSpacePermission?)e.DirectSpacePermission,
+                    DirectEpicPermission = (DirectEpicPermission?)o
+                })
+            .Where(x => x.DirectEpicPermission != null || x.DirectSpacePermission != null)
             .Select(e => new EpicWithAccessLevel
             {
                 Epic = e.Epic,
-                AccessLevel = e.SpaceOrganizationUser != null && e.EpicOrganizationUser != null
-                    ? e.SpaceOrganizationUser.ItemAccessLevel | e.EpicOrganizationUser.ItemAccessLevel
-                    : e.SpaceOrganizationUser != null 
-                        ? e.SpaceOrganizationUser.ItemAccessLevel
-                        : e.SpaceOrganizationUser!.ItemAccessLevel
+                EntityAccessLevel = e.DirectEpicPermission!.EntityAccessLevel
             });
         
         return all;
@@ -199,5 +192,5 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
 public record EpicWithAccessLevel
 {
     public required Epic Epic { get; init; }
-    public required ItemAccessLevel AccessLevel { get; init; }
+    public required EntityAccessLevel EntityAccessLevel { get; init; }
 }

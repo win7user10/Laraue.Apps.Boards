@@ -58,7 +58,7 @@ public class EpicsService(
                     StatusesCount = x.Epic.Statuses!.Count,
                     TouchedAt = x.Epic.TouchedAt,
                     IsDefault = x.Epic.IsDefault,
-                    AccessLevel = x.AccessLevel
+                    EntityAccessLevel = x.EntityAccessLevel
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -93,10 +93,9 @@ public class EpicsService(
         CancellationToken cancellationToken)
     {
         await spacesAccessService
-            .HasAccessOrThrow(
+            .CanCreateEpics(
                 request.AuthData,
                 request.SpaceId,
-                ItemAccessLevel.CreateItems,
                 cancellationToken);
         
         return await coreEpicsService.Create(
@@ -116,7 +115,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.EpicId,
-                ItemAccessLevel.UpdateSelf,
+                ChildrenAccessLevel.Update,
                 cancellationToken);
         
         await coreEpicsService.ChangeStatusesOrder(
@@ -134,7 +133,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.Id,
-                ItemAccessLevel.UpdateSelf,
+                ChildrenAccessLevel.Update,
                 cancellationToken);
 
         await coreEpicsService.Update(
@@ -151,7 +150,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.Id,
-                ItemAccessLevel.DeleteSelf,
+                ChildrenAccessLevel.Delete,
                 cancellationToken);
         
         await coreEpicsService.Delete(
@@ -169,7 +168,7 @@ public record EpicCountDto
     public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
     public required bool IsDefault { get; set; }
-    public required ItemAccessLevel AccessLevel { get; set; }
+    public required EntityAccessLevel EntityAccessLevel { get; set; }
 }
 
 public record GetCategoryRequest

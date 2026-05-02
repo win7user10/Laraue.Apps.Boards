@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
@@ -39,10 +40,13 @@ public class UserPreferencesService(
 
     public async Task UpdateSpace(OrganizationAuthData authData, long spaceId, CancellationToken cancellationToken = default)
     {
-        await spacesAccessService.HasAccessOrThrow(
+        await spacesAccessService.GetAvailableForRead(
             authData,
-            spaceId,
-            ItemAccessLevel.ReadItems,
+            query => query
+                .FirstOrThrowNotFoundEFAsync(
+                    q => q.Space!.Id == spaceId,
+                    $"Space: {spaceId} is not found or not permitted",
+                    cancellationToken),
             cancellationToken);
         
         await coreService

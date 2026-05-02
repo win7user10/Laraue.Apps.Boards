@@ -36,7 +36,7 @@ public class StatusesService(
         await epicsAccessService.HasAccessOrThrow(
             request.AuthData,
             request.EpicId,
-            ItemAccessLevel.UpdateSelf,
+            ChildrenAccessLevel.Update,
             cancellationToken);
 
         return await statusService.Create(
@@ -82,7 +82,7 @@ public class StatusesService(
         await epicsAccessService.HasAccessOrThrow(
             request.AuthData,
             request.EpicId,
-            ItemAccessLevel.ReadItems,
+            ChildrenAccessLevel.Read,
             cancellationToken);
 
         return await statusService.GetStatuses(

@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +31,7 @@ public interface ICoreOrganizationsService
         Guid userId,
         CancellationToken cancellationToken);
     
-    Task AddMember(
+    Task<long> AddMember(
         long organizationId,
         Guid userId,
         CancellationToken cancellationToken);
@@ -43,11 +44,11 @@ public interface ICoreOrganizationsService
         long organizationUserId,
         UserPermissions userPermissions,
         CancellationToken cancellationToken);
-    
+
     Task<UserPermissions> GetUserPermissions(
         long organizationUserId,
         CancellationToken cancellationToken);
-    
+
     Task<PermittableSpace[]> GetPermittableEntities(
         long organizationId,
         CancellationToken cancellationToken);
@@ -72,17 +73,17 @@ public class CoreOrganizationsService(
             color,
             timestamp,
             OrganizationType.Organization);
-        
+
         context.Organizations.Add(entity);
         await context.SaveChangesAsync(cancellationToken);
-        
+
         return entity.Id;
     }
 
     public Task Update(long id, Action<UpdateSettersBuilder<Organization>> setters, CancellationToken cancellationToken)
     {
         var date = dateTimeProvider.UtcNow;
-        
+
         return context.Organizations
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(
@@ -106,15 +107,15 @@ public class CoreOrganizationsService(
         await context.Epics
             .Where(x => spaceIds.Contains(x.SpaceId))
             .ExecuteDeleteAsync(cancellationToken);
-        
+
         await context.Spaces
             .Where(c => c.OrganizationId == id)
             .ExecuteDeleteAsync(cancellationToken);
-        
+
         await context.Organizations
             .Where(c => c.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
-        
+
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -126,15 +127,19 @@ public class CoreOrganizationsService(
             .AnyAsyncEF(cancellationToken);
     }
 
-    public Task AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)
+    public async Task<long> AddMember(long organizationId, Guid userId, CancellationToken cancellationToken)
     {
-        context.OrganizationUsers.Add(new OrganizationUser
+        var user = new OrganizationUser
         {
             OrganizationId = organizationId,
             UserId = userId,
-        });
+        };
+        
+        context.OrganizationUsers.Add(user);
 
-        return context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return user.Id;
     }
 
     public async Task<long?> GetOrganizationIdByJoinCode(string code, CancellationToken cancellationToken)
@@ -144,81 +149,64 @@ public class CoreOrganizationsService(
             .Select(x => new { x.Id })
             .FirstOrDefaultAsyncEF(cancellationToken))?.Id;
     }
-
+    
     public async Task SetUserPermissions(
         long organizationUserId,
         UserPermissions userPermissions,
         CancellationToken cancellationToken)
     {
+        NormalizePermissions(userPermissions);
+        
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
+        
+        // Remove old permissions
+        await context.DirectEpicPermissions
+            .Where(x => x.OrganizationUserId == organizationUserId)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.DirectSpacePermissions
+            .Where(x => x.OrganizationUserId == organizationUserId)
+            .ExecuteDeleteAsync(cancellationToken);
+        
         // Set organization permissions
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.ItemAccessLevel, userPermissions.OrganizationItemAccessLevel),
+                .SetProperty(p => p.AdminAccessLevel, userPermissions.Administrative)
+                .SetProperty(p => p.SpacesAccessLevel, userPermissions.GlobalAccessLevels.Spaces)
+                .SetProperty(p => p.EpicsAccessLevel, userPermissions.GlobalAccessLevels.Epics)
+                .SetProperty(p => p.IssuesAccessLevel, userPermissions.GlobalAccessLevels.Issues),
                 cancellationToken);
 
-        // Set spaces permissions
-        await context.SpaceOrganizationUsers
-            .Where(x => x.OrganizationUserId == organizationUserId)
-            .ExecuteDeleteAsync(cancellationToken);
-        
-        var spaceLevels = userPermissions.SpacesAccessLevels;
-        if (spaceLevels.DirectAccess is not null)
+        // Set spaces direct permissions
+        foreach (var spaceLevel in userPermissions.DirectAccessLevels)
         {
-            var spacePermissions = spaceLevels.DirectAccess
-                .Select(x => new SpaceOrganizationUser
-                {
-                    ItemAccessLevel = x.Value,
-                    OrganizationUserId = organizationUserId,
-                    SpaceId = x.Key,
-                });
-            
-            context.SpaceOrganizationUsers.AddRange(spacePermissions);
-        }
-        else 
-        {
-            var spacePermission = new SpaceOrganizationUser
+            var spacePermission = new DirectSpacePermission
             {
-                ItemAccessLevel = spaceLevels.ItemAccessLevel,
                 OrganizationUserId = organizationUserId,
-                SpaceId = null,
+                SpaceId = spaceLevel.Key,
+                EntityAccessLevel = spaceLevel.Value.Self,
+                ChildrenEpicsAccessLevel = spaceLevel.Value.Epics,
+                ChildrenIssuesAccessLevel = spaceLevel.Value.Issues,
             };
+
+            context.DirectSpacePermissions.Add(spacePermission);
             
-            context.SpaceOrganizationUsers.Add(spacePermission);
-        }
-        
-        // Set epics permissions
-        await context.EpicOrganizationUsers
-            .Where(x => x.OrganizationUserId == organizationUserId)
-            .ExecuteDeleteAsync(cancellationToken);
-        
-        var epicLevels = userPermissions.EpicsAccessLevels;
-        if (epicLevels.DirectAccess is not null)
-        {
-            var epicPermissions = epicLevels.DirectAccess
-                .Select(x => new EpicOrganizationUser
-                {
-                    ItemAccessLevel = x.Value,
-                    OrganizationUserId = organizationUserId,
-                    EpicId = x.Key,
-                });
-            
-            context.EpicOrganizationUsers.AddRange(epicPermissions);
-        }
-        else 
-        {
-            var epicPermission = new EpicOrganizationUser
+            // Set epics direct permissions
+            foreach (var epicLevel in spaceLevel.Value.DirectEpics)
             {
-                ItemAccessLevel = epicLevels.ItemAccessLevel,
-                OrganizationUserId = organizationUserId,
-                EpicId = null,
-            };
-            
-            context.EpicOrganizationUsers.Add(epicPermission);
+                var epicPermission = new DirectEpicPermission
+                {
+                    OrganizationUserId = organizationUserId,
+                    EpicId = epicLevel.Key,
+                    EntityAccessLevel = epicLevel.Value.Self,
+                    ChildrenIssuesAccessLevel = epicLevel.Value.Issues,
+                };
+
+                context.DirectEpicPermissions.Add(epicPermission);
+            }
         }
-        
+
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -227,37 +215,75 @@ public class CoreOrganizationsService(
     {
         var organizationAccessLevel = await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
-            .Select(x => x.ItemAccessLevel)
-            .FirstOrDefaultAsyncEF(cancellationToken);
-        
-        var spacePermissions = await context.SpaceOrganizationUsers
+            .Select(x => new
+            {
+                x.SpacesAccessLevel,
+                x.EpicsAccessLevel,
+                x.IssuesAccessLevel,
+                x.AdminAccessLevel,
+            })
+            .FirstOrThrowNotFoundEFAsync($"User: {organizationUserId} is not found in organization", cancellationToken);
+
+        var spacePermissions = await context.DirectSpacePermissions
             .Where(x => x.OrganizationUserId == organizationUserId)
-            .Where(x => x.ItemAccessLevel > ItemAccessLevel.None)
-            .Select(x => new { x.SpaceId, AccessLevel = x.ItemAccessLevel })
-            .ToArrayAsyncEF(cancellationToken);
-        
-        var epicPermissions = await context.EpicOrganizationUsers
-            .Where(x => x.OrganizationUserId == organizationUserId)
-            .Where(x => x.ItemAccessLevel > ItemAccessLevel.None)
-            .Select(x => new { x.EpicId, AccessLevel = x.ItemAccessLevel })
+            .Select(x => new
+            {
+                x.SpaceId,
+                x.ChildrenEpicsAccessLevel,
+                x.ChildrenIssuesAccessLevel,
+                x.EntityAccessLevel,
+            })
             .ToArrayAsyncEF(cancellationToken);
 
-        var spaceAccessLevels = ToAccessLevels(
-            spacePermissions,
+        var epicPermissions = await context.DirectEpicPermissions
+            .Where(x => x.OrganizationUserId == organizationUserId)
+            .Select(x => new
+            {
+                x.EpicId,
+                x.ChildrenIssuesAccessLevel,
+                x.EntityAccessLevel,
+                x.Epic!.SpaceId
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var epicAccessLevels = epicPermissions
+            .GroupBy(
+                x => x.SpaceId,
+                x => x)
+            .ToDictionary(x => x.Key, x => x
+                .ToDictionary(
+                    y => y.EpicId,
+                    y => new DirectEpicAccessLevel
+                    {
+                        Issues = y.ChildrenIssuesAccessLevel,
+                        Self = y.EntityAccessLevel,
+                    }));
+
+        var spaceAccessLevels = spacePermissions.ToDictionary(
             x => x.SpaceId,
-            x => x.AccessLevel);
-        
-        var epicAccessLevels = ToAccessLevels(
-            epicPermissions,
-            x => x.EpicId,
-            x => x.AccessLevel);
-        
-        return new UserPermissions
+            x => new DirectSpaceAccessLevel
+            {
+                Epics = x.ChildrenEpicsAccessLevel,
+                Issues = x.ChildrenIssuesAccessLevel, 
+                Self = x.EntityAccessLevel,
+                DirectEpics = epicAccessLevels[x.SpaceId]
+            });
+
+        var permissions = new UserPermissions
         {
-            OrganizationItemAccessLevel = organizationAccessLevel,
-            SpacesAccessLevels = spaceAccessLevels,
-            EpicsAccessLevels = epicAccessLevels,
+            Administrative = organizationAccessLevel.AdminAccessLevel,
+            GlobalAccessLevels = new GlobalAccessLevels
+            {
+                Epics = organizationAccessLevel.EpicsAccessLevel,
+                Spaces = organizationAccessLevel.SpacesAccessLevel,
+                Issues = organizationAccessLevel.IssuesAccessLevel,
+            },
+            DirectAccessLevels = spaceAccessLevels
         };
+        
+        NormalizePermissions(permissions);
+
+        return permissions;
     }
 
     public async Task<PermittableSpace[]> GetPermittableEntities(
@@ -270,7 +296,7 @@ public class CoreOrganizationsService(
         
         var epics = await context.Epics
             .Where(x => x.Space!.OrganizationId == organizationId)
-            .Select(x => new { Id = x.Id, x.Name, x.SpaceId })
+            .Select(x => new { x.Id, x.Name, x.SpaceId })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicsBySpaces = epics
@@ -286,38 +312,78 @@ public class CoreOrganizationsService(
             .ToArray();
     }
 
-    private static AccessLevels ToAccessLevels<T>(T[] permissions, Func<T, long?> getItemId, Func<T, ItemAccessLevel> getAccessLevel)
+    /// <summary>
+    /// Add explicit implicitly added permissions, e.g. Read is always need when Write is active.
+    /// </summary>
+    private void NormalizePermissions(UserPermissions permissions)
     {
-        if (permissions.Length == 0)
-            return new AccessLevels();
+        // When at the bottom level something is active, it provides read access to the top level.
+        // When user can view Issues he should view Epic where these Issues are situated.
         
-        if (permissions.Length == 1 && getItemId(permissions[0]) is null)
-            return new AccessLevels { ItemAccessLevel = getAccessLevel(permissions[0]) };
-
-        return new AccessLevels
+        // Global access setup
+        var global = permissions.GlobalAccessLevels;
+        
+        if (global.Issues > ChildrenAccessLevel.None)
         {
-            DirectAccess = permissions
-                .ToDictionary(x => getItemId(x)!.Value, getAccessLevel), 
-            // TODO - possible errors here when something will stores in DB incorrectly
-            // Right way is to merge permissions or change DTO to consume direct and global permissions separately
-        };
+            global.Spaces |= ChildrenAccessLevel.Read;
+            global.Epics |= ChildrenAccessLevel.Read;
+            global.Issues |= ChildrenAccessLevel.Read;
+        }
+
+        if (global.Epics > ChildrenAccessLevel.None)
+        {
+            global.Spaces |= ChildrenAccessLevel.Read;
+            global.Epics |= ChildrenAccessLevel.Read;
+        }
+        
+        if (global.Spaces > ChildrenAccessLevel.None)
+            global.Spaces |= ChildrenAccessLevel.Read;
+        
+        // Direct access setup
+        foreach (var directSpaceAccess in permissions.DirectAccessLevels)
+        {
+            foreach (var directEpicAccess in directSpaceAccess.Value.DirectEpics)
+            {
+                if (directEpicAccess.Value.Issues > ChildrenAccessLevel.None ||
+                    directEpicAccess.Value.Self > EntityAccessLevel.None)
+                {
+                    directSpaceAccess.Value.Self |= EntityAccessLevel.Read;
+                    directEpicAccess.Value.Self |= EntityAccessLevel.Read;
+                }
+            }
+            
+            if (directSpaceAccess.Value.Issues > ChildrenAccessLevel.None || directSpaceAccess.Value.Self > EntityAccessLevel.None)
+                directSpaceAccess.Value.Self |= EntityAccessLevel.Read;
+        }
     }
 }
 
 public record UserPermissions
 {
-    public ItemAccessLevel OrganizationItemAccessLevel { get; set; }
-    public required AccessLevels SpacesAccessLevels { get; set; }
-    public required AccessLevels EpicsAccessLevels { get; set; }
+    public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
+    public Dictionary<long, DirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
+    public AdminAccessLevel Administrative { get; set; }
 }
 
-/// <summary>
-/// Allows to set up AccessLevel for all items in a time or separately for each item.
-/// </summary>
-public record AccessLevels
+public record GlobalAccessLevels
 {
-    public ItemAccessLevel ItemAccessLevel { get; init; }
-    public Dictionary<long, ItemAccessLevel>? DirectAccess { get; init; }
+    public ChildrenAccessLevel Spaces { get; set; }
+    public ChildrenAccessLevel Epics { get; set; }
+    public ChildrenAccessLevel Issues { get; set; }
+}
+
+public record DirectSpaceAccessLevel
+{
+    public ChildrenAccessLevel Epics { get; set; }
+    public ChildrenAccessLevel Issues { get; set; }
+    public EntityAccessLevel Self { get; set; }
+    public Dictionary<long, DirectEpicAccessLevel> DirectEpics { get; set; } = new();
+}
+
+public record DirectEpicAccessLevel
+{
+    public ChildrenAccessLevel Issues { get; set; }
+    public EntityAccessLevel Self { get; set; }
 }
 
 public record PermittableSpace(long Id, string Name, Dictionary<long, string> Epics);

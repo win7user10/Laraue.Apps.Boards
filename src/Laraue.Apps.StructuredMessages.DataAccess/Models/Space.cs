@@ -37,5 +37,5 @@ public class Space
     /// Epics linked to the space.
     /// </summary>
     public IList<Epic>? Epics { get; set; }
-    public IList<SpaceOrganizationUser>? Users { get; set; }
+    public IList<DirectSpacePermission>? Users { get; set; }
 }

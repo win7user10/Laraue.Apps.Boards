@@ -52,8 +52,8 @@ public class WebApiTestHostScope : IDisposable
         Database.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
         
         // Cleanup before test run
-        Database.SpaceOrganizationUsers.ExecuteDelete();
-        Database.EpicOrganizationUsers.ExecuteDelete();
+        Database.DirectSpacePermissions.ExecuteDelete();
+        Database.DirectEpicPermissions.ExecuteDelete();
         Database.Users.ExecuteDelete();
     }
 
@@ -75,9 +75,20 @@ public class WebApiTestHostScope : IDisposable
 
     public Task<Organization> InitializePersonalOrganization(Guid userId, Action<OrganizationInitializer>? setupInitializer = null)
     {
-        var initializer = new OrganizationInitializer(Database, userId)
-            .WithName("Personal")
-            .WithType(OrganizationType.Personal)
+        return InitializeOrganization(userId, (initializer) =>
+        {
+            setupInitializer?.Invoke(initializer.WithType(OrganizationType.Personal));
+        });
+    }
+    
+
+    public Task<Organization> InitializeOrganization(Guid userId, Action<OrganizationInitializer>? setupInitializer = null)
+    {
+        var initializer = ActivatorUtilities.CreateInstance<OrganizationInitializer>(_scope.ServiceProvider, userId);
+        
+        initializer
+            .WithName("New Org")
+            .WithType(OrganizationType.Organization)
             .WithTimestamp(DateTime.UtcNow);
 
         setupInitializer?.Invoke(initializer);

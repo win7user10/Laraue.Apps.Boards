@@ -17,9 +17,8 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, userId)
-            .AddSpace(userId)
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(userId, org => org
+            .AddSpace(userId));
         
         var spaceId = organization.Spaces![1].Id;
         var epicId = await _epicsController
@@ -55,9 +54,9 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.CreateItems))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetEpicsAccessLevel(ChildrenAccessLevel.Create)));
         
         var spaceId = organization.Spaces![0].Id;
         
@@ -80,9 +79,9 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetSpacesAccessLevel(ItemAccessLevel.CreateItems))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
         
         var spaceId = organization.Spaces![0].Id;
         
@@ -105,9 +104,9 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetSpaceAccessLevel(0, ItemAccessLevel.CreateItems))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetSpaceEpicsAccessLevel(0, ChildrenAccessLevel.Create)));
         
         var spaceId = organization.Spaces![0].Id;
         

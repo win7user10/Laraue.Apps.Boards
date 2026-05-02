@@ -20,7 +20,12 @@ public interface ISpacesAccessService
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long spaceId,
-        ItemAccessLevel itemAccessLevel,
+        EntityAccessLevel entityAccessLevel,
+        CancellationToken cancellationToken);
+    
+    Task CanCreateEpics(
+        OrganizationAuthData authData,
+        long spaceId,
         CancellationToken cancellationToken);
 }
 
@@ -31,68 +36,85 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         Func<IQueryable<SpaceWithAccessLevel>, Task<T>> map,
         CancellationToken cancellationToken)
     {
-        var globalOrganizationAccess = await accessService
-            .GetGlobalOrganizationAccess(authData, cancellationToken);
-
-        var globalSpaceAccess = await accessService
-            .GetGlobalSpacesAccess(authData, cancellationToken);
-
-        var globalAccess = globalOrganizationAccess | globalSpaceAccess;
-        if (globalAccess.HasFlag(ItemAccessLevel.ReadItems))
-            return await map(GetGlobalReadableSpacesQuery(authData, globalAccess));
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
         
-        return await map(GetDirectReadableSpacesQuery(authData)); 
+        var accessToViewSpaces = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel | accessLevels.IssuesAccessLevel;
+        if (accessToViewSpaces.HasFlag(ChildrenAccessLevel.Read))
+            return await map(GetGlobalReadableSpacesQuery(authData, accessLevels.SpacesAccessLevel.ToEntityAccessLevel()));
+        
+        return await map(GetDirectReadableSpacesQuery(authData)
+            .Select(x => new SpaceWithAccessLevel(x.Space!, x.EntityAccessLevel))); 
     }
 
     public async Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long spaceId,
-        ItemAccessLevel itemAccessLevel,
+        EntityAccessLevel entityAccessLevel,
         CancellationToken cancellationToken)
     {
-        var globalOrganizationAccess = await accessService
-            .GetGlobalOrganizationAccess(authData, cancellationToken);
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
         
-        if (globalOrganizationAccess.HasFlag(itemAccessLevel))
-            return;
-        
-        var globalSpaceAccess = await accessService
-            .GetGlobalSpacesAccess(authData, cancellationToken);
-        
-        if (globalSpaceAccess.HasFlag(itemAccessLevel))
+        if (accessLevels.SpacesAccessLevel.HasFlag((ChildrenAccessLevel)entityAccessLevel))
             return;
 
-        await context.SpaceOrganizationUsers
+        await context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.SpaceId == spaceId)
             .AnyOrThrowNotFoundEFAsync(
-                sos => sos.ItemAccessLevel.HasFlag(itemAccessLevel),
-                $"Space: {spaceId} is unavailable or permission: {itemAccessLevel} is missing",
+                sos => sos.EntityAccessLevel.HasFlag(entityAccessLevel),
+                $"Space: {spaceId} is unavailable or permission: {entityAccessLevel} is missing",
                 cancellationToken);
     }
 
-    private IQueryable<SpaceWithAccessLevel> GetGlobalReadableSpacesQuery(OrganizationAuthData authData, ItemAccessLevel accessLevel)
+    public async Task CanCreateEpics(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken)
+    {
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
+        
+        if (accessLevels.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+            return;
+        
+        if (accessLevels.EpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+            return;
+
+        await context.DirectSpacePermissions
+            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
+            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
+            .Where(sos => sos.ChildrenEpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+            .FirstOrThrowNotFoundEFAsync(
+                sos => sos.SpaceId == spaceId,
+                $"Space: {spaceId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing",
+                cancellationToken);
+    }
+
+    private IQueryable<SpaceWithAccessLevel> GetGlobalReadableSpacesQuery(OrganizationAuthData authData, EntityAccessLevel accessLevel)
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)
             .LeftJoin(
-                context.SpaceOrganizationUsers,
+                context.DirectSpacePermissions,
                 (space, user) => space.Id == user.SpaceId,
-                (space, user) => new { Space = space, User = (SpaceOrganizationUser?)user })
+                (space, user) => new { Space = space, DirectSpacePermission = (DirectSpacePermission?)user })
             .Select(spaceUser => new SpaceWithAccessLevel(
                 spaceUser.Space,
-                spaceUser.User != null ? spaceUser.User.ItemAccessLevel | accessLevel : accessLevel));
+                spaceUser.DirectSpacePermission != null
+                    ? spaceUser.DirectSpacePermission.EntityAccessLevel | accessLevel
+                    : accessLevel));
     }
     
-    private IQueryable<SpaceWithAccessLevel> GetDirectReadableSpacesQuery(OrganizationAuthData authData)
+    private IQueryable<DirectSpacePermission> GetDirectReadableSpacesQuery(OrganizationAuthData authData)
     {
-        return context.SpaceOrganizationUsers
+        return context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.ItemAccessLevel.HasFlag(ItemAccessLevel.ReadItems))
-            .Select(sos => new SpaceWithAccessLevel(sos.Space!, sos.ItemAccessLevel));
+            .Where(sos => sos.EntityAccessLevel.HasFlag(ChildrenAccessLevel.Read));
     }
 }
 
-public record SpaceWithAccessLevel(Space Space, ItemAccessLevel ItemAccessLevel);
+public record SpaceWithAccessLevel(Space Space, EntityAccessLevel EntityAccessLevel);

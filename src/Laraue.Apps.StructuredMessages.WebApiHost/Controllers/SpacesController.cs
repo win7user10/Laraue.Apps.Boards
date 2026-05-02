@@ -63,7 +63,7 @@ public class SpacesController(ISpacesService spacesService, IEpicsService epicsS
             cancellationToken);
     }
     
-    [HttpGet("{id:long}/spaces")]
+    [HttpGet("{id:long}/epics")]
     public Task<EpicCountDto[]> GetSpaceEpics(
         long id,
         CancellationToken cancellationToken = default) => 

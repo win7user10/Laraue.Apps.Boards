@@ -43,7 +43,7 @@ public class SpacesService(
                     Name = x.Space.Name,
                     Color = x.Space.Color,
                     EpicsCount = x.Space.Epics!.Count,
-                    AccessLevel = x.ItemAccessLevel
+                    AccessLevel = x.EntityAccessLevel
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -53,9 +53,8 @@ public class SpacesService(
 
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
+        await organizationAccessService.CanCreateSpacesOrThrow(
             request.AuthData,
-            ItemAccessLevel.CreateItems,
             cancellationToken);
 
         return await coreSpacesService.Create(
@@ -68,10 +67,11 @@ public class SpacesService(
 
     public async Task Update(UpdateSpaceRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
+        await spacesAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemAccessLevel.UpdateSelf,
-            cancellationToken); // Wrong. Update should be available on space level (when managed is active??). It's strange
+            request.Id,
+            EntityAccessLevel.Update,
+            cancellationToken);
 
         await coreSpacesService.Update(
             request.Id,
@@ -86,7 +86,7 @@ public class SpacesService(
         await spacesAccessService.HasAccessOrThrow(
             request.AuthData,
             request.Id,
-            ItemAccessLevel.DeleteSelf,
+            EntityAccessLevel.Delete,
             cancellationToken);
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
@@ -136,5 +136,5 @@ public record SpaceDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int EpicsCount { get; set; }
-    public required ItemAccessLevel AccessLevel { get; set; }
+    public required EntityAccessLevel AccessLevel { get; set; }
 }

@@ -278,7 +278,7 @@ public class IssuesService(
         await epicsAccessService.HasAccessOrThrow(
             request.AuthData,
             validationData.EpicId,
-            ItemAccessLevel.CreateItems,
+            ChildrenAccessLevel.Create,
             ct);
 
         return await messageService.Create(

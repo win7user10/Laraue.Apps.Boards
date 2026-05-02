@@ -44,10 +44,8 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var userId = await testScope.CreateUser();
         var timestamp = DateTime.UtcNow;
         
-        var organization = await new OrganizationInitializer(testScope.Database, userId)
-            .WithType(OrganizationType.Personal)
-            .AddSpace(userId, space => space.WithTimestamp(timestamp))
-            .Initialize();
+        var organization = await testScope.InitializePersonalOrganization(userId, org => org
+            .AddSpace(userId, space => space.WithTimestamp(timestamp)));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -77,10 +75,8 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         
-        var organization = await new OrganizationInitializer(testScope.Database, userId)
-            .WithType(OrganizationType.Personal)
-            .AddSpace(userId)
-            .Initialize();
+        var organization = await testScope.InitializePersonalOrganization(userId, org => org
+            .AddSpace(userId));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -101,17 +97,14 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         
         // User 1 has organization with default space + additional space
         var user1Id = await testScope.CreateUser();
-        var organization1 = await new OrganizationInitializer(testScope.Database, user1Id)
+        var organization1 = await testScope.InitializePersonalOrganization(user1Id, org => org
             .WithType(OrganizationType.Personal)
-            .AddSpace(user1Id)
-            .Initialize();
+            .AddSpace(user1Id));
         var organization1SpaceIds = organization1.Spaces!.Select(x => x.Id);
         
         // User 2 has organization with default space
         var user2Id = await testScope.CreateUser();
-        var organization2 = await new OrganizationInitializer(testScope.Database, user2Id)
-            .WithType(OrganizationType.Personal)
-            .Initialize();
+        var organization2 = await testScope.InitializePersonalOrganization(user2Id);
         var organization2SpaceIds = organization2.Spaces!.Select(x => x.Id);
         
         // User 1 see two spaces
@@ -134,12 +127,10 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, userId)
-            .WithType(OrganizationType.Personal)
+        var organization = await testScope.InitializePersonalOrganization(userId, org => org
             .AddSpace(userId,  space => space
                 .WithColor("#ff11ff")
-                .WithName("My Space"))
-            .Initialize();
+                .WithName("My Space")));
         var spaceId = organization.Spaces![1].Id;
         
         var spaces = await _spacesController
@@ -186,7 +177,6 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var nonPermittedUserId = await testScope.CreateUser();
         var organization = await testScope.InitializePersonalOrganization(
             userId,
             setup => setup
@@ -194,10 +184,13 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
                     spaceBuilder
                         .AddEpic(userId)));
         
+        var nonPermittedUserId = await testScope.CreateUser();
+        var secondOrganization = await testScope.InitializePersonalOrganization(nonPermittedUserId);
+        
         var space = organization.Spaces![1];
 
         var epics = await _spacesController
-            .WithOrganizationAuthorization(organization.Id, nonPermittedUserId)
+            .WithOrganizationAuthorization(secondOrganization.Id, nonPermittedUserId)
             .Execute(x => x.GetSpaceEpics(space.Id));
         
         Assert.Empty(epics!);

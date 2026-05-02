@@ -75,7 +75,7 @@ public class OrganizationsService(
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
-                    ItemAccessLevel = x.ItemAccessLevel,
+                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     SpacesCount = x.Organization.Spaces!.Count,
@@ -96,7 +96,7 @@ public class OrganizationsService(
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
-                    ItemAccessLevel = x.ItemAccessLevel,
+                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     SpacesCount = x.Organization.Spaces!.Count,
@@ -172,11 +172,11 @@ public class OrganizationsService(
     public async Task SetUserPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
     {
         // TODO - check that passed permissions are correct, check access to passed items
-        var organizationUser = await context.OrganizationUsers
+        await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
-            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
-            .Select(x => new { x.OrganizationId })
-            .FirstOrThrowNotFoundEFAsync($"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
+            .AnyOrThrowNotFoundEFAsync(
+                x => x.OrganizationId == request.AuthData.OrganizationId, 
+                $"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
@@ -209,14 +209,13 @@ public class OrganizationsService(
 
     public async Task<string> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
-            new OrganizationAuthData
-            {
-                OrganizationId = request.OrganizationId,
-                UserId = request.UserId,
-            },
-            ItemAccessLevel.None,
-            cancellationToken);
+        await organizationAccessService.GetAvailable(
+            request.UserId,
+            organizations => organizations
+                .Where(o => o.UserId == request.UserId)
+                .FirstOrThrowNotFoundEFAsync(
+                    "Organization is not exists or user does not belong to organization",
+                    cancellationToken));
 
         return authService.CreateOrganizationToken(request.OrganizationId, request.UserId);
     }
@@ -227,7 +226,7 @@ public class OrganizationsService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            ItemAccessLevel.ReadItems,
+            AdminAccessLevel.ManagePermissions,
             cancellationToken);
 
         var data = await context.OrganizationUsers
@@ -241,7 +240,7 @@ public class OrganizationsService(
                 Username = x.User.TelegramUserName,
                 Initials = null,
                 IsOwner = x.Organization!.OwnerId == x.UserId,
-                ItemAccessLevel = x.ItemAccessLevel,
+                ChildrenAccessLevel = x.SpacesAccessLevel,
             })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -318,7 +317,7 @@ public record OrganizationDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int SpacesCount { get; set; }
-    public required ItemAccessLevel ItemAccessLevel { get; set; }
+    public required bool CanCreateSpaces { get; set; }
     public required AdminAccessLevel AdminAccessLevel { get; set; }
     public required bool IsPersonal { get; set; }
 }
@@ -362,7 +361,7 @@ public record OrganizationMember
     public required string Color { get; set; }
     public string? Initials { get; set; }
     public required bool IsOwner { get; set; }
-    public required ItemAccessLevel ItemAccessLevel { get; set; }
+    public required ChildrenAccessLevel ChildrenAccessLevel { get; set; }
 }
 
 public record GetPermittableEntitiesRequest

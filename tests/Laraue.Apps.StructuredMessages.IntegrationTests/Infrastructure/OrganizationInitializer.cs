@@ -6,7 +6,10 @@ using Status = Laraue.Apps.StructuredMessages.DataAccess.Models.Status;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 
-public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
+public class OrganizationInitializer(
+    DatabaseContext context,
+    ICoreOrganizationsService coreOrganizationsService,
+    Guid ownerId)
 {
     private readonly Dictionary<Guid, Action<PermissionBuilder>> _organizationUsers = new();
     
@@ -114,68 +117,44 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
             
             organization.Spaces!.Add(spaceEntity);
         }
+        
+        context.Add(organization);
+        await context.SaveChangesAsync();
 
         foreach (var user in _organizationUsers)
         {
             var builder = new PermissionBuilder();
             user.Value.Invoke(builder);
 
-            var organizationUser = new OrganizationUser
+            var userPermissions = new UserPermissions
             {
-                ItemAccessLevel = builder.OrganizationItemAccessLevel,
-                AdminAccessLevel = builder.OrganizationAdminAccessLevel,
-                UserId = user.Key
+                GlobalAccessLevels = builder.Permissions.GlobalAccessLevels,
+                Administrative = builder.Permissions.Administrative,
+                DirectAccessLevels = builder.Permissions.DirectAccessLevels
+                    .ToDictionary(
+                        x => organization.Spaces![x.Key].Id,
+                        x =>
+                        {
+                            var spacePermission = organization.Spaces![x.Key];
+                            return new DirectSpaceAccessLevel
+                            {
+                                Epics = x.Value.Epics,
+                                Issues = x.Value.Issues,
+                                Self = x.Value.Self,
+                                DirectEpics = x.Value.DirectEpics
+                                    .ToDictionary(
+                                        y => spacePermission.Epics![y.Key].Id,
+                                        y => y.Value)
+                            };
+                        })
             };
             
-            organization.Users!.Add(organizationUser);
-            
-            // Set global space permissions
-            context.Add(new SpaceOrganizationUser
-            {
-                ItemAccessLevel = builder.SpacesGlobalAccessLevel,
-                OrganizationUser = organizationUser
-            });
-
-            // Set global epic permissions
-            context.Add(new EpicOrganizationUser
-            {
-                ItemAccessLevel = builder.EpicsGlobalAccessLevel,
-                OrganizationUser = organizationUser
-            });
-            
-            // Set direct space permissions
-            foreach (var accessLevel in builder.SpaceAccessLevels)
-            {
-                organization.Spaces![accessLevel.Key].Users = new List<SpaceOrganizationUser>
-                {
-                    new()
-                    {
-                        ItemAccessLevel = accessLevel.Value,
-                        OrganizationUser = organizationUser,
-                    }
-                };
-            }
-            
-            // Set direct epic permissions
-            var epicAccessLevelsBySpaceIndex = builder.EpicAccessLevels;
-            foreach (var epicAccessLevelsBySpace in epicAccessLevelsBySpaceIndex)
-            {
-                foreach (var epicAccessLevels in epicAccessLevelsBySpace.Value)
-                {
-                    organization.Spaces![epicAccessLevelsBySpace.Key].Epics![epicAccessLevels.Key].Users = new List<EpicOrganizationUser>
-                    {
-                        new()
-                        {
-                            ItemAccessLevel = epicAccessLevels.Value,
-                            OrganizationUser = organizationUser,
-                        }
-                    };
-                }
-            }
+            var organizationUserId = await coreOrganizationsService.AddMember(organization.Id, user.Key, CancellationToken.None);
+            await coreOrganizationsService.SetUserPermissions(
+                organizationUserId,
+                userPermissions,
+                CancellationToken.None);
         }
-        
-        context.Add(organization);
-        await context.SaveChangesAsync();
         
         return organization;
     }
@@ -207,54 +186,87 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         return this;
     }
 
+    public record TestUserPermissions
+    {
+        public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
+        public Dictionary<int, TestDirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
+        public AdminAccessLevel Administrative { get; set; }
+    }
+    
+    public record TestDirectSpaceAccessLevel
+    {
+        public ChildrenAccessLevel Epics { get; set; }
+        public ChildrenAccessLevel Issues { get; set; }
+        public EntityAccessLevel Self { get; set; }
+        public Dictionary<int, DirectEpicAccessLevel> DirectEpics { get; set; } = new();
+    }
+    
     public class PermissionBuilder
     {
-        public ItemAccessLevel OrganizationItemAccessLevel { get; private set; }
-        public AdminAccessLevel OrganizationAdminAccessLevel { get; private set; }
-        public ItemAccessLevel SpacesGlobalAccessLevel { get; private set; } = new();
-        public DirectAccess SpaceAccessLevels { get; private set; } = new();
-        public ItemAccessLevel EpicsGlobalAccessLevel { get; private set; } = new();
-        public Dictionary<int, DirectAccess> EpicAccessLevels { get; private set; } = new();
-    
-        public PermissionBuilder SetOrganizationAccessLevel(ItemAccessLevel itemAccessLevel)
+        public TestUserPermissions Permissions { get; set; } = new();
+        
+        public PermissionBuilder SetAdminAccessLevel(AdminAccessLevel adminAccessLevel)
         {
-            OrganizationItemAccessLevel = itemAccessLevel;
+            Permissions.Administrative = adminAccessLevel;
             return this;
+        }
+    
+        public PermissionBuilder SetSpacesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Spaces = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetSpaceAccessLevel(int index, EntityAccessLevel entityAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Self = entityAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetSpaceEpicsAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Epics = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel entityAccessLevel)
+        {
+            return SetEpicAccessLevel(0, 0, entityAccessLevel);
+        }
+    
+        public PermissionBuilder SetEpicsAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Epics = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetEpicAccessLevel(int spaceIndex, int epicIndex, EntityAccessLevel entityAccessLevel)
+        {
+            GetDirectEpicsLevels(spaceIndex, epicIndex).Self = entityAccessLevel;
+            
+            return this;
+        }
+
+        private TestDirectSpaceAccessLevel GetDirectSpacesLevels(int spaceIndex)
+        {
+            if (!Permissions.DirectAccessLevels.ContainsKey(spaceIndex))
+                Permissions.DirectAccessLevels[spaceIndex] = new TestDirectSpaceAccessLevel();
+            
+            return Permissions.DirectAccessLevels[spaceIndex];
         }
         
-        public PermissionBuilder SetOrganizationAccessLevel(AdminAccessLevel adminAccessLevel)
+
+        private DirectEpicAccessLevel GetDirectEpicsLevels(int spaceIndex, int epicIndex)
         {
-            OrganizationAdminAccessLevel = adminAccessLevel;
-            return this;
-        }
-    
-        public PermissionBuilder SetSpacesAccessLevel(ItemAccessLevel itemAccessLevel)
-        {
-            SpacesGlobalAccessLevel = itemAccessLevel;
+            var spaceLevels = GetDirectSpacesLevels(spaceIndex);
+            if (!spaceLevels.DirectEpics.ContainsKey(epicIndex))
+                spaceLevels.DirectEpics[epicIndex] = new DirectEpicAccessLevel();
             
-            return this;
-        }
-    
-        public PermissionBuilder SetSpaceAccessLevel(int index, ItemAccessLevel itemAccessLevel)
-        {
-            SpaceAccessLevels[index] = itemAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(ItemAccessLevel itemAccessLevel)
-        {
-            EpicAccessLevels.TryAdd(0, new DirectAccess());
-            EpicAccessLevels[0][0] = itemAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetEpicsAccessLevel(ItemAccessLevel itemAccessLevel)
-        {
-            EpicsGlobalAccessLevel = itemAccessLevel;
-            
-            return this;
+            return spaceLevels.DirectEpics[epicIndex];
         }
     }
 
@@ -385,7 +397,7 @@ public class OrganizationInitializer(DatabaseContext context, Guid ownerId)
         }
     }
 
-    public class DirectAccess : Dictionary<int, ItemAccessLevel>
+    public class DirectAccess : Dictionary<int, EntityAccessLevel>
     {
     }
 }

@@ -18,7 +18,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, userId).Initialize();
+        var organization = await testScope.InitializeOrganization(userId);
         
         var spaceId = await _spacesController
             .WithOrganizationAuthorization(organization.Id, userId)
@@ -49,9 +49,9 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.CreateItems))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
         
         var spaceId = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
@@ -73,9 +73,9 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
@@ -94,11 +94,10 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId)
             .AddSpace(participatorId, s => s
-                .WithName("Space created by Participator"))
-            .Initialize();
+                .WithName("Space created by Participator")));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -109,7 +108,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         Assert.Equal(2, spaces!.Length);
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space created by Participator", space.Name);
-        Assert.Equal(ItemAccessLevel.All, space.AccessLevel);
+        Assert.Equal(EntityAccessLevel.All, space.AccessLevel);
     }
     
     [Fact]
@@ -118,17 +117,17 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
-            .AddUser(participatorId, builder => builder.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
-            .Initialize();
+            .AddUser(participatorId, builder => builder
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
     }
     
     [Fact]
@@ -137,18 +136,17 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
-            .Initialize();
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
     }
     
     [Fact]
@@ -157,18 +155,17 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
-            .Initialize();
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(ItemAccessLevel.ReadItems, s.AccessLevel));
+        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
     }
     
     [Fact]
@@ -177,13 +174,11 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetOrganizationAccessLevel(ItemAccessLevel.ReadItems)
-                .SetSpacesAccessLevel(ItemAccessLevel.CreateItems)
-                .SetSpaceAccessLevel(1, ItemAccessLevel.UpdateSelf))
-            .Initialize();
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
+                .SetSpaceAccessLevel(1, EntityAccessLevel.Update)));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -192,7 +187,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         var space = spaces!.First(x => x.Id == spaceId);
-        Assert.Equal(ItemAccessLevel.ReadItems | ItemAccessLevel.CreateItems | ItemAccessLevel.UpdateSelf, space.AccessLevel);
+        Assert.Equal(EntityAccessLevel.Read | EntityAccessLevel.Update, space.AccessLevel);
     }
     
     [Fact]
@@ -201,11 +196,10 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId)
             .AddSpace(participatorId, s => s
-                .WithName("Space created by Participator"))
-            .Initialize();
+                .WithName("Space created by Participator")));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -215,47 +209,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         
         var epic = Assert.Single(epics!);
         Assert.Equal("Backlog", epic.Name);
-        Assert.Equal(ItemAccessLevel.All, epic.AccessLevel);
-    }
-    
-    [Fact]
-    public async Task User_ShouldViewEpics_WhenHasOrganizationLevelPermission()
-    {
-        using var testScope = host.CreateTestScope();
-        var ownerId = await testScope.CreateUser();
-        var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, b => b.SetOrganizationAccessLevel(ItemAccessLevel.ReadItems))
-            .AddSpace(ownerId, s => s.AddEpic(ownerId))
-            .Initialize();
-
-        var spaceId = organization.Spaces![1].Id;
-        
-        var epics = await _spacesController
-            .WithOrganizationAuthorization(organization.Id, participatorId)
-            .Execute(x => x.GetSpaceEpics(spaceId));
-        
-        Assert.Equal(2, epics!.Length);
-    }
-    
-    [Fact]
-    public async Task User_ShouldViewEpics_WhenHasSpacesLevelPermission()
-    {
-        using var testScope = host.CreateTestScope();
-        var ownerId = await testScope.CreateUser();
-        var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, b => b.SetSpacesAccessLevel(ItemAccessLevel.ReadItems))
-            .AddSpace(ownerId, s => s.AddEpic(ownerId))
-            .Initialize();
-
-        var spaceId = organization.Spaces![1].Id;
-        
-        var epics = await _spacesController
-            .WithOrganizationAuthorization(organization.Id, participatorId)
-            .Execute(x => x.GetSpaceEpics(spaceId));
-        
-        Assert.Equal(2, epics!.Length);
+        Assert.Equal(EntityAccessLevel.All, epic.EntityAccessLevel);
     }
     
     [Fact]
@@ -264,10 +218,11 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, b => b.SetSpaceAccessLevel(1, ItemAccessLevel.ReadItems))
-            .AddSpace(ownerId, s => s.AddEpic(ownerId))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, b => b
+                .SetSpaceAccessLevel(1, EntityAccessLevel.Read))
+            .AddSpace(ownerId, s => s
+                .AddEpic(ownerId)));
 
         var spaceId = organization.Spaces![1].Id;
         
@@ -279,15 +234,58 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
     }
     
     [Fact]
+    public async Task User_ShouldNotViewEpics_WhenHasAnotherSpaceLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, b => b
+                .SetSpaceAccessLevel(0, EntityAccessLevel.Read))
+            .AddSpace(ownerId, s => s
+                .AddEpic(ownerId)));
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Empty(epics!);
+    }
+    
+    [Fact]
     public async Task User_ShouldViewEpics_WhenHasEpicsLevelPermission()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(participatorId, b => b.SetEpicsAccessLevel(ItemAccessLevel.ReadItems))
-            .AddSpace(ownerId, s => s.AddEpic(ownerId))
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, b => b
+                .SetEpicsAccessLevel(ChildrenAccessLevel.Read))
+            .AddSpace(ownerId, s => s
+                .AddEpic(ownerId)));
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewEpics_WhenHasEpicLevelWritePermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, b => b
+                .SetEpicAccessLevel(1, 1, EntityAccessLevel.Delete))
+            .AddSpace(ownerId, s => s
+                .AddEpic(ownerId)));
 
         var spaceId = organization.Spaces![1].Id;
         

@@ -12,9 +12,8 @@ public interface IOrganizationAccessService
         Guid userId,
         Func<IQueryable<OrganizationUser>, Task<T>> map);
     
-    Task HasAccessOrThrow(
+    Task CanCreateSpacesOrThrow(
         OrganizationAuthData authData,
-        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
@@ -33,14 +32,19 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
         return map(query);
     }
 
-    public async Task HasAccessOrThrow(
+    public async Task CanCreateSpacesOrThrow(
         OrganizationAuthData authData,
-        ItemAccessLevel itemAccessLevel,
         CancellationToken cancellationToken)
     {
-        var hasAccess = await HasAccess(authData.UserId, authData.OrganizationId, itemAccessLevel, cancellationToken);
-        if (!hasAccess)
-            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {itemAccessLevel} is missing");
+        var result = await GetAvailable(authData.UserId, (organizationUsers) =>
+        {
+            return organizationUsers
+                .Where(ou => ou.OrganizationId == authData.OrganizationId)
+                .AnyAsyncEF(ou => ou.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create), cancellationToken);
+        });
+        
+        if (!result)
+            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {ChildrenAccessLevel.Create} for spaces is missing");
     }
 
     public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)
@@ -54,19 +58,5 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
         
         if (!result)
             throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {accessLevel} is missing");
-    }
-
-    private Task<bool> HasAccess(
-        Guid userId,
-        long organizationId,
-        ItemAccessLevel itemAccessLevel,
-        CancellationToken cancellationToken)
-    {
-        return GetAvailable(userId, organizations =>
-        {
-            return organizations
-                .Where(x => x.OrganizationId == organizationId)
-                .AnyAsyncEF(x => x.ItemAccessLevel.HasFlag(itemAccessLevel), cancellationToken);
-        });
     }
 }
