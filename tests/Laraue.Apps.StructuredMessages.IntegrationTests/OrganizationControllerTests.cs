@@ -430,7 +430,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.SetUserPermissions(organizationUser.Id, request)));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }
-    /**
+    
     [Fact]
     public async Task User_ShouldViewPermissionsOfNewEmployeeInOwnedOrganization_Always()
     {
@@ -438,9 +438,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var ownerId = await testScope.CreateUser();
         var organizationUserId = await testScope.CreateUser();
 
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
-            .AddUser(organizationUserId)
-            .Initialize();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(organizationUserId));
 
         var organizationUser = organization.Users![1];
         var permissions = await _organizationsController
@@ -448,16 +447,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.OrganizationChildrenAccessLevel);
-
-        Assert.NotNull(permissions.SpacesAccessLevels);
-        Assert.Null(permissions.SpacesAccessLevels.DirectAccess);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.SpacesAccessLevels.ChildrenAccessLevel);
-
-        Assert.NotNull(permissions.EpicsAccessLevels);
-        Assert.Null(permissions.EpicsAccessLevels.DirectAccess);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.EpicsAccessLevels.ChildrenAccessLevel);
-    }**/
+        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Epics);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Issues);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Spaces);
+        Assert.Equal(AdminAccessLevel.None, permissions.Administrative);
+        Assert.Empty(permissions.DirectAccessLevels);
+    }
 
     [Fact]
     public async Task User_ShouldViewPermissionsOfNewEmployee_WhenHasAccess()
@@ -498,7 +493,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id)));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }
-    /**
+    
     [Fact]
     public async Task User_ShouldViewEmployeePermissionsInOwnedOrganization_Always()
     {
@@ -506,12 +501,10 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var ownerId = await testScope.CreateUser();
         var organizationUserId = await testScope.CreateUser();
 
-        var organization = await new OrganizationInitializer(testScope.Database, ownerId)
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(organizationUserId, builder => builder
-                .SetOrganizationAccessLevel(EntityAccessLevel.Read)
                 .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
-                .SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel.Delete))
-            .Initialize();
+                .SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel.Delete)));
 
         var organizationUser = organization.Users![1];
         var space = organization.Spaces![0];
@@ -522,19 +515,22 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.Read, permissions.OrganizationChildrenAccessLevel);
-
-        Assert.NotNull(permissions.SpacesAccessLevels);
-        Assert.Null(permissions.SpacesAccessLevels.DirectAccess);
-        Assert.Equal(ChildrenAccessLevel.Create, permissions.SpacesAccessLevels.ChildrenAccessLevel);
-
-        Assert.NotNull(permissions.EpicsAccessLevels);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.EpicsAccessLevels.ChildrenAccessLevel);
-        Assert.NotNull(permissions.EpicsAccessLevels.DirectAccess);
-        var directEpicAccess = Assert.Single(permissions.EpicsAccessLevels.DirectAccess);
-        Assert.Equal(epic.Id, directEpicAccess.Key);
-        Assert.Equal(ChildrenAccessLevel.Delete, directEpicAccess.Value);
-    }**/
+        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Epics);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Issues);
+        Assert.Equal(ChildrenAccessLevel.Read | ChildrenAccessLevel.Create, permissions.GlobalAccessLevels.Spaces);
+        Assert.Equal(AdminAccessLevel.None, permissions.Administrative);
+        
+        var directSpaceAccess = Assert.Single(permissions.DirectAccessLevels);
+        Assert.Equal(space.Id, directSpaceAccess.Key);
+        Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Epics);
+        Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Issues);
+        Assert.Equal(EntityAccessLevel.Read, directSpaceAccess.Value.Self);
+        
+        var directEpicsAccess = Assert.Single(directSpaceAccess.Value.DirectEpics);
+        Assert.Equal(epic.Id, directEpicsAccess.Key);
+        Assert.Equal(ChildrenAccessLevel.None, directEpicsAccess.Value.Issues);
+        Assert.Equal(EntityAccessLevel.Read | EntityAccessLevel.Delete, directEpicsAccess.Value.Self);
+    }
     
     [Fact]
     public async Task Login_ShouldReturnTokenForOwnedOrganization_Always()
