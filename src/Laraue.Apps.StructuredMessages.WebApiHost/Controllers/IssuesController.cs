@@ -96,14 +96,14 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpPut("{id:long}")]
     public Task Update(
         [FromRoute] long id,
-        [FromBody] EditMessageRequest request,
+        [FromBody] UpdateIssueRequest request,
         CancellationToken cancellationToken = default)
     {
         return messagesService.EditMessage(
             request with
             {
                 UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                Id = id,
             },
             cancellationToken);
     }

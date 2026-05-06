@@ -40,7 +40,7 @@ public interface IIssuesService
         CancellationToken ct);
     
     Task EditMessage(
-        EditMessageRequest request,
+        UpdateIssueRequest request,
         CancellationToken ct);
     
     Task<IShortPaginatedResult<MessageListDto>> Search(
@@ -292,13 +292,13 @@ public class IssuesService(
             ct);
     }
 
-    public async Task EditMessage(EditMessageRequest request, CancellationToken ct)
+    public async Task EditMessage(UpdateIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException($"Issue is not found: {request.MessageId}");
+        if (!await messageService.UserHasAccessToMessage(request.UserId, request.Id, ct)) 
+            throw new NotFoundException($"Issue is not found: {request.Id}");
         
         await messageService.Update(
-            request.MessageId,
+            request.Id,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
             ct);
@@ -623,10 +623,10 @@ public record CreateIssueRequest
     public required string Content { get; set; }
 }
 
-public record EditMessageRequest
+public record UpdateIssueRequest
 {
     public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public long Id { get; set; }
     public required string Content { get; set; }
 }
 
