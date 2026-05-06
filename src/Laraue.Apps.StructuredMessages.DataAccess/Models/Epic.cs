@@ -10,7 +10,7 @@ public class Epic
     public required string Name { get; set; }
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     
     public Guid UserId { get; set; }
     public User? User { get; set; }

@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
@@ -6,6 +7,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Laraue.Apps.StructuredMessages.WebApiHost;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.Exceptions;
+using Laraue.Core.Exceptions.Web;
 using Laraue.Telegram.NET.Abstractions.Request;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -218,11 +221,19 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
             var responseContent = await response.Content.ReadAsStringAsync();
             var error =
                 $"[{response.RequestMessage?.Method}] {response.RequestMessage?.RequestUri} ({response.StatusCode:D}) \nRequest Content: {bodyString}\nResponse Content:{responseContent}";
-            throw new HttpRequestException(error, null, response.StatusCode);
+
+            var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(responseContent, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            var inner = response.StatusCode switch
+            {
+                HttpStatusCode.BadRequest => new BadRequestException(errorResponse.Errors!),
+                _ => null
+            };
+            
+            throw new HttpRequestException(error, inner, response.StatusCode);
         }
     }
 
-    internal enum BindType
+    private enum BindType
     {
         FromQuery,
         FromPath,

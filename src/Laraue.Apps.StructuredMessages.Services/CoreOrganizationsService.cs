@@ -157,8 +157,6 @@ public class CoreOrganizationsService(
     {
         NormalizePermissions(userPermissions);
         
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        
         // Remove old permissions
         await context.DirectEpicPermissions
             .Where(x => x.OrganizationUserId == organizationUserId)
@@ -172,14 +170,14 @@ public class CoreOrganizationsService(
         await context.OrganizationUsers
             .Where(x => x.Id == organizationUserId)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.AdminAccessLevel, userPermissions.Administrative)
-                .SetProperty(p => p.SpacesAccessLevel, userPermissions.GlobalAccessLevels.Spaces)
-                .SetProperty(p => p.EpicsAccessLevel, userPermissions.GlobalAccessLevels.Epics)
-                .SetProperty(p => p.IssuesAccessLevel, userPermissions.GlobalAccessLevels.Issues),
+                .SetProperty(p => p.AdminAccessLevel, userPermissions.Admin)
+                .SetProperty(p => p.SpacesAccessLevel, userPermissions.Global.Spaces)
+                .SetProperty(p => p.EpicsAccessLevel, userPermissions.Global.Epics)
+                .SetProperty(p => p.IssuesAccessLevel, userPermissions.Global.Issues),
                 cancellationToken);
 
         // Set spaces direct permissions
-        foreach (var spaceLevel in userPermissions.DirectAccessLevels)
+        foreach (var spaceLevel in userPermissions.Direct)
         {
             var spacePermission = new DirectSpacePermission
             {
@@ -208,7 +206,6 @@ public class CoreOrganizationsService(
         }
 
         await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<UserPermissions> GetUserPermissions(long organizationUserId, CancellationToken cancellationToken)
@@ -271,14 +268,14 @@ public class CoreOrganizationsService(
 
         var permissions = new UserPermissions
         {
-            Administrative = organizationAccessLevel.AdminAccessLevel,
-            GlobalAccessLevels = new GlobalAccessLevels
+            Admin = organizationAccessLevel.AdminAccessLevel,
+            Global = new GlobalAccessLevels
             {
                 Epics = organizationAccessLevel.EpicsAccessLevel,
                 Spaces = organizationAccessLevel.SpacesAccessLevel,
                 Issues = organizationAccessLevel.IssuesAccessLevel,
             },
-            DirectAccessLevels = spaceAccessLevels
+            Direct = spaceAccessLevels
         };
         
         NormalizePermissions(permissions);
@@ -292,22 +289,24 @@ public class CoreOrganizationsService(
     {
         var spaces = await context.Spaces
             .Where(x => x.OrganizationId == organizationId)
-            .ToDictionaryAsyncEF(x => x.Id, x => x.Name, cancellationToken);
+            .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color }, cancellationToken);
         
         var epics = await context.Epics
             .Where(x => x.Space!.OrganizationId == organizationId)
-            .Select(x => new { x.Id, x.Name, x.SpaceId })
+            .Select(x => new { x.Id, x.Name, x.SpaceId, x.Color })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicsBySpaces = epics
             .GroupBy(x => x.SpaceId)
             .ToDictionary(x => x.Key, x => x
-                .ToDictionary(y => y.Id, y => y.Name));
+                .Select(y => new PermittableEpic(y.Id, y.Name, y.Color))
+                .ToArray());
 
         return spaces
             .Select(s => new PermittableSpace(
                 s.Key,
-                s.Value,
+                s.Value.Name,
+                s.Value.Color,
                 epicsBySpaces[s.Key]))
             .ToArray();
     }
@@ -321,7 +320,7 @@ public class CoreOrganizationsService(
         // When user can view Issues he should view Epic where these Issues are situated.
         
         // Global access setup
-        var global = permissions.GlobalAccessLevels;
+        var global = permissions.Global;
         
         if (global.Issues > ChildrenAccessLevel.None)
         {
@@ -340,7 +339,7 @@ public class CoreOrganizationsService(
             global.Spaces |= ChildrenAccessLevel.Read;
         
         // Direct access setup
-        foreach (var directSpaceAccess in permissions.DirectAccessLevels)
+        foreach (var directSpaceAccess in permissions.Direct)
         {
             foreach (var directEpicAccess in directSpaceAccess.Value.DirectEpics)
             {
@@ -360,9 +359,9 @@ public class CoreOrganizationsService(
 
 public record UserPermissions
 {
-    public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
-    public Dictionary<long, DirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
-    public AdminAccessLevel Administrative { get; set; }
+    public GlobalAccessLevels Global { get; set; } = new();
+    public Dictionary<long, DirectSpaceAccessLevel> Direct { get; set; } = new();
+    public AdminAccessLevel Admin { get; set; }
 }
 
 public record GlobalAccessLevels
@@ -386,4 +385,5 @@ public record DirectEpicAccessLevel
     public EntityAccessLevel Self { get; set; }
 }
 
-public record PermittableSpace(long Id, string Name, Dictionary<long, string> Epics);
+public record PermittableSpace(long Id, string Name, string Color, PermittableEpic[] Epics);
+public record PermittableEpic(long Id, string Name, string Color);

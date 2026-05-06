@@ -13,7 +13,7 @@ public class Space
     public required string Name { get; set; }
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     
     public Guid CreatorId { get; set; }
     public User? Creator { get; set; }

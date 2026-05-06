@@ -5,6 +5,7 @@ using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
@@ -339,7 +340,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         {
             UserPermissions = new UserPermissions
             {
-                DirectAccessLevels = new Dictionary<long, DirectSpaceAccessLevel>
+                Direct = new Dictionary<long, DirectSpaceAccessLevel>
                 {
                     [space.Id] = new ()
                     {
@@ -352,7 +353,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                         }
                     }
                 },
-                Administrative = AdminAccessLevel.ManagePermissions
+                Admin = AdminAccessLevel.ManagePermissions
             }
         };
         
@@ -379,6 +380,56 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal(epic.Id, epicOrganizationUser.EpicId);
         Assert.Equal(EntityAccessLevel.Read, epicOrganizationUser.EntityAccessLevel);
         Assert.Equal(ChildrenAccessLevel.All, epicOrganizationUser.ChildrenIssuesAccessLevel);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotSetDirectAccessInOwnedOrganization_WhenSpaceOrEpicIsNotExists()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var userIdToReceivePermissions = await testScope.CreateUser();
+
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(userIdToReceivePermissions));
+        
+        var space = organization.Spaces![0];
+        var organizationUser = organization.Users![1];
+
+        var request = new SetPermissionsRequest
+        {
+            UserPermissions = new UserPermissions
+            {
+                Direct = new Dictionary<long, DirectSpaceAccessLevel>
+                {
+                    [space.Id] = new ()
+                    {
+                        DirectEpics = new Dictionary<long, DirectEpicAccessLevel>
+                        {
+                            [0] = new() // Unexists epic
+                            {
+                                Issues = ChildrenAccessLevel.All,
+                            },
+                        }
+                    },
+                    [0] = new () // Unexists space
+                    {
+                        Epics = ChildrenAccessLevel.All
+                    }
+                },
+                Admin = AdminAccessLevel.ManagePermissions
+            }
+        };
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
+            .WithOrganizationAuthorization(organization.Id, ownerId)
+            .Execute(x => x.SetUserPermissions(organizationUser.Id, request)));
+        var badRequest = ex.HasInnerException<BadRequestException>();
+        var exceptedErrors = new[]
+        {
+            "Some spaces are not found in organization: 0",
+            $"Some epics are not found in organization: Space: {space.Id} Epics: 0"
+        };
+        Assert.Equal(exceptedErrors, badRequest.Errors["direct"]);
     }
     
     [Fact]
@@ -447,11 +498,11 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Epics);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Issues);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Spaces);
-        Assert.Equal(AdminAccessLevel.None, permissions.Administrative);
-        Assert.Empty(permissions.DirectAccessLevels);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Epics);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Issues);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Spaces);
+        Assert.Equal(AdminAccessLevel.None, permissions.Admin);
+        Assert.Empty(permissions.Direct);
     }
 
     [Fact]
@@ -515,12 +566,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Epics);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.GlobalAccessLevels.Issues);
-        Assert.Equal(ChildrenAccessLevel.Read | ChildrenAccessLevel.Create, permissions.GlobalAccessLevels.Spaces);
-        Assert.Equal(AdminAccessLevel.None, permissions.Administrative);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Epics);
+        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Issues);
+        Assert.Equal(ChildrenAccessLevel.Read | ChildrenAccessLevel.Create, permissions.Global.Spaces);
+        Assert.Equal(AdminAccessLevel.None, permissions.Admin);
         
-        var directSpaceAccess = Assert.Single(permissions.DirectAccessLevels);
+        var directSpaceAccess = Assert.Single(permissions.Direct);
         Assert.Equal(space.Id, directSpaceAccess.Key);
         Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Epics);
         Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Issues);

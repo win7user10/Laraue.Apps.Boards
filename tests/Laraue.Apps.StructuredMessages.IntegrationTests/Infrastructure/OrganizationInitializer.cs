@@ -128,9 +128,9 @@ public class OrganizationInitializer(
 
             var userPermissions = new UserPermissions
             {
-                GlobalAccessLevels = builder.Permissions.GlobalAccessLevels,
-                Administrative = builder.Permissions.Administrative,
-                DirectAccessLevels = builder.Permissions.DirectAccessLevels
+                Global = builder.Permissions.GlobalAccessLevels,
+                Admin = builder.Permissions.Administrative,
+                Direct = builder.Permissions.DirectAccessLevels
                     .ToDictionary(
                         x => organization.Spaces![x.Key].Id,
                         x =>

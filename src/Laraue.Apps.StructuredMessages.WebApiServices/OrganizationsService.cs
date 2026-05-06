@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
@@ -92,7 +93,7 @@ public class OrganizationsService(
         return organizationAccessService.GetAvailable(
             request.AuthData.UserId,
             organizations => organizations
-                .Where(o => o.Id == request.AuthData.OrganizationId)
+                .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
@@ -171,22 +172,87 @@ public class OrganizationsService(
 
     public async Task SetUserPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
     {
-        // TODO - check that passed permissions are correct, check access to passed items
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManagePermissions,
+            cancellationToken);
+        
         await context.OrganizationUsers
             .Where(x => x.Id == request.OrganizationUserId)
             .AnyOrThrowNotFoundEFAsync(
                 x => x.OrganizationId == request.AuthData.OrganizationId, 
                 $"OrganizationUser: {request.OrganizationUserId} is not found", cancellationToken);
         
-        await organizationAccessService.HasAccessOrThrow(
-            request.AuthData,
-            AdminAccessLevel.ManagePermissions,
-            cancellationToken);
+        // Check that passed spaces belongs to organization
+        if (request.UserPermissions.Direct.Count > 0)
+        {
+            var permittableEntities = (await coreOrganizationsService.GetPermittableEntities(
+                request.AuthData.OrganizationId,
+                cancellationToken))
+                .ToDictionary(
+                    x => x.Id,
+                    x => x.Epics.Select(e => e.Id).ToHashSet());
+
+            var incorrectSpaces = new List<long>();
+            var incorrectEpics = new Dictionary<long, List<long>>();
+            foreach (var directSpacePermission in request.UserPermissions.Direct)
+            {
+                if (!permittableEntities.TryGetValue(directSpacePermission.Key, out var entity))
+                {
+                    incorrectSpaces.Add(directSpacePermission.Key);
+                    continue;
+                }
+
+                foreach (var directEpicPermission in directSpacePermission.Value.DirectEpics)
+                {
+                    if (!entity.Contains(directEpicPermission.Key))
+                    {
+                        incorrectEpics.TryAdd(directSpacePermission.Key, []);
+                        incorrectEpics[directSpacePermission.Key].Add(directEpicPermission.Key);
+                    }
+                }
+            }
+
+            if (incorrectSpaces.Count > 0 || incorrectEpics.Count > 0)
+            {
+                var errors = new List<string>();
+                
+                if (incorrectSpaces.Count > 0)
+                    errors.Add($"Some spaces are not found in organization: {string.Join(',', incorrectSpaces)}");
+                
+                if (incorrectEpics.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    sb.Append("Some epics are not found in organization:");
+                    foreach (var epic in incorrectEpics)
+                    {
+                        sb
+                            .Append(' ')
+                            .Append("Space: ")
+                            .Append(epic.Key)
+                            .Append(" Epics: ")
+                            .Append(string.Join(", ", epic.Value));
+                    }
+                    
+                    errors.Add(sb.ToString());
+                }
+
+                throw new BadRequestException(
+                    new Dictionary<string, string?[]>()
+                    {
+                        [nameof(UserPermissions.Direct)] = errors.ToArray(),
+                    });
+            }
+        }
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         
         await coreOrganizationsService.SetUserPermissions(
             request.OrganizationUserId,
             request.UserPermissions,
             cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<UserPermissions> GetUserPermissions(GetUserPermissionsRequest request, CancellationToken cancellationToken)
