@@ -11,9 +11,18 @@ public static class OrganizationExtensions
         int statusIndex,
         int issueIndex)
     {
+        var status = organization.GetStatus(spaceIndex, epicIndex, statusIndex);
+        return status.Issues![issueIndex];
+    }
+    
+    public static Status GetStatus(
+        this Organization organization,
+        int spaceIndex,
+        int epicIndex,
+        int statusIndex)
+    {
         var space = organization.Spaces![spaceIndex];
         var epic = space.Epics![epicIndex];
-        var defaultStatus = epic.Statuses![statusIndex];
-        return defaultStatus.Issues![issueIndex];
+        return epic.Statuses![statusIndex];
     }
 }

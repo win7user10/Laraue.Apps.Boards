@@ -223,9 +223,10 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
                 $"[{response.RequestMessage?.Method}] {response.RequestMessage?.RequestUri} ({response.StatusCode:D}) \nRequest Content: {bodyString}\nResponse Content:{responseContent}";
 
             var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(responseContent, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-            var inner = response.StatusCode switch
+            Exception? inner = response.StatusCode switch
             {
                 HttpStatusCode.BadRequest => new BadRequestException(errorResponse.Errors!),
+                HttpStatusCode.NotFound => new NotFoundException(errorResponse.Message),
                 _ => null
             };
             

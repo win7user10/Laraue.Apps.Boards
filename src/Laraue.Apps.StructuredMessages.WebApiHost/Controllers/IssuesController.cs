@@ -54,7 +54,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpPut("{id:long}/move")]
     public Task Move(
         long id,
-        MoveCardRequest request,
+        [FromBody] MoveIssueRequest request,
         CancellationToken cancellationToken = default)
     {
         return messagesService.Move(

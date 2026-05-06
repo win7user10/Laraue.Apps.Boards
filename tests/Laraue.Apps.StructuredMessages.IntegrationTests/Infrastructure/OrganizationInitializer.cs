@@ -18,7 +18,7 @@ public class OrganizationInitializer(
     private DateTime _timestamp = DateTime.UtcNow;
     private OrganizationType _type = OrganizationType.Organization;
 
-    private List<SpaceBuilder> _spaces = new ();
+    private readonly List<SpaceBuilder> _spaces = new ();
 
     public OrganizationInitializer WithName(string name)
     {

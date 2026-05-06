@@ -28,7 +28,7 @@ public interface IIssuesService
         CancellationToken cancellationToken);
 
     Task Move(
-        MoveCardRequest request,
+        MoveIssueRequest request,
         CancellationToken ct);
     
     Task DeleteMessage(
@@ -246,13 +246,13 @@ public class IssuesService(
         return result;
     }
 
-    public async Task Move(MoveCardRequest request, CancellationToken ct)
+    public async Task Move(MoveIssueRequest request, CancellationToken ct)
     {
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.IssueId, ct))
-            throw new NotFoundException("Card not found");
+            throw new NotFoundException($"Issue: {request.IssueId} is not found");
         
         if (!await statusService.UserHasAccessToStatus(request.UserId, request.StatusId, ct))
-            throw new NotFoundException("Status not found");
+            throw new NotFoundException($"Status: {request.StatusId} is not found");
         
         await messageService.Move(
             request.IssueId,
@@ -525,7 +525,7 @@ public class IssuesService(
     }
 }
 
-public record MoveCardRequest
+public record MoveIssueRequest
 {
     public Guid UserId { get; set; }
     public long IssueId { get; set; }
