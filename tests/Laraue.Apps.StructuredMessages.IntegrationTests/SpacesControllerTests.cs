@@ -169,7 +169,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
     }
     
     [Fact]
-    public async Task UserItemAccessLevel_ShouldBeMergedFromOrganizationAndSpaceLevel_Always()
+    public async Task UserChildrenAccessLevel_ShouldBeMergedFromOrganizationAndSpaceLevel_Always()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -276,6 +276,27 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
     }
     
     [Fact]
+    public async Task User_ShouldViewEpics_WhenHasSpaceEpicsLevelPermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, b => b
+                .SetSpaceEpicsAccessLevel(1, ChildrenAccessLevel.Read))
+            .AddSpace(ownerId, s => s
+                .AddEpic(ownerId)));
+
+        var spaceId = organization.Spaces![1].Id;
+        
+        var epics = await _spacesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetSpaceEpics(spaceId));
+        
+        Assert.Equal(2, epics!.Length);
+    }
+    
+    [Fact]
     public async Task User_ShouldViewEpics_WhenHasEpicLevelWritePermission()
     {
         using var testScope = host.CreateTestScope();
@@ -295,7 +316,4 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         
         Assert.Equal(2, epics!.Length);
     }
-    
-    // TODO - should not view when has permissions
-    // TODO - should not view when has not permissions
 }

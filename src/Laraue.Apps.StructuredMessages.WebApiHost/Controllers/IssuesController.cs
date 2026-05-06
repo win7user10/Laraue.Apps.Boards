@@ -13,7 +13,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpGet]
     public Task<BatchResult<MessageListDto>> GetMessages(
         [FromQuery] GetMessagesRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.GetMessages(
             request with
@@ -27,7 +27,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpGet("{id:long}")]
     public Task<MessageDetailDto> GetMessage(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.GetMessage(
             new GetMessageRequest
@@ -41,7 +41,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpGet("board")]
     public Task<ColumnMessages[]> GetBoard(
         [FromQuery] GetBoardRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.GetBoard(
             request with
@@ -55,7 +55,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     public Task Move(
         long id,
         MoveCardRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.Move(
             request with
@@ -69,7 +69,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.DeleteMessage(
             new DeleteMessageRequest
@@ -83,7 +83,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpPost]
     public Task<long> Create(
         [FromBody] CreateIssueRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.Create(
             request with
@@ -97,7 +97,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     public Task Update(
         [FromRoute] long id,
         [FromBody] EditMessageRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.EditMessage(
             request with
@@ -111,7 +111,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpGet("search")]
     public Task<IShortPaginatedResult<MessageListDto>> Search(
         [FromQuery] SearchRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.Search(
             request with
@@ -124,7 +124,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpGet("summary")]
     public Task<CategorySummary[]> GetBoardSummary(
         [FromQuery] GetBoardSummaryRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return messagesService.GetBoardSummary(
             request with
