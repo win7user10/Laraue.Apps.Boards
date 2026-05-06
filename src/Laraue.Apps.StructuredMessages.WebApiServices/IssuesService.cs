@@ -47,17 +47,15 @@ public interface IIssuesService
         SearchRequest request,
         CancellationToken ct);
     
-    Task<MessageDetailDto> GetMessage(
-        GetMessageRequest request,
+    Task<IssueDetailDto> GetIssue(
+        GetIssueRequest request,
         CancellationToken cancellationToken);
 }
 
 public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService messageService,
-    ICoreEpicsService epicsService,
     IDateTimeProvider dateTimeProvider,
-    ICoreSpacesService coreSpacesService,
     ICoreStatusService statusService,
     IIssuesAccessService issuesAccessService,
     IEpicsAccessService epicsAccessService)
@@ -332,16 +330,16 @@ public class IssuesService(
         return mapped;
     }
 
-    public async Task<MessageDetailDto> GetMessage(
-        GetMessageRequest request,
+    public async Task<IssueDetailDto> GetIssue(
+        GetIssueRequest request,
         CancellationToken cancellationToken)
     {
         if (!await messageService.UserHasAccessToMessage(
-            request.UserId, request.MessageId, cancellationToken))
-            throw new NotFoundException($"Issue is not found: {request.MessageId}");
+            request.UserId, request.IssueId, cancellationToken))
+            throw new NotFoundException($"Issue is not found: {request.IssueId}");
 
         var result = await context.Issues
-            .Where(x => x.Id == request.MessageId)
+            .Where(x => x.Id == request.IssueId)
             .Select(x => new MessageDetailDtoData
             {
                 Id = x.Id,
@@ -363,16 +361,16 @@ public class IssuesService(
             result.TelegramFirstName,
             result.TelegramLastName);;
 
-        return new MessageDetailDto
+        return new IssueDetailDto
         {
             Id = result.Id,
             Content = result.Content,
             Sender = sender.Sender,
             SenderInitial = sender.Initial,
             Time = result.Time,
-            CategoryName = result.CategoryName,
+            EpicName = result.CategoryName,
             StatusName = result.StatusName,
-            CategoryColor = result.CategoryColor,
+            EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
         };
     }
@@ -540,10 +538,10 @@ public record GetMessagesRequest : BatchRequest
     public string? SearchString { get; set; }
 }
 
-public record GetMessageRequest
+public record GetIssueRequest
 {
     public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public long IssueId { get; set; }
 }
 
 public record GetBoardRequest
@@ -640,15 +638,15 @@ public record SearchRequest : IPaginationData
     public int PerPage { get; init; }
 }
 
-public class MessageDetailDto
+public class IssueDetailDto
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
     public required string? Content { get; set; }
-    public required string? CategoryName { get; set; }
-    public required string? CategoryColor { get; set; }
+    public required string? EpicName { get; set; }
+    public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
 }

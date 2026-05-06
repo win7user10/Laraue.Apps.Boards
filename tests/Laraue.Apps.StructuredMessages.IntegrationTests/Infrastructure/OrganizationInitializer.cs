@@ -92,7 +92,8 @@ public class OrganizationInitializer(
                 {
                     var statusEntity = new Status
                     {
-                        Name = status.StatusName
+                        Name = status.StatusName,
+                        Color = status.StatusColor,
                     };
                     
                     epicEntity.Statuses.Add(statusEntity);
@@ -108,6 +109,8 @@ public class OrganizationInitializer(
                         {
                             Content = issue.Content,
                             UserId = issue.CreatorId,
+                            CreatedAt = issue.Timestamp,
+                            UpdatedAt = issue.Timestamp,
                         });
                     }
                 }
@@ -375,10 +378,18 @@ public class OrganizationInitializer(
     public class StatusBuilder
     {
         public string StatusName { get; private set; } = "AdditionalStatus";
+        public string StatusColor { get; private set; } = "#ffffff";
         
         public StatusBuilder WithName(string name)
         {
             StatusName = name;
+
+            return this;
+        }
+        
+        public StatusBuilder WithColor(string color)
+        {
+            StatusColor = color;
 
             return this;
         }
@@ -387,11 +398,19 @@ public class OrganizationInitializer(
     public class IssueBuilder(Guid creatorId)
     {
         public Guid CreatorId { get; } = creatorId;
+        public DateTime Timestamp { get; private set; } = DateTime.UtcNow;
         public string Content { get; private set; } = "IssueContent";
         
         public IssueBuilder WithContent(string name)
         {
             Content = name;
+
+            return this;
+        }
+        
+        public IssueBuilder WithTimestamp(DateTime timestamp)
+        {
+            Timestamp = timestamp;
 
             return this;
         }

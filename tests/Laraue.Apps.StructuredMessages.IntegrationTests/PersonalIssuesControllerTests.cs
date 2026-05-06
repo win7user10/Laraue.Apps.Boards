@@ -148,4 +148,41 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var notFoundException = ex.HasInnerException<NotFoundException>();
         Assert.Equal("Status: 0 is not found", notFoundException.Message);
     }
+    
+    [Fact]
+    public async Task User_ShouldGetPersonalIssue_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
+        var timestamp = new DateTime(2020, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .WithName("Top Epic")
+                        .WithColor("#121212")
+                        .AddStatus(st => st
+                            .WithName("Beautiful status")
+                            .WithColor("#212121"))
+                        .AddIssue(userId, 1, issue => issue
+                            .WithContent("Hi")
+                            .WithTimestamp(timestamp)))));
+
+        var issue = organization.GetIssue(1, 1, 1, 0);
+        
+        var issueDto = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetIssue(issue.Id));
+        
+        Assert.NotNull(issueDto);
+        Assert.Equal("Hi", issueDto.Content);
+        Assert.Equal("Top Epic", issueDto.EpicName);
+        Assert.Equal("#121212", issueDto.EpicColor);
+        Assert.Equal("Beautiful status", issueDto.StatusName);
+        Assert.Equal("#212121", issueDto.StatusColor);
+        Assert.Equal("sn", issueDto.SenderInitial);
+        Assert.Equal("snake1977", issueDto.Sender);
+        Assert.Equal(timestamp, issueDto.Time);
+    }
 }

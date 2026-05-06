@@ -25,15 +25,15 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     
     
     [HttpGet("{id:long}")]
-    public Task<MessageDetailDto> GetMessage(
+    public Task<IssueDetailDto> GetIssue(
         long id,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.GetMessage(
-            new GetMessageRequest
+        return messagesService.GetIssue(
+            new GetIssueRequest
             {
                 UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                IssueId = id,
             },
             cancellationToken);
     }

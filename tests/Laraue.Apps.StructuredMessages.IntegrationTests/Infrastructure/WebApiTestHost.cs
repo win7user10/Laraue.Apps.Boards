@@ -62,9 +62,11 @@ public class WebApiTestHostScope : IDisposable
         _scope.Dispose();
     }
     
-    public async Task<Guid> CreateUser()
+    public async Task<Guid> CreateUser(Action<User>? setupUser = null)
     {
         var user = new User();
+        
+        setupUser?.Invoke(user);
         
         Database.Users.Add(user);
         
