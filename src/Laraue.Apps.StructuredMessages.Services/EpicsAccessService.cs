@@ -3,6 +3,7 @@ using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
@@ -36,9 +37,10 @@ public interface IEpicsAccessService
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
     
-    Task CanCreateIssues(
+    Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long epicId,
+        EntityAccessLevel entityAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -84,11 +86,11 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        var globalEpicAccess = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel;
-        if (globalEpicAccess.HasFlag(childrenAccessLevel))
+        if (accessLevels.IssuesAccessLevel.HasFlag(childrenAccessLevel))
             return;
 
         var epic = await context.Epics
+            .Where(e => e.Id == epicId)
             .Select(x => new { x.SpaceId })
             .FirstOrThrowNotFoundEFAsync("Epic is not found", cancellationToken);
         
@@ -96,7 +98,7 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.SpaceId == epic.SpaceId)
-            .AnyAsync(sos => sos.ChildrenEpicsAccessLevel.HasFlag(childrenAccessLevel), cancellationToken);
+            .AnyAsync(sos => sos.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel), cancellationToken);
         
         if (hasDirectAccessFromSpace)
             return;
@@ -111,24 +113,24 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
                 cancellationToken);
     }
 
-    public async Task CanCreateIssues(OrganizationAuthData authData, long epicId, CancellationToken cancellationToken)
+    public async Task HasAccessOrThrow(
+        OrganizationAuthData authData,
+        long epicId,
+        EntityAccessLevel entityAccessLevel,
+        CancellationToken cancellationToken)
     {
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        if (accessLevels.IssuesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+        if (accessLevels.IssuesAccessLevel.HasFlag(entityAccessLevel))
             return;
 
         await context.DirectEpicPermissions
             .Where(dep => dep.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(dep => dep.OrganizationUser!.UserId == authData.UserId)
-            .Where(dep => dep.ChildrenIssuesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            .FirstOrThrowNotFoundEFAsync(
-                sos => sos.EpicId == epicId,
-                $"Epic: {epicId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing",
-                cancellationToken);
+            .Where(dep => dep.ChildrenIssuesAccessLevel.HasFlag(entityAccessLevel))
+            .AnyAsyncEF(sos => sos.EpicId == epicId, cancellationToken);
     }
-
 
     private IQueryable<EpicWithAccessLevel> GetGlobalReadableEpicsQuery(
         OrganizationAuthData authData,

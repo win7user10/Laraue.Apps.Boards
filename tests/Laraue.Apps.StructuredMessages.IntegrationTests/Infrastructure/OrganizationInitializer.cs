@@ -18,8 +18,17 @@ public class OrganizationInitializer(
     private DateTime _timestamp = DateTime.UtcNow;
     private OrganizationType _type = OrganizationType.Organization;
 
-    private readonly List<SpaceBuilder> _spaces = new ();
-
+    private readonly List<SpaceBuilder> _spaces =
+    [
+        new SpaceBuilder(ownerId, DateTime.UtcNow)
+            .WithName("Default Space")
+            .SetAsDefault()
+            .AddEpic(ownerId, e => e
+                .AddStatus(s => s.WithName("New"))
+                .SetAsDefault()
+                .WithName("Backlog"))
+    ];
+    
     public OrganizationInitializer WithName(string name)
     {
         _organizationName = name;
@@ -57,8 +66,11 @@ public class OrganizationInitializer(
             _timestamp,
             _type);
 
-        foreach (var space in _spaces)
+        organization.Spaces = new List<Space>(); // Add all children manually
+
+        for (var index = 0; index < _spaces.Count; index++)
         {
+            var space = _spaces[index];
             var spaceEntity = new Space
             {
                 Name = space.SpaceName,
@@ -66,7 +78,8 @@ public class OrganizationInitializer(
                 CreatedAt = space.Timestamp,
                 UpdatedAt = space.Timestamp,
                 CreatorId = space.CreatorId,
-                Epics = new List<Epic>
+                IsDefault = space.IsDefault,
+                Epics = index == 0 ? new List<Epic>() : new List<Epic>
                 {
                     OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
                 }
@@ -82,6 +95,7 @@ public class OrganizationInitializer(
                     UpdatedAt = epic.Timestamp,
                     TouchedAt = epic.Timestamp,
                     UserId = epic.CreatorId,
+                    IsDefault = epic.IsDefault,
                     Statuses = new List<Status>
                     {
                         OrganizationDefaults.GetNewStatusEntity(),
@@ -95,7 +109,7 @@ public class OrganizationInitializer(
                         Name = status.StatusName,
                         Color = status.StatusColor,
                     };
-                    
+
                     epicEntity.Statuses.Add(statusEntity);
                 }
 
@@ -114,13 +128,13 @@ public class OrganizationInitializer(
                         });
                     }
                 }
-                
+
                 spaceEntity.Epics.Add(epicEntity);
             }
-            
+
             organization.Spaces!.Add(spaceEntity);
         }
-        
+
         context.Add(organization);
         await context.SaveChangesAsync();
 
@@ -189,6 +203,25 @@ public class OrganizationInitializer(
         return this;
     }
 
+    public OrganizationInitializer AddIssue(
+        int spaceIndex,
+        int epicIndex,
+        int statusIndex,
+        Guid creatorId,
+        Action<IssueBuilder> setupIssue)
+    {
+        _spaces[spaceIndex].Epics[epicIndex].AddIssue(creatorId, statusIndex, setupIssue);
+
+        return this;
+    }
+    
+    public OrganizationInitializer AddIssueToDefaultStatus(
+        Guid creatorId,
+        Action<IssueBuilder> setupIssue)
+    {
+        return AddIssue(0, 0, 0, creatorId, setupIssue);
+    }
+
     public record TestUserPermissions
     {
         public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
@@ -231,6 +264,14 @@ public class OrganizationInitializer(
         public PermissionBuilder SetSpaceEpicsAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
         {
             GetDirectSpacesLevels(index).Epics = childrenAccessLevel;
+            
+            return this;
+        }
+        
+    
+        public PermissionBuilder SetSpaceIssuesAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Issues = childrenAccessLevel;
             
             return this;
         }
@@ -287,6 +328,7 @@ public class OrganizationInitializer(
         public DateTime Timestamp { get; private set; }  = timestamp;
         public Guid CreatorId { get; private set; }  = creatorId;
         public List<EpicBuilder> Epics { get;} = new();
+        public bool IsDefault { get; private set; }
 
         public SpaceBuilder WithName(string name)
         {
@@ -299,6 +341,12 @@ public class OrganizationInitializer(
         {
             SpaceColor = color;
 
+            return this;
+        }
+
+        public SpaceBuilder SetAsDefault()
+        {
+            IsDefault = true;
             return this;
         }
         
@@ -330,6 +378,7 @@ public class OrganizationInitializer(
         public string EpicColor { get; private set; }  = "#121212";
         public DateTime Timestamp { get; private set; }  = timestamp;
         public Guid CreatorId { get; private set; }  = creatorId;
+        public bool IsDefault { get; private set; }
         public List<StatusBuilder> Statuses  { get; private set; } = new ();
         public Dictionary<int, List<IssueBuilder>> Issues  { get; private set; } = new ();
         
@@ -361,6 +410,12 @@ public class OrganizationInitializer(
             
             Statuses.Add(builder);
 
+            return this;
+        }
+
+        public EpicBuilder SetAsDefault()
+        {
+            IsDefault = true;
             return this;
         }
 

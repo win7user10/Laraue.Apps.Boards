@@ -9,3 +9,11 @@ public enum EntityAccessLevel : byte
     Delete = 8,
     All = Read | Update | Delete
 }
+
+public static class EntityAccessLevelExtensions
+{
+    public static ChildrenAccessLevel ToEntityAccessLevel(this EntityAccessLevel accessLevel)
+    {
+        return (ChildrenAccessLevel)accessLevel;
+    }
+}

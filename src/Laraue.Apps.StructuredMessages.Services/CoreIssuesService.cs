@@ -11,11 +11,6 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreIssuesService
 {
-    Task<bool> UserHasAccessToMessage(
-        Guid userId,
-        long id,
-        CancellationToken cancellationToken);
-    
     Task<long> Create(
         SaveMessageRequest request,
         CancellationToken cancellationToken);
@@ -30,7 +25,7 @@ public interface ICoreIssuesService
         long statusId,
         CancellationToken ct);
     
-    Task DeleteMessage(
+    Task Delete(
         long id,
         CancellationToken cancellationToken);
 }
@@ -38,14 +33,6 @@ public interface ICoreIssuesService
 public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
     : ICoreIssuesService
 {
-    public Task<bool> UserHasAccessToMessage(Guid userId, long id, CancellationToken cancellationToken)
-    {
-        return context.Issues
-            .Where(x => x.UserId == userId)
-            .Where(x => x.Id == id)
-            .AnyAsyncEF(cancellationToken);
-    }
-
     public async Task<long> Create(
         SaveMessageRequest request,
         CancellationToken cancellationToken)
@@ -99,7 +86,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
             ct);
     }
 
-    public Task DeleteMessage(long id, CancellationToken cancellationToken)
+    public Task Delete(long id, CancellationToken cancellationToken)
     {
         return context.Issues
             .Where(x => x.Id == id)

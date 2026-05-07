@@ -87,7 +87,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
     }
     
     [Fact]
-    public async Task User_ShouldNotCreateIssue_WhenHasGlobalAccessToCreateEpics()
+    public async Task User_ShouldNotCreateIssue_WhenHasGlobalAccessOnlyToCreateEpics()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -111,5 +111,138 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         
         var notFound = ex.HasInnerException<NotFoundException>();
         Assert.Equal($"Status: {status.Id} is not found, or Create permission is missing for Epic contains this status", notFound.Message);
+    }
+    
+    [Fact]
+    public async Task User_ShouldCreateIssue_WhenHasIssuesAccessOnSpaceLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            organization => organization
+                .AddUser(participatorId, u => u
+                    .SetSpaceIssuesAccessLevel(0, ChildrenAccessLevel.Create)));
+
+        var status = organization.GetStatus(0, 0, 0);
+        
+        var issueId = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Create(
+                new CreateIssueRequest
+                {
+                    Content = "New Issue",
+                    StatusId = status.Id
+                }));
+
+        var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
+        Assert.Equal("New Issue", issue.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotCreateIssue_WhenHasIssuesAccessOnOtherSpaceLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            organization => organization
+                .AddSpace(userId)
+                .AddUser(participatorId, u => u
+                    .SetSpaceIssuesAccessLevel(0, ChildrenAccessLevel.Create)));
+
+        var statusWhereSpaceAccessMissing = organization.GetStatus(1, 0, 0);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Create(
+                new CreateIssueRequest
+                {
+                    Content = "New Issue",
+                    StatusId = statusWhereSpaceAccessMissing.Id
+                })));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal($"Status: {statusWhereSpaceAccessMissing.Id} is not found, or Create permission is missing for Epic contains this status", notFound.Message);
+    }
+    
+    [Fact]
+    public async Task User_ShouldCreateIssue_WhenHasEpicsCreateChildrenAccessOnSpaceLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            organization => organization
+                .AddUser(participatorId, u => u
+                    .SetSpaceEpicsAccessLevel(0, ChildrenAccessLevel.Create)));
+
+        var status = organization.GetStatus(0, 0, 0);
+        
+        var issueId = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Create(
+                new CreateIssueRequest
+                {
+                    Content = "New Issue",
+                    StatusId = status.Id
+                }));
+        var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
+        Assert.Equal("New Issue", issue.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldUpdateIssue_WhenIsOrganizationOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddIssueToDefaultStatus(userId, builder => builder.WithContent("Hi")));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        
+        await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Update(
+                issue.Id,
+                new UpdateIssueRequest
+                {
+                    Content = "New",
+                }));
+
+        issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
+        Assert.Equal("New", issue.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotUpdateIssue_WhenHasNotAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId)
+                .AddIssueToDefaultStatus(userId, builder => builder.WithContent("Hi")));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Update(
+                issue.Id,
+                new UpdateIssueRequest
+                {
+                    Content = "New",
+                })));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal("Issue is not exists or epic children permission: Update is missing", notFound.Message);
     }
 }

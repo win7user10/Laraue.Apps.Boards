@@ -145,7 +145,7 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
                 })));
         
         var notFoundException = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Status: 0 is not found", notFoundException.Message);
+        Assert.Equal("Status: 0 is not exists or permission Update missing on Epic", notFoundException.Message);
     }
     
     [Fact]

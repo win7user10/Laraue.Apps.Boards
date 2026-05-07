@@ -26,7 +26,8 @@ public interface IStatusesService
 
 public class StatusesService(
     ICoreStatusService statusService,
-    IEpicsAccessService epicsAccessService)
+    IEpicsAccessService epicsAccessService,
+    IStatusAccessService statusAccessService)
     : IStatusesService
 {
     public async Task<long> CreateStatus(
@@ -51,9 +52,10 @@ public class StatusesService(
 
     public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
     {
-        if (!await statusService.UserHasAccessToStatus(
-            request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException("Status is not found");
+        await statusAccessService.CanModifyStatusOrThrow(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
 
         await statusService.Delete(
             new Services.DeleteStatusRequest
@@ -65,9 +67,10 @@ public class StatusesService(
 
     public async Task Edit(EditStatusRequest request, CancellationToken cancellationToken)
     {
-        if (!await statusService.UserHasAccessToStatus(
-                request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException("Status is not found");
+        await statusAccessService.CanModifyStatusOrThrow(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
 
         await statusService.Update(
             request.Id,
@@ -106,13 +109,13 @@ public record CreateStatusRequest
 
 public record DeleteStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public required long Id { get; set; }
 }
 
 public record EditStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
     
     [MaxLength(7)]

@@ -31,8 +31,8 @@ public interface IIssuesService
         MoveIssueRequest request,
         CancellationToken ct);
     
-    Task DeleteMessage(
-        DeleteMessageRequest request,
+    Task Delete(
+        DeleteIssueRequest request,
         CancellationToken ct);
     
     Task<long> Create(
@@ -56,9 +56,9 @@ public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService messageService,
     IDateTimeProvider dateTimeProvider,
-    ICoreStatusService statusService,
     IIssuesAccessService issuesAccessService,
-    IEpicsAccessService epicsAccessService)
+    IEpicsAccessService epicsAccessService,
+    IStatusAccessService statusAccessService)
     : IIssuesService
 {
     public async Task<BatchResult<IssueListDto>> GetIssues(
@@ -247,11 +247,18 @@ public class IssuesService(
 
     public async Task Move(MoveIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.IssueId, ct))
-            throw new NotFoundException($"Issue: {request.IssueId} is not found");
+        // Check that can move Issue
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Update,
+            ct);
         
-        if (!await statusService.UserHasAccessToStatus(request.UserId, request.StatusId, ct))
-            throw new NotFoundException($"Status: {request.StatusId} is not found");
+        // Check that can move to specified status
+        await statusAccessService.CanMoveToStatusOrThrow(
+            request.AuthData,
+            request.StatusId,
+            ct);
         
         await messageService.Move(
             request.IssueId,
@@ -259,12 +266,15 @@ public class IssuesService(
             ct);
     }
 
-    public async Task DeleteMessage(DeleteMessageRequest request, CancellationToken ct)
+    public async Task Delete(DeleteIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException($"Issue is not found: {request.MessageId}");
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Delete,
+            ct);
 
-        await messageService.DeleteMessage(request.MessageId, ct);
+        await messageService.Delete(request.IssueId, ct);
     }
 
     public async Task<long> Create(CreateIssueRequest request, CancellationToken ct)
@@ -276,9 +286,10 @@ public class IssuesService(
 
         try
         {
-            await epicsAccessService.CanCreateIssues(
+            await epicsAccessService.HasAccessOrThrow(
                 request.AuthData,
                 validationData.EpicId,
+                ChildrenAccessLevel.Create,
                 ct);
         }
         catch (NotFoundException)
@@ -300,8 +311,11 @@ public class IssuesService(
 
     public async Task UpdateIssue(UpdateIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.Id, ct)) 
-            throw new NotFoundException($"Issue is not found: {request.Id}");
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.Id,
+            EntityAccessLevel.Update,
+            ct);
         
         await messageService.Update(
             request.Id,
@@ -342,9 +356,11 @@ public class IssuesService(
         GetIssueRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await messageService.UserHasAccessToMessage(
-            request.UserId, request.IssueId, cancellationToken))
-            throw new NotFoundException($"Issue is not found: {request.IssueId}");
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Read,
+            cancellationToken);
 
         var result = await context.Issues
             .Where(x => x.Id == request.IssueId)
@@ -533,7 +549,7 @@ public class IssuesService(
 
 public record MoveIssueRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long IssueId { get; set; }
     public long StatusId { get; set; }
 }
@@ -547,7 +563,7 @@ public record GetIssuesRequest : BatchRequest
 
 public record GetIssueRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long IssueId { get; set; }
 }
 
@@ -615,10 +631,10 @@ public enum MediaType
     Video,
 }
 
-public record DeleteMessageRequest
+public record DeleteIssueRequest
 {
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long IssueId { get; set; }
 }
 
 public record CreateIssueRequest
@@ -630,7 +646,7 @@ public record CreateIssueRequest
 
 public record UpdateIssueRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
     public required string Content { get; set; }
 }

@@ -17,11 +17,6 @@ public interface ICoreStatusService
         long epicId,
         CancellationToken cancellationToken);
     
-    Task<bool> UserHasAccessToStatus(
-        Guid userId,
-        long id,
-        CancellationToken cancellationToken);
-    
     Task Delete(
         DeleteStatusRequest request,
         CancellationToken cancellationToken);
@@ -70,14 +65,6 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
                 Count = x.Issues!.Count,
             })
             .ToArrayAsyncEF(cancellationToken);
-    }
-
-    public Task<bool> UserHasAccessToStatus(Guid userId, long id, CancellationToken cancellationToken)
-    {
-        return context.Statuses
-            .Where(x => x.Epic!.UserId == userId)
-            .Where(x => x.Id == id)
-            .AnyAsyncEF(cancellationToken);
     }
 
     public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)

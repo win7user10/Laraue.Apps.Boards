@@ -34,7 +34,7 @@ public class StatusesController(IStatusesService statusesService)
             new DeleteStatusRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -49,7 +49,7 @@ public class StatusesController(IStatusesService statusesService)
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }

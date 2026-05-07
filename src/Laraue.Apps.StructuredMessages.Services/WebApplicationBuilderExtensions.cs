@@ -39,6 +39,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<ICoreEpicsService, CoreEpicsService>()
                 .AddScoped<IEpicsAccessService, EpicsAccessService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
+                .AddScoped<IStatusAccessService, StatusAccessService>()
                 .AddScoped<ICoreUserPreferencesService, CoreUserPreferencesService>()
                 .AddScoped<ICoreSpacesService, CoreSpacesService>()
                 .AddScoped<ISpacesAccessService, SpacesAccessService>()

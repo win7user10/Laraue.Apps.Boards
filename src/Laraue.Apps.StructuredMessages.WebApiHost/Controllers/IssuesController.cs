@@ -34,7 +34,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         return issuesService.GetIssue(
             new GetIssueRequest
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
                 IssueId = id,
             },
             cancellationToken);
@@ -62,7 +62,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         return issuesService.Move(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
                 IssueId = id
             },
             cancellationToken);
@@ -73,11 +73,11 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         long id,
         CancellationToken cancellationToken = default)
     {
-        return issuesService.DeleteMessage(
-            new DeleteMessageRequest
+        return issuesService.Delete(
+            new DeleteIssueRequest
             {
-                UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                IssueId = id,
             },
             cancellationToken);
     }
@@ -104,7 +104,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         return issuesService.UpdateIssue(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
                 Id = id,
             },
             cancellationToken);

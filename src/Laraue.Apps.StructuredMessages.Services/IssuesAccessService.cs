@@ -1,4 +1,6 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess.Models;
+﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.Exceptions.Web;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -7,6 +9,12 @@ public interface IIssuesAccessService
     Task<T> GetAvailable<T>(
         OrganizationAuthData authData,
         Func<IQueryable<Issue>, Task<T>> map,
+        CancellationToken cancellationToken);
+    
+    Task HasAccessOrThrow(
+        OrganizationAuthData authData,
+        long issueId,
+        EntityAccessLevel entityAccessLevel,
         CancellationToken cancellationToken);
 }
 
@@ -21,5 +29,25 @@ public class IssuesAccessService(IEpicsAccessService epicsAccessService) : IIssu
             authData,
             epics => map(epics.SelectMany(e => e.Epic.Statuses!.SelectMany(i => i.Issues!))),
             cancellationToken);
+    }
+
+    public async Task HasAccessOrThrow(
+        OrganizationAuthData authData,
+        long issueId,
+        EntityAccessLevel entityAccessLevel,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await epicsAccessService.HasAccessOrThrow(
+                authData,
+                issueId,
+                entityAccessLevel.ToEntityAccessLevel(),
+                cancellationToken);
+        }
+        catch (NotFoundException)
+        {
+            throw new NotFoundException($"Issue is not exists or epic children permission: {entityAccessLevel} is missing");
+        }
     }
 }
