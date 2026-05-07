@@ -21,8 +21,23 @@ public static class OrganizationExtensions
         int epicIndex,
         int statusIndex)
     {
-        var space = organization.Spaces![spaceIndex];
-        var epic = space.Epics![epicIndex];
+        var epic = organization.GetEpic(spaceIndex, epicIndex);
         return epic.Statuses![statusIndex];
+    }
+    
+    public static Epic GetEpic(
+        this Organization organization,
+        int spaceIndex,
+        int epicIndex)
+    {
+        var space = organization.GetSpace(spaceIndex);
+        return space.Epics![epicIndex];
+    }
+    
+    public static Space GetSpace(
+        this Organization organization,
+        int spaceIndex)
+    {
+        return organization.Spaces![spaceIndex];
     }
 }

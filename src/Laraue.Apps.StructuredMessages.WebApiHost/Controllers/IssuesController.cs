@@ -8,16 +8,18 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/issues")]
-public class IssuesController(IIssuesService messagesService) : ControllerBase
+public class IssuesController(IIssuesService issuesService) : ControllerBase
 {
-    [HttpGet]
-    public Task<BatchResult<MessageListDto>> GetMessages(
-        [FromQuery] GetMessagesRequest request,
+    [HttpGet("by-status/{statusId:long}")]
+    public Task<BatchResult<IssueListDto>> GetIssuesByStatus(
+        long statusId,
+        [FromQuery] GetIssuesRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.GetMessages(
+        return issuesService.GetIssues(
             request with
             {
+                StatusId = statusId,
                 AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
@@ -29,7 +31,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         long id,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.GetIssue(
+        return issuesService.GetIssue(
             new GetIssueRequest
             {
                 UserId = HttpContext.User.GetId(),
@@ -43,7 +45,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         [FromQuery] GetBoardRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.GetBoard(
+        return issuesService.GetBoard(
             request with
             {
                 AuthData = HttpContext.User.GetOrganizationAuthData(),
@@ -57,7 +59,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         [FromBody] MoveIssueRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.Move(
+        return issuesService.Move(
             request with
             {
                 UserId = HttpContext.User.GetId(),
@@ -71,7 +73,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         long id,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.DeleteMessage(
+        return issuesService.DeleteMessage(
             new DeleteMessageRequest
             {
                 UserId = HttpContext.User.GetId(),
@@ -85,7 +87,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         [FromBody] CreateIssueRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.Create(
+        return issuesService.Create(
             request with
             {
                 AuthData = HttpContext.User.GetOrganizationAuthData(),
@@ -99,7 +101,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         [FromBody] UpdateIssueRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.EditMessage(
+        return issuesService.EditMessage(
             request with
             {
                 UserId = HttpContext.User.GetId(),
@@ -109,11 +111,11 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     }
     
     [HttpGet("search")]
-    public Task<IShortPaginatedResult<MessageListDto>> Search(
+    public Task<IShortPaginatedResult<IssueListDto>> Search(
         [FromQuery] SearchRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.Search(
+        return issuesService.Search(
             request with
             {
                 UserId = HttpContext.User.GetId(),
@@ -126,7 +128,7 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
         [FromQuery] GetBoardSummaryRequest request,
         CancellationToken cancellationToken = default)
     {
-        return messagesService.GetBoardSummary(
+        return issuesService.GetBoardSummary(
             request with
             {
                 UserId = HttpContext.User.GetId(),

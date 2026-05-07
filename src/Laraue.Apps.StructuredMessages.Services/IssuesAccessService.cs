@@ -10,7 +10,6 @@ public interface IIssuesAccessService
         CancellationToken cancellationToken);
 }
 
-
 public class IssuesAccessService(IEpicsAccessService epicsAccessService) : IIssuesAccessService
 {
     public Task<T> GetAvailable<T>(

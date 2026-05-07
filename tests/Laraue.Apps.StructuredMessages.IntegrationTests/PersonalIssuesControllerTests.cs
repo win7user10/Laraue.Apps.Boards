@@ -1,5 +1,4 @@
-﻿using System.Net;
-using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
+﻿using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Core.Exceptions.Web;
@@ -184,5 +183,75 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.Equal("sn", issueDto.SenderInitial);
         Assert.Equal("snake1977", issueDto.Sender);
         Assert.Equal(timestamp, issueDto.Time);
+    }
+    
+    [Fact]
+    public async Task User_ShouldGetPersonalIssues_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
+        var timestamp = new DateTime(2020, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Hi")
+                            .WithTimestamp(timestamp)))));
+
+        var status = organization.GetStatus(1, 1, 0);
+        var epic = organization.GetEpic(1, 1);
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetIssuesByStatus(
+                status.Id,
+                new GetIssuesRequest
+                {
+                    Skip = 0,
+                    Take = 10,
+                }));
+        
+        Assert.NotNull(issuesResult);
+        var issueDto = Assert.Single(issuesResult.Data);
+        Assert.Equal("Hi", issueDto.Content);
+        Assert.Equal("sn", issueDto.SenderInitial);
+        Assert.Equal("snake1977", issueDto.Sender);
+        Assert.Equal(status.Id, issueDto.StatusId);
+        Assert.Equal(timestamp, issueDto.Time);
+        Assert.Equal(epic.Id, issueDto.EpicId);
+        Assert.Empty(issueDto.Media);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchPersonalIssues_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("Hi"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("John")))));
+
+        var status = organization.GetStatus(1, 1, 0);
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetIssuesByStatus(
+                status.Id,
+                new GetIssuesRequest
+                {
+                    Skip = 0,
+                    Take = 10,
+                    SearchString = "jo"
+                }));
+        
+        Assert.NotNull(issuesResult);
+        var issueDto = Assert.Single(issuesResult.Data);
+        Assert.Equal("John", issueDto.Content);
     }
 }

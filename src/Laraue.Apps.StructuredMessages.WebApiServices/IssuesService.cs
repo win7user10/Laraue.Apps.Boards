@@ -15,8 +15,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IIssuesService
 {
-    Task<BatchResult<MessageListDto>> GetMessages(
-        GetMessagesRequest request,
+    Task<BatchResult<IssueListDto>> GetIssues(
+        GetIssuesRequest request,
         CancellationToken cancellationToken);
     
     Task<ColumnMessages[]> GetBoard(
@@ -43,7 +43,7 @@ public interface IIssuesService
         UpdateIssueRequest request,
         CancellationToken ct);
     
-    Task<IShortPaginatedResult<MessageListDto>> Search(
+    Task<IShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct);
     
@@ -61,8 +61,8 @@ public class IssuesService(
     IEpicsAccessService epicsAccessService)
     : IIssuesService
 {
-    public async Task<BatchResult<MessageListDto>> GetMessages(
-        GetMessagesRequest request,
+    public async Task<BatchResult<IssueListDto>> GetIssues(
+        GetIssuesRequest request,
         CancellationToken cancellationToken)
     {
         var result = await issuesAccessService.GetAvailable(
@@ -70,18 +70,18 @@ public class IssuesService(
             (issues) =>
             {
                 var query = issues
-                    .Where(i => i.Status!.Epic!.SpaceId == request.SpaceId)
                     .Where(i => i.StatusId == request.StatusId);
-                
+
                 if (!string.IsNullOrEmpty(request.SearchString))
+                {
                     query = query
-                        .Where(x => EF.Functions.ILike(
-                            x.Content!,
-                            request.SearchString.AsSearchable()));
+                        .Where(x => x.Content!
+                            .ILike(request.SearchString.AsSearchable()));
+                }
 
                 var ordered = query.OrderByDescending(x => x.Id);
                 var projected = ProjectToTemporaryDto(ordered);
-                return ToBatchResult(projected, request);
+                return ToBatchResult(projected, request, cancellationToken);
             },
             cancellationToken);
         
@@ -92,7 +92,7 @@ public class IssuesService(
         
         await Enrich(projected, cancellationToken);
 
-        return new BatchResult<MessageListDto>
+        return new BatchResult<IssueListDto>
         {
             HasNext = result.HasNext,
             Data = projected,
@@ -102,12 +102,13 @@ public class IssuesService(
 
     private static async Task<BatchResult<T>> ToBatchResult<T>(
         IQueryable<T> queryable,
-        BatchRequest request)
+        BatchRequest request,
+        CancellationToken cancellationToken)
     {
         var requested = await queryable
             .Skip(request.Skip)
             .Take(request.Take + 1)
-            .ToListAsyncLinqToDB();
+            .ToListAsyncLinqToDB(cancellationToken);
         
         var hasNext = request.Take < requested.Count;
         var result = requested.Take(request.Take).ToArray();
@@ -153,7 +154,7 @@ public class IssuesService(
                     },
                     cancellationToken);
 
-            var mappedStatusResult = new InitialBatchResult<MessageListDto>()
+            var mappedStatusResult = new InitialBatchResult<IssueListDto>()
             {
                 Data = statusResult.Data.Select(Map).ToArray(),
                 HasNext = statusResult.HasNextPage,
@@ -302,7 +303,7 @@ public class IssuesService(
             ct);
     }
 
-    public async Task<IShortPaginatedResult<MessageListDto>> Search(
+    public async Task<IShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct)
     {
@@ -503,19 +504,19 @@ public class IssuesService(
         });
     }
     
-    private static MessageListDto Map(MessageListDtoData source)
+    private static IssueListDto Map(MessageListDtoData source)
     {
         var senderData = UserInitialsUtility.GetInitials(
             source.TelegramUsername,
             source.TelegramFirstName,
             source.TelegramLastName);
 
-        return new MessageListDto
+        return new IssueListDto
         {
             Id = source.Id,
             StatusId = source.StatusId,
             Content = source.Content,
-            CategoryId = source.CategoryId,
+            EpicId = source.CategoryId,
             Sender = senderData.Sender,
             SenderInitial = senderData.Initial,
             Time = source.Time
@@ -530,10 +531,9 @@ public record MoveIssueRequest
     public long StatusId { get; set; }
 }
 
-public record GetMessagesRequest : BatchRequest
+public record GetIssuesRequest : BatchRequest
 {
     public OrganizationAuthData AuthData { get; set; } = new();
-    public long SpaceId { get; set; }
     public long StatusId { get; set; }
     public string? SearchString { get; set; }
 }
@@ -561,7 +561,7 @@ public record GetBoardSummaryRequest
 public record ColumnMessages
 {
     public required long StatusId { get; set; }
-    public required InitialBatchResult<MessageListDto> Items { get; set; }
+    public required InitialBatchResult<IssueListDto> Items { get; set; }
 }
 
 public class MessageListDtoData
@@ -583,14 +583,14 @@ public interface ICanContainMedia
     public List<MediaInfo> Media { get; set; }
 }
 
-public class MessageListDto : ICanContainMedia
+public class IssueListDto : ICanContainMedia
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
     public required string? Content { get; set; }
-    public required long CategoryId { get; set; }
+    public required long EpicId { get; set; }
     public required long StatusId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
 }
