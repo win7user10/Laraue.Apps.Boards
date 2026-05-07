@@ -310,7 +310,7 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
     }
     
     [Fact]
-    public async Task User_ShouldSearchIssues_Always()
+    public async Task User_ShouldSearchIssues_WhenFilterByEpicId()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
@@ -319,13 +319,12 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
             o => o
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e
-                        .AddStatus(st => st.WithName("Done"))
-                        .AddIssue(userId, 1, issue => issue.WithContent("Build app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
                         .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
                         .AddIssue(userId, 0, issue => issue.WithContent("Fix bug")))));
         
         var epic = organization.GetEpic(1, 1);
-        var backlogStatus = organization.GetStatus(1, 1, 1);
+        var backlogStatus = organization.GetStatus(1, 1, 0);
 
         var searchResult = await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
@@ -347,5 +346,71 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.Equal(backlogStatus.Id, item.StatusId);
         Assert.Equal(epic.Id, item.EpicId);
         Assert.Empty(item.Media);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenFilterBySpaceId()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("Other space app"))))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Deliver app")))));
+        
+        var space = organization.GetSpace(2);
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "app",
+                    Page = 0,
+                    PerPage = 10,
+                    SpaceId = space.Id,
+                }));
+        
+        Assert.NotNull(searchResult);
+        Assert.Equal(2, searchResult.Data.Count);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenNoFilterBySpaceOrEpic()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("Other space app"))))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Fix bug")))));
+        
+        var space = organization.GetSpace(2);
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "app",
+                    Page = 0,
+                    PerPage = 10,
+                }));
+        
+        Assert.NotNull(searchResult);
+        Assert.Equal(3, searchResult.Data.Count);
     }
 }
