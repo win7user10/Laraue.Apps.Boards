@@ -39,11 +39,11 @@ public interface IIssuesService
         CreateIssueRequest request,
         CancellationToken ct);
     
-    Task EditMessage(
+    Task UpdateIssue(
         UpdateIssueRequest request,
         CancellationToken ct);
     
-    Task<IShortPaginatedResult<IssueListDto>> Search(
+    Task<ShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct);
     
@@ -291,7 +291,7 @@ public class IssuesService(
             ct);
     }
 
-    public async Task EditMessage(UpdateIssueRequest request, CancellationToken ct)
+    public async Task UpdateIssue(UpdateIssueRequest request, CancellationToken ct)
     {
         if (!await messageService.UserHasAccessToMessage(request.UserId, request.Id, ct)) 
             throw new NotFoundException($"Issue is not found: {request.Id}");
@@ -303,7 +303,7 @@ public class IssuesService(
             ct);
     }
 
-    public async Task<IShortPaginatedResult<IssueListDto>> Search(
+    public async Task<ShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct)
     {

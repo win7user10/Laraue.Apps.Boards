@@ -255,7 +255,6 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.Equal("John", issueDto.Content);
     }
     
-    
     [Fact]
     public async Task User_ShouldGetBoard_Always()
     {
@@ -308,5 +307,45 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.False(doneColumn.Items.HasNext);
         var doneIssue = Assert.Single(doneColumn.Items.Data);
         Assert.Equal("Build app", doneIssue.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddStatus(st => st.WithName("Done"))
+                        .AddIssue(userId, 1, issue => issue.WithContent("Build app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Fix bug")))));
+        
+        var epic = organization.GetEpic(1, 1);
+        var backlogStatus = organization.GetStatus(1, 1, 1);
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "build",
+                    Page = 0,
+                    PerPage = 10,
+                    EpicId = epic.Id,
+                }));
+        
+        Assert.NotNull(searchResult);
+        var item = Assert.Single(searchResult.Data);
+        
+        Assert.Equal("Build app", item.Content);
+        Assert.Equal("sn", item.SenderInitial);
+        Assert.Equal("snake1977", item.Sender);
+        Assert.Equal(backlogStatus.Id, item.StatusId);
+        Assert.Equal(epic.Id, item.EpicId);
+        Assert.Empty(item.Media);
     }
 }

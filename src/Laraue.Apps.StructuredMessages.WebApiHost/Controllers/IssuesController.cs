@@ -101,7 +101,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         [FromBody] UpdateIssueRequest request,
         CancellationToken cancellationToken = default)
     {
-        return issuesService.EditMessage(
+        return issuesService.UpdateIssue(
             request with
             {
                 UserId = HttpContext.User.GetId(),
@@ -111,7 +111,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
     }
     
     [HttpGet("search")]
-    public Task<IShortPaginatedResult<IssueListDto>> Search(
+    public Task<ShortPaginatedResult<IssueListDto>> Search(
         [FromQuery] SearchRequest request,
         CancellationToken cancellationToken = default)
     {
