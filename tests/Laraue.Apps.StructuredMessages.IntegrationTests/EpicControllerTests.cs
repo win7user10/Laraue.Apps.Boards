@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,7 +75,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
     }
     
     [Fact]
-    public async Task User_ShouldCreateEpicInOrganization_WhenHasAccessOnSpacesLevel()
+    public async Task User_ShouldNotCreateEpicInOrganization_WhenHasCreateAccessOnSpacesLevel()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -84,8 +85,8 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
                 .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
         
         var spaceId = organization.Spaces![0].Id;
-        
-        var epicId = await _epicsController
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _epicsController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Create(
                 new CreateEpicRequest
@@ -93,9 +94,10 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
                     Name = "Epic 1",
                     Color = "#fffff1",
                     SpaceId = spaceId,
-                }));
-        
-        Assert.NotEqual(0, epicId);
+                })));
+
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal($"Space: {spaceId} is not exists or items permission: Create is missing", notFound.Message);
     }
     
     [Fact]

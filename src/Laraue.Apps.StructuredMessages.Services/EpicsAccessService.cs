@@ -35,6 +35,11 @@ public interface IEpicsAccessService
         long epicId,
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
+    
+    Task CanCreateIssues(
+        OrganizationAuthData authData,
+        long epicId,
+        CancellationToken cancellationToken);
 }
 
 public class Filter
@@ -105,8 +110,26 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
                 $"Epic is unavailable or permission: {childrenAccessLevel} is missing",
                 cancellationToken);
     }
-    
-    
+
+    public async Task CanCreateIssues(OrganizationAuthData authData, long epicId, CancellationToken cancellationToken)
+    {
+        var accessLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
+        
+        if (accessLevels.IssuesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+            return;
+
+        await context.DirectEpicPermissions
+            .Where(dep => dep.OrganizationUser!.OrganizationId == authData.OrganizationId)
+            .Where(dep => dep.OrganizationUser!.UserId == authData.UserId)
+            .Where(dep => dep.ChildrenIssuesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
+            .FirstOrThrowNotFoundEFAsync(
+                sos => sos.EpicId == epicId,
+                $"Epic: {epicId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing",
+                cancellationToken);
+    }
+
+
     private IQueryable<EpicWithAccessLevel> GetGlobalReadableEpicsQuery(
         OrganizationAuthData authData,
         EntityAccessLevel accessLevel,

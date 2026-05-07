@@ -77,9 +77,6 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        if (accessLevels.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            return;
-        
         if (accessLevels.EpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
             return;
 

@@ -276,10 +276,9 @@ public class IssuesService(
 
         try
         {
-            await epicsAccessService.HasAccessOrThrow(
+            await epicsAccessService.CanCreateIssues(
                 request.AuthData,
                 validationData.EpicId,
-                ChildrenAccessLevel.Create,
                 ct);
         }
         catch (NotFoundException)
