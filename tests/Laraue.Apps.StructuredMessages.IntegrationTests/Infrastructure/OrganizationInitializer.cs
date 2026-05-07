@@ -247,6 +247,13 @@ public class OrganizationInitializer(
             return this;
         }
     
+        public PermissionBuilder SetIssuesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Issues = childrenAccessLevel;
+            
+            return this;
+        }
+    
         public PermissionBuilder SetEpicAccessLevel(int spaceIndex, int epicIndex, EntityAccessLevel entityAccessLevel)
         {
             GetDirectEpicsLevels(spaceIndex, epicIndex).Self = entityAccessLevel;

@@ -85,7 +85,7 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
 
         var epic = await context.Epics
             .Select(x => new { x.SpaceId })
-            .FirstOrThrowNotFoundEFAsync($"Epic: {epicId} is not found", cancellationToken);
+            .FirstOrThrowNotFoundEFAsync("Epic is not found", cancellationToken);
         
         var hasDirectAccessFromSpace = await context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
@@ -102,7 +102,7 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .Where(eou => eou.EpicId == epicId)
             .AnyOrThrowNotFoundEFAsync(
                 eou => eou.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel),
-                $"Space: {epic} is unavailable or permission: {childrenAccessLevel} is missing",
+                $"Epic is unavailable or permission: {childrenAccessLevel} is missing",
                 cancellationToken);
     }
     

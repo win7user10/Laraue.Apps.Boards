@@ -274,11 +274,19 @@ public class IssuesService(
             .Select(x => new { x.EpicId, x.Epic!.SpaceId })
             .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", ct);
 
-        await epicsAccessService.HasAccessOrThrow(
-            request.AuthData,
-            validationData.EpicId,
-            ChildrenAccessLevel.Create,
-            ct);
+        try
+        {
+            await epicsAccessService.HasAccessOrThrow(
+                request.AuthData,
+                validationData.EpicId,
+                ChildrenAccessLevel.Create,
+                ct);
+        }
+        catch (NotFoundException)
+        {
+            throw new NotFoundException(
+                $"Status: {request.StatusId} is not found, or {ChildrenAccessLevel.Create} permission is missing for Epic contains this status");
+        }
 
         return await messageService.Create(
             new SaveMessageRequest
