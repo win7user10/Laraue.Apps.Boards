@@ -123,7 +123,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
             cancellationToken);
     }
 
-    [HttpGet("summary")]
+    /*[HttpGet("summary")] Need to rethink the concept of summary
     public Task<CategorySummary[]> GetBoardSummary(
         [FromQuery] GetBoardSummaryRequest request,
         CancellationToken cancellationToken = default)
@@ -134,5 +134,5 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
                 UserId = HttpContext.User.GetId(),
             },
             cancellationToken);
-    }
+    }*/
 }   
