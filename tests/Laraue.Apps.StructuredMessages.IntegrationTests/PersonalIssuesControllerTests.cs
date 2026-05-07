@@ -254,4 +254,59 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var issueDto = Assert.Single(issuesResult.Data);
         Assert.Equal("John", issueDto.Content);
     }
+    
+    
+    [Fact]
+    public async Task User_ShouldGetBoard_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser(u => { u.TelegramUserName = "snake1977"; });
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddStatus(st => st.WithName("Done"))
+                        .AddIssue(userId, 1, issue => issue.WithContent("Build app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
+                        .AddIssue(userId, 0, issue => issue.WithContent("Fix bug")))));
+        
+        var epic =  organization.GetEpic(1, 1);
+        var backlogStatus = organization.GetStatus(1, 1, 0);
+        var doneStatus = organization.GetStatus(1, 1, 1);
+
+        var boardColumns = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetBoard(
+                new GetBoardRequest
+                {
+                    Take = 10,
+                    SearchString = "app",
+                    EpicId = epic.Id,
+                }));
+        
+        Assert.NotNull(boardColumns);
+        Assert.Equal(2, boardColumns.Length);
+        
+        var backlogColumn = boardColumns[0];
+        Assert.Equal(backlogStatus.Id, backlogColumn.StatusId);
+        Assert.Equal(1, backlogColumn.Items.TotalCount);
+        Assert.Equal(1, backlogColumn.Items.Offset);
+        Assert.False(backlogColumn.Items.HasNext);
+        var backlogIssue = Assert.Single(backlogColumn.Items.Data);
+        Assert.Equal("Deliver app", backlogIssue.Content);
+        Assert.Equal("sn", backlogIssue.SenderInitial);
+        Assert.Equal("snake1977", backlogIssue.Sender);
+        Assert.Equal(backlogStatus.Id, backlogIssue.StatusId);
+        Assert.Equal(epic.Id, backlogIssue.EpicId);
+        Assert.Empty(backlogIssue.Media);
+        
+        var doneColumn = boardColumns[1];
+        Assert.Equal(doneStatus.Id, doneColumn.StatusId);
+        Assert.Equal(1, doneColumn.Items.TotalCount);
+        Assert.Equal(1, doneColumn.Items.Offset);
+        Assert.False(doneColumn.Items.HasNext);
+        var doneIssue = Assert.Single(doneColumn.Items.Data);
+        Assert.Equal("Build app", doneIssue.Content);
+    }
 }

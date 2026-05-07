@@ -158,7 +158,7 @@ public class IssuesService(
             {
                 Data = statusResult.Data.Select(Map).ToArray(),
                 HasNext = statusResult.HasNextPage,
-                Offset = request.Take,
+                Offset = statusResult.Data.Count,
                 TotalCount = statusResult.Total,
             };
             
