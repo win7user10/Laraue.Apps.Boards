@@ -642,7 +642,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
+        var organization = await testScope.InitializeOrganization(
             userId,
             o => o
                 .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Read))
@@ -670,7 +670,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
+        var organization = await testScope.InitializeOrganization(
             userId,
             o => o
                 .AddUser(participatorId, u => u
@@ -701,7 +701,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
+        var organization = await testScope.InitializeOrganization(
             userId,
             o => o
                 .AddUser(participatorId, u => u
@@ -733,7 +733,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
+        var organization = await testScope.InitializeOrganization(
             userId,
             o => o
                 .AddUser(participatorId, u => u
@@ -763,7 +763,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
+        var organization = await testScope.InitializeOrganization(
             userId,
             o => o
                 .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
@@ -784,5 +784,33 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         Assert.NotNull(boardColumns);
         var boardColumn = Assert.Single(boardColumns);
         Assert.Equal(2, boardColumn.Items.TotalCount);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotGetBoard_WhenHasNotAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId)
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 2")));
+
+        var epic = organization.GetEpic(0, 0);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetBoard(
+                new GetBoardRequest
+                {
+                    EpicId = epic.Id,
+                    Take = 10
+                })));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal("Epic is unavailable or children permission: Read is missing", notFound.Message);
     }
 }

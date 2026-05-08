@@ -127,6 +127,12 @@ public class IssuesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.EpicId,
+            ChildrenAccessLevel.Read,
+            cancellationToken);
+        
         var statusIds = await context.Statuses
             .Where(x => x.EpicId == request.EpicId)
             .Select(x => x.Id)
@@ -571,7 +577,7 @@ public record GetIssueRequest
 
 public record GetBoardRequest
 {
-    public OrganizationAuthData? AuthData { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long EpicId { get; set; }
     
     [Range(1, 100)]

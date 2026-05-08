@@ -109,7 +109,7 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .Where(eou => eou.EpicId == epicId)
             .AnyOrThrowNotFoundEFAsync(
                 eou => eou.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel),
-                $"Epic is unavailable or permission: {childrenAccessLevel} is missing",
+                $"Epic is unavailable or children permission: {childrenAccessLevel} is missing",
                 cancellationToken);
     }
 
