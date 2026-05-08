@@ -74,7 +74,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var status = organization.GetStatus(0, 0, 0);
         
         var issueId = await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Create(
                 new CreateIssueRequest
                 {
@@ -128,7 +128,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var status = organization.GetStatus(0, 0, 0);
         
         var issueId = await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Create(
                 new CreateIssueRequest
                 {
@@ -169,7 +169,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
     }
     
     [Fact]
-    public async Task User_ShouldCreateIssue_WhenHasEpicsCreateChildrenAccessOnSpaceLevel()
+    public async Task User_ShouldCreateIssue_WhenHasIssuesCreateChildrenAccessOnSpaceLevel()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -178,12 +178,12 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
             userId,
             organization => organization
                 .AddUser(participatorId, u => u
-                    .SetSpaceEpicsAccessLevel(0, ChildrenAccessLevel.Create)));
+                    .SetSpaceIssuesAccessLevel(0, ChildrenAccessLevel.Create)));
 
         var status = organization.GetStatus(0, 0, 0);
         
         var issueId = await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Create(
                 new CreateIssueRequest
                 {
@@ -261,7 +261,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var issue = organization.GetIssue(0, 0, 0, 0);
         
         await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Update(
                 issue.Id,
                 new UpdateIssueRequest
@@ -288,7 +288,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var issue = organization.GetIssue(0, 0, 0, 0);
         
         await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Update(
                 issue.Id,
                 new UpdateIssueRequest
@@ -357,7 +357,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var issue = organization.GetIssue(0, 0, 0, 0);
         
         await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Delete(issue.Id));
 
         issue = await testScope.Database.Issues.FirstOrDefaultAsyncEF(e => e.Id == issue.Id);
@@ -379,7 +379,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var issue = organization.GetIssue(0, 0, 0, 0);
         
         await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Delete(issue.Id));
 
         issue = await testScope.Database.Issues.FirstOrDefaultAsyncEF(e => e.Id == issue.Id);
@@ -403,6 +403,37 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         
         await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Move(
+                issue.Id,
+                new MoveIssueRequest
+                {
+                    StatusId = newStatus.Id
+                }));
+
+        issue = await testScope.Database.Issues.FirstOrDefaultAsyncEF(e => e.Id == issue.Id);
+        Assert.NotNull(issue);
+        Assert.Equal(newStatus.Id, issue.StatusId);
+    }
+
+    [Fact]
+    public async Task User_ShouldMoveIssue_WhenHasCreateIssuesAccessInEpicAndIssueUpdateAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Create | ChildrenAccessLevel.Update))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e.AddStatus()))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.Move(
                 issue.Id,
                 new MoveIssueRequest

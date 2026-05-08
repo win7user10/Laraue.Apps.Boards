@@ -1,5 +1,7 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 
 namespace Laraue.Apps.StructuredMessages.Services;
@@ -18,7 +20,7 @@ public interface IIssuesAccessService
         CancellationToken cancellationToken);
 }
 
-public class IssuesAccessService(IEpicsAccessService epicsAccessService) : IIssuesAccessService
+public class IssuesAccessService(IEpicsAccessService epicsAccessService, DatabaseContext context) : IIssuesAccessService
 {
     public Task<T> GetAvailable<T>(
         OrganizationAuthData authData,
@@ -39,9 +41,14 @@ public class IssuesAccessService(IEpicsAccessService epicsAccessService) : IIssu
     {
         try
         {
+            var epicId = await context.Issues
+                .Where(i => i.Id == issueId)
+                .Select(x => x.Status!.EpicId)
+                .FirstOrThrowNotFoundEFAsync(string.Empty, cancellationToken);
+
             await epicsAccessService.HasAccessOrThrow(
                 authData,
-                issueId,
+                epicId,
                 entityAccessLevel.ToEntityAccessLevel(),
                 cancellationToken);
         }
