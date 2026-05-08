@@ -411,35 +411,4 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.NotNull(searchResult);
         Assert.Equal(3, searchResult.Data.Count);
     }
-    
-    [Fact]
-    public async Task User_ShouldViewBoardSummary_Always()
-    {
-        using var testScope = host.CreateTestScope();
-        var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
-            userId,
-            o => o
-                .AddSpace(userId, s => s
-                    .AddEpic(userId, e => e
-                        .AddIssue(userId, 0, issue => issue.WithContent("Other space app"))))
-                .AddSpace(userId, s => s
-                    .AddEpic(userId, e => e
-                        .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
-                        .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
-                        .AddIssue(userId, 0, issue => issue.WithContent("Fix bug")))));
-
-        var searchResult = await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Search(
-                new SearchRequest
-                {
-                    SearchString = "app",
-                    Page = 0,
-                    PerPage = 10,
-                }));
-        
-        Assert.NotNull(searchResult);
-        Assert.Equal(3, searchResult.Data.Count);
-    }
 }

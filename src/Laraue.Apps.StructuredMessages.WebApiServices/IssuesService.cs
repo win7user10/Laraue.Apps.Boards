@@ -21,11 +21,11 @@ public interface IIssuesService
         GetIssuesRequest request,
         CancellationToken cancellationToken);
     
-    Task<ColumnMessages[]> GetBoard(
+    Task<ColumnIssues[]> GetBoard(
         GetBoardRequest request,
         CancellationToken cancellationToken);
     
-    Task<CategorySummary[]> GetBoardSummary(
+    Task<EpicSummary[]> GetBoardSummary(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken);
 
@@ -41,7 +41,7 @@ public interface IIssuesService
         CreateIssueRequest request,
         CancellationToken ct);
     
-    Task UpdateIssue(
+    Task Update(
         UpdateIssueRequest request,
         CancellationToken ct);
     
@@ -123,7 +123,7 @@ public class IssuesService(
         };
     }
 
-    public async Task<ColumnMessages[]> GetBoard(
+    public async Task<ColumnIssues[]> GetBoard(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
@@ -138,7 +138,7 @@ public class IssuesService(
             .Select(x => x.Id)
             .ToListAsyncEF(cancellationToken);
 
-        var result = new List<ColumnMessages>();
+        var result = new List<ColumnIssues>();
         foreach (var statusId in statusIds)
         {
             var query = context
@@ -170,7 +170,7 @@ public class IssuesService(
                 TotalCount = statusResult.Total,
             };
             
-            result.Add(new ColumnMessages
+            result.Add(new ColumnIssues
             {
                 StatusId = statusId,
                 Items = mappedStatusResult,
@@ -186,7 +186,7 @@ public class IssuesService(
         return result.ToArray();
     }
 
-    public async Task<CategorySummary[]> GetBoardSummary(
+    public async Task<EpicSummary[]> GetBoardSummary(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
@@ -231,7 +231,7 @@ public class IssuesService(
             .ToDictionary(x => x.Id, x => x.Count);
 
         var result = categoryById
-            .Select(category => new CategorySummary
+            .Select(category => new EpicSummary
             {
                 Id = category.Key,
                 Color = category.Value.Color,
@@ -307,7 +307,7 @@ public class IssuesService(
         }
 
         return await messageService.Create(
-            new SaveMessageRequest
+            new Services.CreateIssueRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
                 Text = request.Content,
@@ -317,7 +317,7 @@ public class IssuesService(
             ct);
     }
 
-    public async Task UpdateIssue(UpdateIssueRequest request, CancellationToken ct)
+    public async Task Update(UpdateIssueRequest request, CancellationToken ct)
     {
         await issuesAccessService.HasAccessOrThrow(
             request.AuthData,
@@ -518,10 +518,10 @@ public class IssuesService(
         }
     }
 
-    private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
+    private static IQueryable<IssueListDtoData> ProjectToTemporaryDto(
         IQueryable<Issue> queryable)
     {
-        return queryable.Select(x => new MessageListDtoData
+        return queryable.Select(x => new IssueListDtoData
         {
             Id = x.Id,
             Content = x.Content,
@@ -535,7 +535,7 @@ public class IssuesService(
         });
     }
     
-    private static IssueListDto Map(MessageListDtoData source)
+    private static IssueListDto Map(IssueListDtoData source)
     {
         var senderData = UserInitialsUtility.GetInitials(
             source.TelegramUsername,
@@ -591,13 +591,13 @@ public record GetBoardSummaryRequest
     public long SpaceId { get; set; }
 }
 
-public record ColumnMessages
+public record ColumnIssues
 {
     public required long StatusId { get; set; }
     public required InitialBatchResult<IssueListDto> Items { get; set; }
 }
 
-public class MessageListDtoData
+public class IssueListDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -726,7 +726,7 @@ public class ColumnSummary
     public required int SortOrder { get; set; }
 }
 
-public record CategorySummary
+public record EpicSummary
 {
     public required long Id { get; set; }
     public required string Name { get; set; }

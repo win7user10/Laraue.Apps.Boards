@@ -1,6 +1,6 @@
 ﻿namespace Laraue.Apps.StructuredMessages.Services;
 
-public class CardsDefaults
+public class IssueDefaults
 {
     public const string DefaultStatusName = "New";
 }

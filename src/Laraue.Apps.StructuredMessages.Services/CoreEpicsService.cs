@@ -60,7 +60,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         statuses ??= [
             new Status
             {
-                Name = CardsDefaults.DefaultStatusName,
+                Name = IssueDefaults.DefaultStatusName,
                 Color = Palette.DefaultStatusColor
             }];
 

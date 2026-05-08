@@ -41,7 +41,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
     }
     
     [HttpGet("board")]
-    public Task<ColumnMessages[]> GetBoard(
+    public Task<ColumnIssues[]> GetBoard(
         [FromQuery] GetBoardRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -101,7 +101,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         [FromBody] UpdateIssueRequest request,
         CancellationToken cancellationToken = default)
     {
-        return issuesService.UpdateIssue(
+        return issuesService.Update(
             request with
             {
                 AuthData = HttpContext.User.GetOrganizationAuthData(),

@@ -73,7 +73,7 @@ public class EpicsController(IEpicsService categoriesService)
         CancellationToken cancellationToken = default)
     {
         return categoriesService.Delete(
-            new DeleteCategoryRequest
+            new DeleteEpicRequest
             {
                 Id = id,
                 AuthData = HttpContext.User.GetOrganizationAuthData(),

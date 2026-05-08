@@ -30,7 +30,7 @@ public interface IEpicsService
         CancellationToken cancellationToken);
     
     Task Delete(
-        DeleteCategoryRequest request,
+        DeleteEpicRequest request,
         CancellationToken cancellationToken);
 }
 
@@ -144,7 +144,7 @@ public class EpicsService(
             cancellationToken);
     }
 
-    public async Task Delete(DeleteCategoryRequest request, CancellationToken cancellationToken)
+    public async Task Delete(DeleteEpicRequest request, CancellationToken cancellationToken)
     {
         await epicsAccessService
             .HasAccessOrThrow(
@@ -225,7 +225,7 @@ public record UpdateEpicRequest
     public required string Color { get; set; }
 }
 
-public record DeleteCategoryRequest
+public record DeleteEpicRequest
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     

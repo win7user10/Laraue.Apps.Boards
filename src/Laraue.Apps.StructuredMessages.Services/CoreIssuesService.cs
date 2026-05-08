@@ -1,9 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
-using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
-using Laraue.Core.Exceptions.Web;
-using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -12,7 +9,7 @@ namespace Laraue.Apps.StructuredMessages.Services;
 public interface ICoreIssuesService
 {
     Task<long> Create(
-        SaveMessageRequest request,
+        CreateIssueRequest request,
         CancellationToken cancellationToken);
     
     Task Update(
@@ -34,7 +31,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
     : ICoreIssuesService
 {
     public async Task<long> Create(
-        SaveMessageRequest request,
+        CreateIssueRequest request,
         CancellationToken cancellationToken)
     {
         var entity = new Issue
@@ -105,7 +102,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
     }
 }
 
-public class SaveMessageRequest
+public class CreateIssueRequest
 {
     public Guid UserId { get; set; }
     public required string? Text { get; set; }
