@@ -243,7 +243,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 })));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Issue is not exists or epic children permission: Update is missing", notFound.Message);
+        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Update is missing", notFound.Message);
     }
     
     [Fact]
@@ -339,7 +339,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
             .Execute(x => x.Delete(issue.Id)));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Issue is not exists or epic children permission: Delete is missing", notFound.Message);
+        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Delete is missing", notFound.Message);
     }
     
     [Fact]
@@ -473,7 +473,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 })));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Issue is not exists or epic children permission: Update is missing", notFound.Message);
+        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Update is missing", notFound.Message);
     }
 
     [Fact]
@@ -756,5 +756,33 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         Assert.NotNull(issuesResult);
         var issueDto = Assert.Single(issuesResult.Data);
         Assert.Equal("John 1", issueDto.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldGetBoard_WhenIsOrganizationOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 2")));
+
+        var epic = organization.GetEpic(0, 0);
+        
+        var boardColumns = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.GetBoard(
+                new GetBoardRequest
+                {
+                    SearchString = "jo",
+                    EpicId = epic.Id,
+                    Take = 10
+                }));
+        
+        Assert.NotNull(boardColumns);
+        var boardColumn = Assert.Single(boardColumns);
+        Assert.Equal(2, boardColumn.Items.TotalCount);
     }
 }

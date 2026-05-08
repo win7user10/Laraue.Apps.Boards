@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
+﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Extensions;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
@@ -572,6 +573,8 @@ public record GetBoardRequest
 {
     public OrganizationAuthData? AuthData { get; set; }
     public long EpicId { get; set; }
+    
+    [Range(1, 100)]
     public int Take { get; init; }
     public string? SearchString { get; init; }
 }

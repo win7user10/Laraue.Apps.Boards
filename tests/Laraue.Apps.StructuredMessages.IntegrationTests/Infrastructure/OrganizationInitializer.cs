@@ -96,7 +96,7 @@ public class OrganizationInitializer(
                     TouchedAt = epic.Timestamp,
                     UserId = epic.CreatorId,
                     IsDefault = epic.IsDefault,
-                    Statuses = new List<Status>
+                    Statuses = index == 0 ? new List<Status>() : new List<Status>
                     {
                         OrganizationDefaults.GetNewStatusEntity(),
                     }
