@@ -118,7 +118,7 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
         return issuesService.Search(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

@@ -6,6 +6,7 @@ using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.Contracts;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DataAccess.Extensions;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -328,24 +329,24 @@ public class IssuesService(
         SearchRequest request,
         CancellationToken ct)
     {
-        var query = context.Issues
-            .Where(x => x.UserId == request.UserId);
+        var result = await issuesAccessService.GetAvailable(
+            request.AuthData,
+            issues =>
+            {
+                if (request.EpicId.HasValue)
+                    issues = issues.Where(x => x.Status!.EpicId == request.EpicId);
         
-        if (request.EpicId.HasValue)
-            query = query.Where(x => x.Status!.EpicId == request.EpicId);
+                if (request.SpaceId.HasValue)
+                    issues = issues.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
         
-        if (request.SpaceId.HasValue)
-            query = query.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
-        
-        if (!string.IsNullOrEmpty(request.SearchString))
-            query = query
-                .Where(x => EF.Functions.ILike(
-                    x.Content!,
-                    request.SearchString.AsSearchable()));
+                if (!string.IsNullOrEmpty(request.SearchString))
+                    issues = issues
+                        .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
 
-        var result = await ProjectToTemporaryDto(query)
-            .ShortPaginateEFAsync(request, ct);
-
+                return ProjectToTemporaryDto(issues)
+                    .ShortPaginateLinq2DbAsync(request, ct);
+            }, ct);
+        
         var mapped = result.MapTo(Map);
         await Enrich(mapped.Data, ct);
         
@@ -653,7 +654,7 @@ public record UpdateIssueRequest
 
 public record SearchRequest : IPaginationData
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long? EpicId { get; set; }
     public long? SpaceId { get; set; }
     public string? SearchString { get; set; }

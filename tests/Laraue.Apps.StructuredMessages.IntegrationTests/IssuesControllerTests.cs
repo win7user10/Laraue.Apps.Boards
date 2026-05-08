@@ -635,4 +635,32 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var notFound = ex.HasInnerException<NotFoundException>();
         Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Read is missing", notFound.Message);
     }
+
+    [Fact]
+    public async Task User_ShouldSearchAllIssues_WhenHasIssuesAccessOnGlobalLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("Hi"))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John")));
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "jo",
+                    Page = 0,
+                    PerPage = 10,
+                }));
+        
+        Assert.NotNull(issuesResult);
+        var issueDto = Assert.Single(issuesResult.Data);
+        Assert.Equal("John", issueDto.Content);
+    }
 }
