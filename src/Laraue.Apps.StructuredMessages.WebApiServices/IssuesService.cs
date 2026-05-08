@@ -343,7 +343,7 @@ public class IssuesService(
                     issues = issues
                         .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
 
-                return ProjectToTemporaryDto(issues)
+                return ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
                     .ShortPaginateLinq2DbAsync(request, ct);
             }, ct);
         

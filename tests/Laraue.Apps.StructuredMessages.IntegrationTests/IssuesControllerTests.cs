@@ -663,4 +663,98 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         var issueDto = Assert.Single(issuesResult.Data);
         Assert.Equal("John", issueDto.Content);
     }
+    
+    [Fact]
+    public async Task User_ShouldSearchOnlyPermittedSpaceIssues_WhenHasIssuesAccessOnSpaceLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetSpaceIssuesAccessLevel(1, ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
+                .AddSpace(userId, space => space
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("John 2")))));
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "jo",
+                    Page = 0,
+                    PerPage = 10,
+                }));
+        
+        Assert.NotNull(issuesResult);
+        var issueDto = Assert.Single(issuesResult.Data);
+        Assert.Equal("John 2", issueDto.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchPermittedSpaceAndEpicsIssuesSameTime_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetSpaceIssuesAccessLevel(1, ChildrenAccessLevel.Read)
+                    .SetEpicIssuesAccessLevel(0, 0, ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
+                .AddSpace(userId, space => space
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("John 2")))));
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "jo",
+                    Page = 0,
+                    PerPage = 10,
+                }));
+        
+        Assert.NotNull(issuesResult);
+        Assert.Equal("John 2", issuesResult.Data[0].Content);
+        Assert.Equal("John 1", issuesResult.Data[1].Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchOnlyPermittedEpicsIssues_WhenHasIssuesAccessOnEpicsLevel()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetEpicIssuesAccessLevel(0, 0, ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId, issue => issue.WithContent("John 1"))
+                .AddSpace(userId, space => space
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue.WithContent("John 2")))));
+        
+        var issuesResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    SearchString = "jo",
+                    Page = 0,
+                    PerPage = 10,
+                }));
+        
+        Assert.NotNull(issuesResult);
+        var issueDto = Assert.Single(issuesResult.Data);
+        Assert.Equal("John 1", issueDto.Content);
+    }
 }

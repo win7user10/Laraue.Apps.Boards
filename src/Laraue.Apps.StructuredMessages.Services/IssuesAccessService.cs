@@ -29,7 +29,9 @@ public class IssuesAccessService(IEpicsAccessService epicsAccessService, Databas
     {
         return epicsAccessService.GetAvailable(
             authData,
-            epics => map(epics.SelectMany(e => e.Epic.Statuses!.SelectMany(i => i.Issues!))),
+            epics => map(epics
+                .SelectMany(e => e.Epic.Statuses!
+                    .SelectMany(i => i.Issues!))),
             cancellationToken);
     }
 
