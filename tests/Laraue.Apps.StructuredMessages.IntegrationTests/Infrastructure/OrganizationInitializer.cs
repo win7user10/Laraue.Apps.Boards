@@ -221,6 +221,12 @@ public class OrganizationInitializer(
     {
         return AddIssue(0, 0, 0, creatorId, setupIssue);
     }
+    
+    public OrganizationInitializer AddIssueToDefaultStatus(
+        Guid creatorId)
+    {
+        return AddIssueToDefaultStatus(creatorId, _ => {});
+    }
 
     public record TestUserPermissions
     {
@@ -411,6 +417,11 @@ public class OrganizationInitializer(
             Statuses.Add(builder);
 
             return this;
+        }
+        
+        public EpicBuilder AddStatus()
+        {
+            return AddStatus(_ => { });
         }
 
         public EpicBuilder SetAsDefault()
