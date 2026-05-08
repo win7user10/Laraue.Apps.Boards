@@ -54,7 +54,7 @@ public class IssuesAccessService(IEpicsAccessService epicsAccessService, Databas
         }
         catch (NotFoundException)
         {
-            throw new NotFoundException($"Issue is not exists or epic children permission: {entityAccessLevel} is missing");
+            throw new NotFoundException($"Issue: {issueId} is not exists or epic children permission: {entityAccessLevel} is missing");
         }
     }
 }
