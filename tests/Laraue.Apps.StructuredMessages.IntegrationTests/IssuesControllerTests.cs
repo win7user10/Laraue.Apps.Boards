@@ -566,4 +566,73 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
         
         Assert.NotNull(issueDto);
     }
+
+    [Fact]
+    public async Task User_ShouldViewIssue_WhenHasSpaceAccessToReadIssues()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetSpaceIssuesAccessLevel(0, ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        
+        var issueDto = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetIssue(issue.Id));
+        
+        Assert.NotNull(issueDto);
+    }
+
+    [Fact]
+    public async Task User_ShouldViewIssue_WhenHasEpicAccessToReadIssues()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetEpicIssuesAccessLevel(0, 0, ChildrenAccessLevel.Read))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        
+        var issueDto = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetIssue(issue.Id));
+        
+        Assert.NotNull(issueDto);
+    }
+
+    [Fact]
+    public async Task User_ShouldNotViewIssue_WhenHasAnotherEpicAccessToReadIssues()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0)))
+                .AddUser(participatorId, u => u
+                    .SetEpicIssuesAccessLevel(1, 0, ChildrenAccessLevel.Read)));
+
+        var issue = organization.GetIssue(1, 1, 0, 0);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _issuesController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.GetIssue(issue.Id)));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Read is missing", notFound.Message);
+    }
 }

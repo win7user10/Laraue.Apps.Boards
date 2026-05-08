@@ -307,6 +307,13 @@ public class OrganizationInitializer(
             
             return this;
         }
+    
+        public PermissionBuilder SetEpicIssuesAccessLevel(int spaceIndex, int epicIndex, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectEpicsLevels(spaceIndex, epicIndex).Issues = childrenAccessLevel;
+            
+            return this;
+        }
 
         private TestDirectSpaceAccessLevel GetDirectSpacesLevels(int spaceIndex)
         {
