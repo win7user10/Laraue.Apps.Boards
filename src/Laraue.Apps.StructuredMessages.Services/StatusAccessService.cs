@@ -35,7 +35,7 @@ public class StatusAccessService(
             await epicsAccessService.HasAccessOrThrow(
                 authData,
                 epicId,
-                ChildrenAccessLevel.Update,
+                ChildrenAccessLevel.Create,
                 cancellationToken);
         }
         catch (NotFoundException)
@@ -72,6 +72,6 @@ public class StatusAccessService(
 
     private static string GetError(long statusId)
     {
-        return $"Status: {statusId} is not exists or permission {ChildrenAccessLevel.Update} missing on Epic";
+        return $"Status: {statusId} is not exists or permission: {ChildrenAccessLevel.Update} missing on Epic";
     }
 }
