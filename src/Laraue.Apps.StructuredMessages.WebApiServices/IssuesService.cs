@@ -190,22 +190,23 @@ public class IssuesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        
-        var categoryById = (await context.Epics
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == spaceId)
-            .Select(x => new
-            {
-                x.Id,
-                x.Color,
-                x.Name,
-            })
-            .ToArrayAsyncEF(cancellationToken))
-            .ToDictionary(x => x.Id);
+        var epics = await epicsAccessService.GetAvailable(
+            request.AuthData,
+            new Filter { SpaceId = request.SpaceId },
+            epics => epics
+                .Select(x => new
+                {
+                    x.Epic.Id,
+                    x.Epic.Color,
+                    x.Epic.Name,
+                })
+                .ToArrayAsyncEF(cancellationToken),
+            cancellationToken);
+
+        var epicById = epics.ToDictionary(x => x.Id);
         
         var statusByCategoryId = (await context.Statuses
-            .Where(x => categoryById.Keys.Contains(x.EpicId))
+            .Where(x => epicById.Keys.Contains(x.EpicId))
             .Select(x => new
             {
                 x.Id,
@@ -218,19 +219,18 @@ public class IssuesService(
          .ToLookup(x => x.MessageCategoryId);
         
         var counts = (await context.Issues
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.Status!.Epic!.SpaceId == spaceId)
+            .Where(x =>  epics.Select(e => e.Id).Contains(x.Status!.EpicId))
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = IdService.ToNotNullableId(x.Key),
+                Id = x.Key,
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
             .ToDictionary(x => x.Id, x => x.Count);
 
-        var result = categoryById
+        var result = epicById
             .Select(category => new EpicSummary
             {
                 Id = category.Key,
@@ -587,7 +587,7 @@ public record GetBoardRequest
 
 public record GetBoardSummaryRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long SpaceId { get; set; }
 }
 

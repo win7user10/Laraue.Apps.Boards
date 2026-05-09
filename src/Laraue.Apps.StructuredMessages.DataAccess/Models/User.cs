@@ -13,7 +13,7 @@ public class User : ITelegramUser<Guid>
     public string? TelegramFirstName { get; set; }
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public string Color { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public IList<Epic>? Epics { get; set; }
     public IList<Space>? Spaces { get; set; }

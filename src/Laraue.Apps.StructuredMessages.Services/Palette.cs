@@ -4,6 +4,7 @@ public static class Palette
 {
     public const string DefaultStatusColor = "#dda61b";
     public const string DefaultUserColor = "#3fb950";
+    public const string DefaultBacklogColor = "#2f81f7";
     
     private static readonly Random Random = new (); 
     public static readonly string[] Colors =

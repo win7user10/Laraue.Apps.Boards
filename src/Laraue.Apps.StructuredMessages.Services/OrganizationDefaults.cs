@@ -54,7 +54,7 @@ public class OrganizationDefaults
         return new()
         {
             Name = "Backlog",
-            Color = Palette.RandomColor(),
+            Color = Palette.DefaultBacklogColor,
             CreatedAt = timestamp,
             TouchedAt = timestamp,
             UpdatedAt = timestamp,

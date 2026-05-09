@@ -123,16 +123,16 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
             cancellationToken);
     }
 
-    /*[HttpGet("summary")] Need to rethink the concept of summary
-    public Task<CategorySummary[]> GetBoardSummary(
+    [HttpGet("summary")]
+    public Task<EpicSummary[]> GetBoardSummary(
         [FromQuery] GetBoardSummaryRequest request,
         CancellationToken cancellationToken = default)
     {
         return issuesService.GetBoardSummary(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
-    }*/
+    }
 }   

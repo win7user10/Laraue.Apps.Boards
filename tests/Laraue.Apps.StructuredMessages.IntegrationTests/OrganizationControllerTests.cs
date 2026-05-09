@@ -275,7 +275,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         {
             Name = "Org 1",
             OwnerId = ownerId,
-            JoinCode = "abc"
+            JoinCode = "abc",
+            Color = "#ffffff"
         };
         
         testScope.Database.Organizations.Add(organization);
@@ -309,7 +310,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         {
             Name = "Org 1",
             OwnerId = ownerId,
-            JoinCode = "abc"
+            JoinCode = "abc",
+            Color = "#ffffff"
         };
         
         testScope.Database.Organizations.Add(organization);

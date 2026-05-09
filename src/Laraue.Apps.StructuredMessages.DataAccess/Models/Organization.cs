@@ -13,7 +13,7 @@ public class Organization
     public string Name { get; set; } = string.Empty;
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     
     /// <summary>
     /// Who is the owner of organization. That can be transferred.

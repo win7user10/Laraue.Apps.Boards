@@ -54,7 +54,6 @@ public class CoreUserPreferencesService(DatabaseContext context) : ICoreUserPref
         return new UserPreferencesResponse
         {
             EpicSortOrder = preferences.EpicSortOrder,
-            SpaceId = IdService.ToNotNullableId(preferences.SpaceId),
         };
     }
     
@@ -71,5 +70,4 @@ public class CoreUserPreferencesService(DatabaseContext context) : ICoreUserPref
 public record UserPreferencesResponse
 {
     public required EpicSortOrder EpicSortOrder { get; init; }
-    public required long SpaceId { get; init; }
 }
