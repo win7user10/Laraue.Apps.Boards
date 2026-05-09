@@ -39,12 +39,14 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        var accessToViewSpaces = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel | accessLevels.IssuesAccessLevel;
+        var accessToViewSpaces = accessLevels.SpacesAccessLevel;
         if (accessToViewSpaces.HasFlag(ChildrenAccessLevel.Read))
             return await map(GetGlobalReadableSpacesQuery(authData, accessLevels.SpacesAccessLevel.ToEntityAccessLevel()));
         
         return await map(GetDirectReadableSpacesQuery(authData)
-            .Select(x => new SpaceWithAccessLevel(x.Space!, x.EntityAccessLevel))); 
+            .Select(x => new SpaceWithAccessLevel(
+                x.Space!,
+                x.EntityAccessLevel))); 
     }
 
     public async Task HasAccessOrThrow(
@@ -100,9 +102,11 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
                 (space, user) => new { Space = space, DirectSpacePermission = (DirectSpacePermission?)user })
             .Select(spaceUser => new SpaceWithAccessLevel(
                 spaceUser.Space,
-                spaceUser.DirectSpacePermission != null
-                    ? spaceUser.DirectSpacePermission.EntityAccessLevel | accessLevel
-                    : accessLevel));
+                spaceUser.Space.IsDefault
+                    ? EntityAccessLevel.Read | EntityAccessLevel.Update
+                    : spaceUser.DirectSpacePermission != null
+                        ? spaceUser.DirectSpacePermission.EntityAccessLevel | accessLevel
+                        : accessLevel));
     }
     
     private IQueryable<DirectSpacePermission> GetDirectReadableSpacesQuery(OrganizationAuthData authData)

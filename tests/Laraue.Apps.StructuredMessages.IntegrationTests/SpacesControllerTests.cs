@@ -108,7 +108,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         Assert.Equal(2, spaces!.Length);
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space created by Participator", space.Name);
-        Assert.Equal(EntityAccessLevel.All, space.AccessLevel);
+        Assert.True(space.CanUpdate);
+        Assert.True(space.CanDelete);
     }
     
     [Fact]
@@ -127,7 +128,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.False(s.CanUpdate));
+        Assert.All(spaces, s => Assert.False(s.CanDelete));
     }
     
     [Fact]
@@ -146,7 +148,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.False(s.CanUpdate));
+        Assert.All(spaces, s => Assert.False(s.CanDelete));
     }
     
     [Fact]
@@ -165,7 +168,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.Equal(EntityAccessLevel.Read, s.AccessLevel));
+        Assert.All(spaces, s => Assert.False(s.CanUpdate));
+        Assert.All(spaces, s => Assert.False(s.CanDelete));
     }
     
     [Fact]
@@ -187,7 +191,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
             .Execute(x => x.GetAll());
         
         var space = spaces!.First(x => x.Id == spaceId);
-        Assert.Equal(EntityAccessLevel.Read | EntityAccessLevel.Update, space.AccessLevel);
+        Assert.True(space.CanUpdate);
+        Assert.False(space.CanDelete);
     }
     
     [Fact]

@@ -1,9 +1,11 @@
-﻿using System.Security.Cryptography;
+﻿using System.Collections.Specialized;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
@@ -22,6 +24,12 @@ public interface ITelegramAuthService
     Task<string> Authenticate(
         TelegramWidgetAuthRequest request,
         CancellationToken cancellationToken);
+
+    Task<Guid> RegisterUser(
+        MiniAppUser user,
+        CancellationToken cancellationToken);
+
+    string BuildHash(NameValueCollection collection);
 }
     
 public class TelegramAuthService(
@@ -119,10 +127,21 @@ public class TelegramAuthService(
         if (string.IsNullOrEmpty(receivedHash))
             throw new ForbiddenException("Hash is missing");
         
-        var sortedKeys = parsedData.AllKeys.OrderBy(key => key, StringComparer.Ordinal).ToList();
-        var dataCheckStrings = sortedKeys.Select(key => $"{key}={parsedData[key]}");
-        var dataCheckString = string.Join("\n", dataCheckStrings);
+        var generatedHash = BuildHash(parsedData);
+        var result = generatedHash.Equals(receivedHash, StringComparison.OrdinalIgnoreCase);
+        if (!result)
+            throw new ForbiddenException("Hash mismatch");
+        
+        var user = parsedData["user"];
+        return JsonSerializer.Deserialize<MiniAppUser>(user!, JsonBotAPI.Options)!;
+    }
 
+    public string BuildHash(NameValueCollection collection)
+    {
+        var sortedKeys = collection.AllKeys.OrderBy(key => key, StringComparer.Ordinal).ToList();
+        var dataCheckStrings = sortedKeys.Select(key => $"{key}={collection[key]}");
+        var dataCheckString = string.Join("\n", dataCheckStrings);
+        
         var secretKey = HMACSHA256.HashData(
             "WebAppData"u8.ToArray(),
             Encoding.UTF8.GetBytes(options.Value.Token));
@@ -132,18 +151,16 @@ public class TelegramAuthService(
             Encoding.UTF8.GetBytes(dataCheckString));
         
         var generatedHash = Convert.ToHexString(generatedHashBytes).ToLower();
-        var result = generatedHash.Equals(receivedHash, StringComparison.OrdinalIgnoreCase);
-        if (!result)
-            throw new ForbiddenException("Auth is expired");
-        
-        var user = parsedData["user"];
-        return JsonSerializer.Deserialize<MiniAppUser>(user!, JsonBotAPI.Options)!;
+
+        return generatedHash;
     }
     
-    private async Task<Guid> RegisterUser(
+    public async Task<Guid> RegisterUser(
         MiniAppUser user,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        
         var newUser = new User
         {
             CreatedAt = dateTimeProvider.UtcNow,
@@ -156,6 +173,18 @@ public class TelegramAuthService(
         
         context.Users.Add(newUser);
         await context.SaveChangesAsync(cancellationToken);
+        
+        var organization = OrganizationDefaults.GetNewOrganizationEntity(
+            newUser.Id,
+            "Personal",
+            Palette.RandomColor(),
+            newUser.CreatedAt,
+            OrganizationType.Personal);
+        
+        context.Organizations.Add(organization);
+        await context.SaveChangesAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
 
         return newUser.Id;
     }
@@ -165,7 +194,7 @@ public class MiniAppUser
 {
     public long Id { get; set; }
     public string? Username { get; set; }
-    public required string? LanguageCode { get; set; }
-    public required string? FirstName { get; set; }
-    public required string? LastName { get; set; }
+    public string? LanguageCode { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
 }

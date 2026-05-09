@@ -43,7 +43,8 @@ public class SpacesService(
                     Name = x.Space.Name,
                     Color = x.Space.Color,
                     EpicsCount = x.Space.Epics!.Count,
-                    AccessLevel = x.EntityAccessLevel
+                    CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
+                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -136,5 +137,6 @@ public record SpaceDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int EpicsCount { get; set; }
-    public required EntityAccessLevel AccessLevel { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
 }
