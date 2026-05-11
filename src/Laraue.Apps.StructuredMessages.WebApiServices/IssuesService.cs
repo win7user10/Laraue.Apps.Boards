@@ -67,26 +67,30 @@ public class IssuesService(
         GetIssuesRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await issuesAccessService.GetAvailable(
-            request.AuthData,
-            (issues) =>
-            {
-                var query = issues
-                    .Where(i => i.StatusId == request.StatusId);
-
-                if (!string.IsNullOrEmpty(request.SearchString))
-                {
-                    query = query
-                        .Where(x => x.Content!
-                            .ILike(request.SearchString.AsSearchable()));
-                }
-
-                var ordered = query.OrderByDescending(x => x.Id);
-                var projected = ProjectToTemporaryDto(ordered);
-                return ToBatchResult(projected, request, cancellationToken);
-            },
-            cancellationToken);
+        var statusData = await context.Statuses
+            .Where(x => x.Id == request.StatusId)
+            .Select(x => new { x.EpicId })
+            .FirstOrThrowNotFoundEFAsync("Status is not found", cancellationToken);
         
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            statusData.EpicId,
+            ChildrenAccessLevel.Read,
+            cancellationToken);
+
+        var query = context.Issues
+            .Where(i => i.StatusId == request.StatusId);
+            
+        if (!string.IsNullOrEmpty(request.SearchString))
+        {
+            query = query
+                .Where(x => x.Content!
+                    .ILike(request.SearchString.AsSearchable()));
+        }
+
+        var ordered = query.OrderByDescending(x => x.Id);
+        var temporaryResult = ProjectToTemporaryDto(ordered);
+        var result = await ToBatchResult(temporaryResult, request, cancellationToken);
 
         var projected = result.Data
             .Select(Map)
@@ -143,7 +147,6 @@ public class IssuesService(
         {
             var query = context
                 .Issues
-                .Where(x => x.UserId == request.AuthData!.UserId)
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))

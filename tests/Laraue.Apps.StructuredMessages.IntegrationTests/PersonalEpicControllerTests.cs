@@ -179,5 +179,9 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.NotNull(epic);
         Assert.True(epic.CanDelete);
         Assert.True(epic.CanUpdate);
+        Assert.True(epic.CanCreateIssues);
+        Assert.True(epic.CanViewIssues);
+        Assert.True(epic.CanDeleteIssues);
+        Assert.True(epic.CanUpdateIssues);
     }
 }

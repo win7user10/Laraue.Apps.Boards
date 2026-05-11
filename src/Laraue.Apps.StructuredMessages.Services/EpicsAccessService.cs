@@ -33,16 +33,16 @@ public interface IEpicsAccessService
     /// <summary>
     /// Returns is entity permitted for a change operation. To check access for read use one of <c>GetAvailable</c> methods.
     /// </summary>
+    /// TODO - do not throw inside a method. Only return true false and throw with custom exception always
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long epicId,
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
     
-    Task<bool> HasAccess(
+    Task<ChildrenAccessLevel> GetChildrenAccessLevel(
         OrganizationAuthData authData,
         long epicId,
-        ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
@@ -92,45 +92,48 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken)
     {
-        var hasAccess = await HasAccess(authData, epicId, childrenAccessLevel, cancellationToken);
-        if (!hasAccess)
+        var result = await GetChildrenAccessLevel(authData, epicId, cancellationToken);
+        if (!result.HasFlag(childrenAccessLevel))
             throw new NotFoundException(
-            $"Epic is unavailable or children permission: {childrenAccessLevel} is missing");
+                $"Epic is unavailable or children permission: {childrenAccessLevel} is missing");
     }
 
-    public async Task<bool> HasAccess(
+    public async Task<ChildrenAccessLevel> GetChildrenAccessLevel(
         OrganizationAuthData authData,
         long epicId,
-        ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken)
     {
-        var accessLevels = await accessService
+        var globalLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
-        
-        if (accessLevels.IssuesAccessLevel.HasFlag(childrenAccessLevel))
-            return true;
+
+        var result = globalLevels.IssuesAccessLevel;
 
         var epic = await context.Epics
             .Where(e => e.Id == epicId)
             .Select(x => new { x.SpaceId })
             .FirstOrThrowNotFoundEFAsync("Epic is not found", cancellationToken);
         
-        var hasDirectAccessFromSpace = await context.DirectSpacePermissions
+        var spaceDirectPermissions = await context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.SpaceId == epic.SpaceId)
-            .AnyAsync(sos => sos.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel), cancellationToken);
+            .Select(sos => new { sos.ChildrenIssuesAccessLevel })
+            .FirstOrDefaultAsyncLinqToDB(cancellationToken);
         
-        if (hasDirectAccessFromSpace)
-            return true;
+        if (spaceDirectPermissions is not null)
+            result |= spaceDirectPermissions.ChildrenIssuesAccessLevel;
         
-        return await context.DirectEpicPermissions
+        var epicDirectPermissions = await context.DirectEpicPermissions
             .Where(eou => eou.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(eou => eou.OrganizationUser!.UserId == authData.UserId)
             .Where(eou => eou.EpicId == epicId)
-            .AnyAsyncEF(
-                eou => eou.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel),
-                cancellationToken);
+            .Select(sos => new { sos.ChildrenIssuesAccessLevel })
+            .FirstOrDefaultAsyncLinqToDB(cancellationToken);
+        
+        if (epicDirectPermissions is not null)
+            result |= epicDirectPermissions.ChildrenIssuesAccessLevel;
+
+        return result;
     }
 
     public async Task HasAccessOrThrow(

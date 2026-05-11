@@ -87,17 +87,24 @@ public class EpicsService(
                         .ToArray(),
                     CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
                     CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
-                    CanViewIssues = false // Fill later
+                    CanViewIssues = false, // Fill next fields later
+                    CanCreateIssues = false,
+                    CanDeleteIssues = false,
+                    CanUpdateIssues = false,
                 })
                 .FirstOrThrowNotFoundLinq2DbAsync($"Epic: {request.Id} is not found", cancellationToken),
             cancellationToken);
         
-        epic.CanViewIssues = await epicsAccessService.HasAccess(
+        var accessLevel = await epicsAccessService.GetChildrenAccessLevel(
             request.AuthData,
             request.Id,
-            ChildrenAccessLevel.Read,
             cancellationToken);
 
+        epic.CanDeleteIssues = accessLevel.HasFlag(ChildrenAccessLevel.Delete);
+        epic.CanUpdateIssues = accessLevel.HasFlag(ChildrenAccessLevel.Update);
+        epic.CanViewIssues = accessLevel.HasFlag(ChildrenAccessLevel.Read);
+        epic.CanCreateIssues = accessLevel.HasFlag(ChildrenAccessLevel.Create);
+        
         return epic;
     }
 
@@ -197,6 +204,9 @@ public record EpicDto
     public required string? Color { get; set; }
     public StatusDto[] Statuses { get; set; } = [];
     public required bool CanViewIssues { get; set; }
+    public required bool CanCreateIssues { get; set; }
+    public required bool CanDeleteIssues { get; set; }
+    public required bool CanUpdateIssues { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
 }

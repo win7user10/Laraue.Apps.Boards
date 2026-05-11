@@ -124,4 +124,31 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         
         Assert.NotEqual(0, epicId);
     }
+    
+    [Fact]
+    public async Task User_ShouldGetEpic_WhenHasAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(userId,
+            setup => setup
+                .AddSpace(userId)
+                .AddUser(participatorId, u => u
+                    .SetIssuesAccessLevel(ChildrenAccessLevel.Read)));
+
+        var epicId = organization.GetEpic(1, 0).Id;
+        
+        var epic = await _epicsController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Get(epicId));
+        
+        Assert.NotNull(epic);
+        Assert.False(epic.CanDelete);
+        Assert.False(epic.CanUpdate);
+        Assert.False(epic.CanCreateIssues);
+        Assert.True(epic.CanViewIssues);
+        Assert.False(epic.CanDeleteIssues);
+        Assert.False(epic.CanUpdateIssues);
+    }
 }
