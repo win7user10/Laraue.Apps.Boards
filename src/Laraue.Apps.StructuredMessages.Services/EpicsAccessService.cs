@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
+﻿using System.Linq.Expressions;
+using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
@@ -180,9 +181,9 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .Select(epicData => new EpicWithAccessLevel
             {
                 Epic = epicData.Epic,
-                EntityAccessLevel = epicData.DirectEpicPermission != null
-                    ? epicData.DirectEpicPermission.EntityAccessLevel | accessLevel
-                    : accessLevel,
+                EntityAccessLevel = MergeGlobalAndDirectLevels(
+                    epicData.DirectEpicPermission,
+                    AdjustEpicAccessLevel(epicData.Epic, accessLevel)),
             });
     }
     
@@ -235,6 +236,24 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         
         return all;
     }
+
+    [ExpressionMethod(nameof(AdjustEpicAccessLevelImpl))]
+    private static EntityAccessLevel AdjustEpicAccessLevel(Epic epic, EntityAccessLevel globalAccessLevel)
+        => throw new InvalidOperationException("LINQ translation only.");
+    
+    private static Expression<Func<Epic, EntityAccessLevel, EntityAccessLevel>> AdjustEpicAccessLevelImpl()
+        => (epic, globalAccessLevel) => epic.IsDefault
+            ? globalAccessLevel & (EntityAccessLevel.Read | EntityAccessLevel.Update)
+            : globalAccessLevel;
+    
+    [ExpressionMethod(nameof(MergeGlobalAndDirectLevelsImpl))]
+    private static EntityAccessLevel MergeGlobalAndDirectLevels(DirectEpicPermission? directEpicPermission, EntityAccessLevel globalAccessLevel)
+        => throw new InvalidOperationException("LINQ translation only.");
+    
+    private static Expression<Func<DirectEpicPermission?, EntityAccessLevel, EntityAccessLevel>> MergeGlobalAndDirectLevelsImpl()
+        => (permission, globalAccessLevel) => permission != null
+            ? permission.EntityAccessLevel | globalAccessLevel
+            : globalAccessLevel;
 }
 
 public record EpicWithAccessLevel

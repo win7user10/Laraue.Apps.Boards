@@ -109,7 +109,11 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space created by Participator", space.Name);
         Assert.True(space.CanUpdate);
-        Assert.False(space.CanDelete);
+        Assert.True(space.CanDelete);
+        
+        var defaultSpace = spaces.Except([space]).Single();
+        Assert.True(defaultSpace.CanUpdate);
+        Assert.False(defaultSpace.CanDelete);
     }
     
     [Fact]

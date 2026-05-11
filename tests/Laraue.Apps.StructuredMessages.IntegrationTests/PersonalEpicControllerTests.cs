@@ -99,4 +99,44 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
         var issue = await testScope.Database.Issues.SingleAsyncEF();
         Assert.Equal(exceptedNewStatusId, issue.StatusId);
     }
+    
+    [Fact]
+    public async Task User_ShouldGetPersonalDefaultEpic_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(userId);
+
+        var epicId = organization.GetEpic(0, 0).Id;
+        
+        var epic = await _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Get(epicId));
+        
+        Assert.NotNull(epic);
+        Assert.False(epic.CanDelete);
+        Assert.True(epic.CanUpdate);
+    }
+    
+    [Fact]
+    public async Task User_ShouldGetPersonalAdditionalEpic_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(userId,
+            setup => setup
+                .AddSpace(userId, spaceBuilder =>
+                    spaceBuilder
+                        .AddEpic(userId, epicBuilder => epicBuilder.WithName("My Epic").WithColor("#111111"))));
+
+        var epicId = organization.GetEpic(1, 1).Id;
+        
+        var epic = await _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Get(epicId));
+        
+        Assert.NotNull(epic);
+        Assert.True(epic.CanDelete);
+        Assert.True(epic.CanUpdate);
+    }
 }

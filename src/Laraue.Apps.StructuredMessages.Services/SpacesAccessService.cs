@@ -114,8 +114,8 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
     
     private static Expression<Func<SpaceWithPermission, EntityAccessLevel, EntityAccessLevel>> AdjustSpaceAccessLevelImpl()
         => (spaceUser, globalAccessLevel) => spaceUser.Space.IsDefault
-            ? globalAccessLevel
-            : globalAccessLevel & (EntityAccessLevel.Read | EntityAccessLevel.Update);
+            ? globalAccessLevel & (EntityAccessLevel.Read | EntityAccessLevel.Update)
+            : globalAccessLevel;
 
     [ExpressionMethod(nameof(MergeGlobalAndDirectLevelsImpl))]
     private static EntityAccessLevel MergeGlobalAndDirectLevels(SpaceWithPermission spaceUser, EntityAccessLevel globalAccessLevel)
