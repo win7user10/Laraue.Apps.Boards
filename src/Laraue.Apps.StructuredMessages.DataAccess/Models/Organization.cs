@@ -45,7 +45,7 @@ public class Organization
     /// Organization code to join an organization.
     /// </summary>
     [MaxLength(8)]
-    public string JoinCode { get; set; } = string.Empty;
+    public string? JoinCode { get; set; }
     
     /// <summary>
     /// Users of organization.

@@ -79,7 +79,7 @@ public class WebApiTestHostScope : IDisposable
     {
         return InitializeOrganization(userId, (initializer) =>
         {
-            setupInitializer?.Invoke(initializer.WithType(OrganizationType.Personal));
+            setupInitializer?.Invoke(initializer.SetIsPersonal(true));
         });
     }
     
@@ -90,7 +90,7 @@ public class WebApiTestHostScope : IDisposable
         
         initializer
             .WithName("New Org")
-            .WithType(OrganizationType.Organization)
+            .SetIsPersonal(false)
             .WithTimestamp(DateTime.UtcNow);
 
         setupInitializer?.Invoke(initializer);

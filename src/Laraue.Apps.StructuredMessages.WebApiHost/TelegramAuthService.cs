@@ -179,7 +179,7 @@ public class TelegramAuthService(
             "Personal",
             Palette.RandomColor(),
             newUser.CreatedAt,
-            OrganizationType.Personal);
+            isPersonal: true);
         
         context.Organizations.Add(organization);
         await context.SaveChangesAsync(cancellationToken);

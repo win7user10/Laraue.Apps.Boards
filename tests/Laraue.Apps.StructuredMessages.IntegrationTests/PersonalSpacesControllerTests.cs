@@ -98,7 +98,6 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         // User 1 has organization with default space + additional space
         var user1Id = await testScope.CreateUser();
         var organization1 = await testScope.InitializePersonalOrganization(user1Id, org => org
-            .WithType(OrganizationType.Personal)
             .AddSpace(user1Id));
         var organization1SpaceIds = organization1.Spaces!.Select(x => x.Id);
         

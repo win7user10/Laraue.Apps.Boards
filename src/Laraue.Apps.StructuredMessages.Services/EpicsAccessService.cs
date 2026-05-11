@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,12 @@ public interface IEpicsAccessService
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken);
     
+    Task<bool> HasAccess(
+        OrganizationAuthData authData,
+        long epicId,
+        ChildrenAccessLevel childrenAccessLevel,
+        CancellationToken cancellationToken);
+    
     Task HasAccessOrThrow(
         OrganizationAuthData authData,
         long epicId,
@@ -47,6 +54,7 @@ public interface IEpicsAccessService
 public class Filter
 {
     public long? SpaceId { get; set; }
+    public long? EpicId { get; set; }
 }
 
 public class EpicsAccessService(DatabaseContext context, IAccessService accessService) : IEpicsAccessService
@@ -83,11 +91,23 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         ChildrenAccessLevel childrenAccessLevel,
         CancellationToken cancellationToken)
     {
+        var hasAccess = await HasAccess(authData, epicId, childrenAccessLevel, cancellationToken);
+        if (!hasAccess)
+            throw new NotFoundException(
+            $"Epic is unavailable or children permission: {childrenAccessLevel} is missing");
+    }
+
+    public async Task<bool> HasAccess(
+        OrganizationAuthData authData,
+        long epicId,
+        ChildrenAccessLevel childrenAccessLevel,
+        CancellationToken cancellationToken)
+    {
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
         if (accessLevels.IssuesAccessLevel.HasFlag(childrenAccessLevel))
-            return;
+            return true;
 
         var epic = await context.Epics
             .Where(e => e.Id == epicId)
@@ -101,15 +121,14 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
             .AnyAsync(sos => sos.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel), cancellationToken);
         
         if (hasDirectAccessFromSpace)
-            return;
+            return true;
         
-        await context.DirectEpicPermissions
+        return await context.DirectEpicPermissions
             .Where(eou => eou.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(eou => eou.OrganizationUser!.UserId == authData.UserId)
             .Where(eou => eou.EpicId == epicId)
-            .AnyOrThrowNotFoundEFAsync(
+            .AnyAsyncEF(
                 eou => eou.ChildrenIssuesAccessLevel.HasFlag(childrenAccessLevel),
-                $"Epic is unavailable or children permission: {childrenAccessLevel} is missing",
                 cancellationToken);
     }
 
@@ -140,6 +159,8 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         var query = context.Epics.AsQueryable();
         if (filter.SpaceId.HasValue)
             query = query.Where(e => e.SpaceId == filter.SpaceId.Value);
+        if (filter.EpicId.HasValue)
+            query = query.Where(e => e.Id == filter.EpicId.Value);
         
         return query
             .Where(s => s.Space!.OrganizationId == authData.OrganizationId)
@@ -171,6 +192,8 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         
         if (filter.SpaceId.HasValue)
             epicsQuery = epicsQuery.Where(e => e.Space!.Id == filter.SpaceId.Value);
+        if (filter.EpicId.HasValue)
+            epicsQuery = epicsQuery.Where(e => e.Id == filter.EpicId.Value);
         
         var all = epicsQuery
             .InnerJoin(

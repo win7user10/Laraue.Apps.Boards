@@ -52,7 +52,7 @@ public class SpacesController(ISpacesService spacesService, IEpicsService epicsS
     }
     
     [HttpGet]
-    public Task<SpaceDto[]> GetAll(
+    public Task<SpaceListDto[]> GetAll(
         CancellationToken cancellationToken = default)
     {
         return spacesService.GetSpaces(
@@ -71,6 +71,18 @@ public class SpacesController(ISpacesService spacesService, IEpicsService epicsS
             new GetEpicsRequest
             {
                 SpaceId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    
+    [HttpGet("{id:long}")]
+    public Task<SpaceDto> GetSpace(
+        long id,
+        CancellationToken cancellationToken = default) => 
+        spacesService.GetSpace(
+            new GetSpaceRequest
+            {
+                Id = id,
                 AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);

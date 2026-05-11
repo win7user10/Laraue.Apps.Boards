@@ -109,7 +109,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space created by Participator", space.Name);
         Assert.True(space.CanUpdate);
-        Assert.True(space.CanDelete);
+        Assert.False(space.CanDelete);
     }
     
     [Fact]
@@ -214,7 +214,6 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         
         var epic = Assert.Single(epics!);
         Assert.Equal("Backlog", epic.Name);
-        Assert.Equal(EntityAccessLevel.All, epic.EntityAccessLevel);
     }
     
     [Fact]

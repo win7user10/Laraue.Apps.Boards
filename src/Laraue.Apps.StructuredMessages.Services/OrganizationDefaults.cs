@@ -10,7 +10,7 @@ public class OrganizationDefaults
         string organizationName,
         string organizationColor,
         DateTime timestamp,
-        OrganizationType organizationType)
+        bool isPersonal)
     {
         var organizationUser = new OrganizationUser
         {
@@ -28,8 +28,8 @@ public class OrganizationDefaults
             Color = organizationColor,
             CreatedAt = timestamp,
             UpdatedAt = timestamp,
-            Type = organizationType,
-            JoinCode = StringGenerator.GenerateJoinCode(),
+            Type = isPersonal ? OrganizationType.Personal : OrganizationType.Organization,
+            JoinCode = isPersonal ? null : StringGenerator.GenerateJoinCode(),
             Users = new List<OrganizationUser> { organizationUser },
             Spaces = new List<Space>
             {

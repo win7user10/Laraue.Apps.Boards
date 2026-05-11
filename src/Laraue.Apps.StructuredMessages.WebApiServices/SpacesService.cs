@@ -7,8 +7,12 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface ISpacesService
 {
-    Task<SpaceDto[]> GetSpaces(
+    Task<SpaceListDto[]> GetSpaces(
         GetSpacesRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<SpaceDto> GetSpace(
+        GetSpaceRequest request,
         CancellationToken cancellationToken);
     
     Task<long> Create(
@@ -30,26 +34,45 @@ public class SpacesService(
     IOrganizationAccessService organizationAccessService)
     : ISpacesService
 {
-    public async Task<SpaceDto[]> GetSpaces(
+    public async Task<SpaceListDto[]> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
         var spaces = await spacesAccessService.GetAvailableForRead(
             request.AuthData,
             items => items
-                .Select(x => new SpaceDto
+                .Select(x => new SpaceListDto
                 {
                     Id = x.Space.Id,
                     Name = x.Space.Name,
                     Color = x.Space.Color,
                     EpicsCount = x.Space.Epics!.Count,
                     CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
-                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update
+                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
         
         return spaces;
+    }
+
+    public async Task<SpaceDto> GetSpace(GetSpaceRequest request, CancellationToken cancellationToken)
+    {
+        await spacesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.Id,
+            EntityAccessLevel.Read,
+            cancellationToken);
+        
+        var canCreateEpics = await spacesAccessService.CanCreateEpics(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
+
+        return new SpaceDto
+        {
+            CanCreateEpics = canCreateEpics,
+        };
     }
 
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
@@ -126,12 +149,18 @@ public record DeleteSpaceRequest
     public long Id { get; set; }
 }
 
+public record GetSpaceRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+    public required long Id { get; set; }
+}
+
 public record GetSpacesRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
 }
 
-public record SpaceDto
+public record SpaceListDto
 {
     public long Id { get; set; }
     public required string Name { get; set; }
@@ -139,4 +168,9 @@ public record SpaceDto
     public required int EpicsCount { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
+}
+
+public record SpaceDto
+{
+    public required bool CanCreateEpics { get; set; }
 }

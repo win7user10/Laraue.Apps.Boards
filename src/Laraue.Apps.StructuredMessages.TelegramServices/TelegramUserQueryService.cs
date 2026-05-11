@@ -29,7 +29,7 @@ public class TelegramUserQueryService(DatabaseContext context, IDateTimeProvider
                 "Personal",
                 Palette.RandomColor(),
                 timestamp,
-                OrganizationType.Personal)
+                isPersonal: true)
         };
         
         context.Users.Add(user);

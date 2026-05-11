@@ -3,6 +3,8 @@ using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -14,7 +16,7 @@ public interface IEpicsService
         CancellationToken cancellationToken);
     
     Task<EpicDto> GetEpic(
-        GetCategoryRequest request,
+        GetEpicRequest request,
         CancellationToken cancellationToken);
     
     Task ChangeStatusesOrder(
@@ -58,45 +60,59 @@ public class EpicsService(
                     StatusesCount = x.Epic.Statuses!.Count,
                     TouchedAt = x.Epic.TouchedAt,
                     IsDefault = x.Epic.IsDefault,
-                    EntityAccessLevel = x.EntityAccessLevel
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
     }
 
-    public Task<EpicDto> GetEpic(
-        GetCategoryRequest request,
+    public async Task<EpicDto> GetEpic(
+        GetEpicRequest request,
         CancellationToken cancellationToken)
     {
-        return context
-            .Epics
-            .Where(x => x.Id == request.CategoryId)
-            .Select(x => new EpicDto
-            {
-                Color = x.Color,
-                Name = x.Name,
-                Statuses = x.Statuses!
-                    .Select(s => new StatusDto
-                    {
-                        Id = s.Id,
-                        Color = s.Color,
-                        Name = s.Name,
-                        SortOrder = s.SortOrder,
-                    })
-                    .ToArray(),
-            })
-            .FirstOrThrowNotFoundEFAsync($"Epic: {request.CategoryId} is not found", cancellationToken);
+        var epic = await epicsAccessService.GetAvailable(
+            request.AuthData,
+            new Filter { EpicId = request.Id },
+            epics => epics
+                .Select(x => new EpicDto
+                {
+                    Color = x.Epic.Color,
+                    Name = x.Epic.Name,
+                    Statuses = x.Epic.Statuses!
+                        .Select(s => new StatusDto
+                        {
+                            Id = s.Id,
+                            Color = s.Color,
+                            Name = s.Name,
+                            SortOrder = s.SortOrder,
+                        })
+                        .ToArray(),
+                    CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
+                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
+                    CanViewIssues = false // Fill later
+                })
+                .FirstOrThrowNotFoundLinq2DbAsync($"Epic: {request.Id} is not found", cancellationToken),
+            cancellationToken);
+        
+        epic.CanViewIssues = await epicsAccessService.HasAccess(
+            request.AuthData,
+            request.Id,
+            ChildrenAccessLevel.Read,
+            cancellationToken);
+
+        return epic;
     }
 
     public async Task<long> Create(
         CreateEpicRequest request,
         CancellationToken cancellationToken)
     {
-        await spacesAccessService
+        if (!await spacesAccessService
             .CanCreateEpics(
                 request.AuthData,
                 request.SpaceId,
-                cancellationToken);
+                cancellationToken))
+            throw new NotFoundException(
+                $"Space: {request.SpaceId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing");
         
         return await coreEpicsService.Create(
             request.SpaceId,
@@ -168,13 +184,12 @@ public record EpicCountDto
     public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
     public required bool IsDefault { get; set; }
-    public required EntityAccessLevel EntityAccessLevel { get; set; }
 }
 
-public record GetCategoryRequest
+public record GetEpicRequest
 {
-    public required Guid UserId { get; set; }
-    public required long CategoryId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public required long Id { get; set; }
 }
 
 public record EpicDto
@@ -182,6 +197,9 @@ public record EpicDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public StatusDto[] Statuses { get; set; } = [];
+    public required bool CanViewIssues { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
 }
 
 public class StatusDto

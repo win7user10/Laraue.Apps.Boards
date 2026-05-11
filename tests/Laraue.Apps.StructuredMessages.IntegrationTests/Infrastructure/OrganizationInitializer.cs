@@ -16,7 +16,7 @@ public class OrganizationInitializer(
     private string _organizationName = "TestOrganization";
     private string _organizationColor = "#ffffff";
     private DateTime _timestamp = DateTime.UtcNow;
-    private OrganizationType _type = OrganizationType.Organization;
+    private bool _isPersonal = false;
 
     private readonly List<SpaceBuilder> _spaces =
     [
@@ -50,9 +50,9 @@ public class OrganizationInitializer(
         return this;
     }
 
-    public OrganizationInitializer WithType(OrganizationType type)
+    public OrganizationInitializer SetIsPersonal(bool isPersonal)
     {
-        _type = type;
+        _isPersonal = isPersonal;
 
         return this;
     }
@@ -64,7 +64,7 @@ public class OrganizationInitializer(
             _organizationName,
             _organizationColor,
             _timestamp,
-            _type);
+            _isPersonal);
 
         organization.Spaces = new List<Space>(); // Add all children manually
 

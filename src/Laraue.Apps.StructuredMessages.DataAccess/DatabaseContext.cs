@@ -84,6 +84,10 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => new { x.OwnerId, x.Type })
                 .HasFilter("type = 1")
                 .IsUnique();
+            
+            entity
+                .HasIndex(x => x.JoinCode)
+                .IsUnique();
         });
     }
 }

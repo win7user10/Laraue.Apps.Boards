@@ -15,10 +15,10 @@ public class EpicsController(IEpicsService categoriesService)
         [FromRoute] long id,
         CancellationToken cancellationToken = default) => 
         categoriesService.GetEpic(
-            new GetCategoryRequest
+            new GetEpicRequest
             {
-                UserId = HttpContext.User.GetId(),
-                CategoryId = id
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                Id = id
             },
             cancellationToken);
 

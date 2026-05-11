@@ -1,8 +1,10 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
+﻿using System.Linq.Expressions;
+using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB;
+using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
@@ -23,7 +25,7 @@ public interface ISpacesAccessService
         EntityAccessLevel entityAccessLevel,
         CancellationToken cancellationToken);
     
-    Task CanCreateEpics(
+    Task<bool> CanCreateEpics(
         OrganizationAuthData authData,
         long spaceId,
         CancellationToken cancellationToken);
@@ -71,7 +73,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
                 cancellationToken);
     }
 
-    public async Task CanCreateEpics(
+    public async Task<bool> CanCreateEpics(
         OrganizationAuthData authData,
         long spaceId,
         CancellationToken cancellationToken)
@@ -80,15 +82,14 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
             .GetChildrenAccessLevels(authData, cancellationToken);
         
         if (accessLevels.EpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            return;
+            return true;
 
-        await context.DirectSpacePermissions
+        return await context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
             .Where(sos => sos.ChildrenEpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            .FirstOrThrowNotFoundEFAsync(
+            .AnyAsyncEF(
                 sos => sos.SpaceId == spaceId,
-                $"Space: {spaceId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing",
                 cancellationToken);
     }
 
@@ -99,15 +100,33 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
             .LeftJoin(
                 context.DirectSpacePermissions,
                 (space, user) => space.Id == user.SpaceId,
-                (space, user) => new { Space = space, DirectSpacePermission = (DirectSpacePermission?)user })
+                (space, user) => new SpaceWithPermission(space,user))
             .Select(spaceUser => new SpaceWithAccessLevel(
                 spaceUser.Space,
-                spaceUser.Space.IsDefault
-                    ? EntityAccessLevel.Read | EntityAccessLevel.Update
-                    : spaceUser.DirectSpacePermission != null
-                        ? spaceUser.DirectSpacePermission.EntityAccessLevel | accessLevel
-                        : accessLevel));
+                MergeGlobalAndDirectLevels(
+                    spaceUser,
+                    AdjustSpaceAccessLevel(spaceUser, accessLevel))));
     }
+
+    [ExpressionMethod(nameof(AdjustSpaceAccessLevelImpl))]
+    private static EntityAccessLevel AdjustSpaceAccessLevel(SpaceWithPermission spaceUser, EntityAccessLevel globalAccessLevel)
+        => throw new InvalidOperationException("LINQ translation only.");
+    
+    private static Expression<Func<SpaceWithPermission, EntityAccessLevel, EntityAccessLevel>> AdjustSpaceAccessLevelImpl()
+        => (spaceUser, globalAccessLevel) => spaceUser.Space.IsDefault
+            ? globalAccessLevel
+            : globalAccessLevel & (EntityAccessLevel.Read | EntityAccessLevel.Update);
+
+    [ExpressionMethod(nameof(MergeGlobalAndDirectLevelsImpl))]
+    private static EntityAccessLevel MergeGlobalAndDirectLevels(SpaceWithPermission spaceUser, EntityAccessLevel globalAccessLevel)
+        => throw new InvalidOperationException("LINQ translation only.");
+    
+    private static Expression<Func<SpaceWithPermission, EntityAccessLevel, EntityAccessLevel>> MergeGlobalAndDirectLevelsImpl()
+        => (spaceUser, globalAccessLevel) => spaceUser.DirectSpacePermission != null
+            ? spaceUser.DirectSpacePermission.EntityAccessLevel | globalAccessLevel
+            : globalAccessLevel;
+
+    private record SpaceWithPermission(Space Space, DirectSpacePermission? DirectSpacePermission);
     
     private IQueryable<DirectSpacePermission> GetDirectReadableSpacesQuery(OrganizationAuthData authData)
     {

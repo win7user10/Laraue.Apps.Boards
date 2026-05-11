@@ -156,7 +156,7 @@ public class OrganizationsService(
             cancellationToken);
         
         if (organizationId == null)
-            throw new NotFoundException($"Organization is not found: {request.JoinCode}");
+            throw new NotFoundException($"Organization code: {request.JoinCode} is not found");
         
         if (await coreOrganizationsService.HasMember(
             organizationId.Value,

@@ -72,7 +72,7 @@ public class CoreOrganizationsService(
             name,
             color,
             timestamp,
-            OrganizationType.Organization);
+            isPersonal: false);
 
         context.Organizations.Add(entity);
         await context.SaveChangesAsync(cancellationToken);

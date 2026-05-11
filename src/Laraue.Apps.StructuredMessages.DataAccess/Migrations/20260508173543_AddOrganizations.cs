@@ -77,7 +77,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     type = table.Column<int>(type: "integer", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    join_code = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false)
+                    join_code = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -178,13 +178,15 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                 });
             
             migrationBuilder.Sql(@"
-insert into organizations (name, owner_id, type, color, created_at, updated_at, join_code)
-select 'Personal', u.id, 1, '#3fb950', u.created_at, u.created_at, (SELECT string_agg(
-    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-           ceil(random() * 62)::int, 1),
-    ''
-) FROM generate_series(1, 8))
-from users u;
+INSERT INTO organizations (name, owner_id, type, color, created_at, updated_at)
+SELECT
+    'Personal',
+    u.id,
+    1,
+    '#3fb950',
+    u.created_at,
+    u.created_at
+FROM users u;
 
 update spaces s
 set organization_id = o.id
