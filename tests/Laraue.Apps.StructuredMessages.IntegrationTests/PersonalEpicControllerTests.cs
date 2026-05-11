@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
@@ -43,7 +44,7 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldUpdatePersonalEpic_Always()
+    public async Task User_ShouldUpdatePersonalAdditionalEpic_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -73,7 +74,30 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldDeletePersonalEpic_Always()
+    public async Task User_ShouldUpdatePersonalDefaultEpic_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(userId);
+        
+        var epicId = organization.GetEpic(0, 0).Id;
+        
+        await _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Update(
+                epicId,
+                new ()
+                {
+                    Name = "Epic 1",
+                    Color = "#ffffff",
+                }));
+
+        var epic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == epicId);
+        Assert.Equal("Epic 1", epic.Name);
+    }
+    
+    [Fact]
+    public async Task User_ShouldDeletePersonalAdditionalEpic_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
@@ -98,6 +122,23 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
      
         var issue = await testScope.Database.Issues.SingleAsyncEF();
         Assert.Equal(exceptedNewStatusId, issue.StatusId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotDeletePersonalDefaultEpic_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(userId);
+
+        var epicId = organization.GetEpic(0, 0).Id;
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _epicsController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Delete(epicId)));
+
+        var badRequest = ex.HasInnerException<ForbiddenException>();
+        Assert.Equal("Default Epic can not be deleted", badRequest.Message);
     }
     
     [Fact]

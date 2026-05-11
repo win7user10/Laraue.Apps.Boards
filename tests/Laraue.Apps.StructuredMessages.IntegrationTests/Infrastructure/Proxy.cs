@@ -227,6 +227,7 @@ public class Proxy<TController>(HttpClient client, WebApiTestHost host) where TC
             {
                 HttpStatusCode.BadRequest => new BadRequestException(errorResponse.Errors!),
                 HttpStatusCode.NotFound => new NotFoundException(errorResponse.Message),
+                HttpStatusCode.Forbidden => new ForbiddenException(errorResponse.Message),
                 _ => null
             };
             

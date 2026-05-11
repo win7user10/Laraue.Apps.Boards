@@ -131,7 +131,7 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
             throw new NotFoundException($"Backlog for space with Epic:{request.Id} is not found");
             
         if (defaultEpic.EpicId == request.Id)
-            throw new BadRequestException(nameof(request.Id), $"Removing default Epic:{request.Id} is not allowed");
+            throw new ForbiddenException("Default Epic can not be deleted");
         
         await context.Issues
             .Where(x => x.Status!.EpicId == request.Id)

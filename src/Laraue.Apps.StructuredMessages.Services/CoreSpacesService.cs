@@ -96,7 +96,7 @@ public class CoreSpacesService(
             throw new NotFoundException($"Default Organization Space for Space:{id} is not found");
             
         if (defaultSpace.SpaceId == id)
-            throw new BadRequestException(nameof(id), $"Removing default Space:{id} is not allowed");
+            throw new ForbiddenException("Default Space can not be deleted");
         
         // The situation should not happen in real App as soon as Backlog Epic is always required for Space. This line will be dropped when status id will be taken from FE. 
         if (defaultSpace.NewStatusId is null)
