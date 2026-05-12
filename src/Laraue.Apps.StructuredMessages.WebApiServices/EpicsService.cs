@@ -137,7 +137,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.EpicId,
-                ChildrenAccessLevel.Update,
+                EntityAccessLevel.Update,
                 cancellationToken);
         
         await coreEpicsService.ChangeStatusesOrder(
@@ -155,7 +155,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.Id,
-                ChildrenAccessLevel.Update,
+                EntityAccessLevel.Update,
                 cancellationToken);
 
         await coreEpicsService.Update(
@@ -172,7 +172,7 @@ public class EpicsService(
             .HasAccessOrThrow(
                 request.AuthData,
                 request.Id,
-                ChildrenAccessLevel.Delete,
+                EntityAccessLevel.Update,
                 cancellationToken);
         
         await coreEpicsService.Delete(

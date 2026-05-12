@@ -151,4 +151,31 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         Assert.False(epic.CanDeleteIssues);
         Assert.False(epic.CanUpdateIssues);
     }
+    
+    
+    [Fact]
+    public async Task User_ShouldUpdateEpicInOrganization_WhenHasDirectEditAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddUser(participatorId, builder => builder
+                .SetEpicAccessLevel(0, 0, EntityAccessLevel.Update)));
+        
+        var epicId = organization.GetEpic(0, 0).Id;
+        
+        await _epicsController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Update(
+                epicId,
+                new UpdateEpicRequest
+                {
+                    Name = "Epic 1",
+                    Color = "#fffff1",
+                }));
+        
+        var epic = await testScope.Database.Epics.FirstAsync(x => x.Id == epicId);
+        Assert.Equal("Epic 1", epic.Name);
+    }
 }

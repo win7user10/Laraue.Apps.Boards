@@ -76,12 +76,9 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        var accessToViewEpic = accessLevels.EpicsAccessLevel | accessLevels.IssuesAccessLevel;
+        var accessToViewEpic = accessLevels.EpicsAccessLevel;
         if (accessToViewEpic.HasFlag(ChildrenAccessLevel.Read))
-        {
-            var accessToEditEpic = accessLevels.SpacesAccessLevel | accessLevels.EpicsAccessLevel;
-            return await map(GetGlobalReadableEpicsQuery(authData, accessToEditEpic.ToEntityAccessLevel(), filter));
-        }
+            return await map(GetGlobalReadableEpicsQuery(authData, accessToViewEpic.ToEntityAccessLevel(), filter));
         
         return await map(GetDirectReadableEpicsQuery(authData, filter));
     }
@@ -144,14 +141,15 @@ public class EpicsAccessService(DatabaseContext context, IAccessService accessSe
     {
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
-        
-        if (accessLevels.IssuesAccessLevel.HasFlag(entityAccessLevel))
+
+        var castedAccessLevel = entityAccessLevel.ToEntityAccessLevel();
+        if (accessLevels.IssuesAccessLevel.HasFlag(castedAccessLevel))
             return;
 
         await context.DirectEpicPermissions
             .Where(dep => dep.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(dep => dep.OrganizationUser!.UserId == authData.UserId)
-            .Where(dep => dep.ChildrenIssuesAccessLevel.HasFlag(entityAccessLevel))
+            .Where(dep => dep.ChildrenIssuesAccessLevel.HasFlag(castedAccessLevel))
             .AnyAsyncEF(sos => sos.EpicId == epicId, cancellationToken);
     }
 
