@@ -64,7 +64,7 @@ public class SpacesController(ISpacesService spacesService, IEpicsService epicsS
     }
     
     [HttpGet("{id:long}/epics")]
-    public Task<EpicCountDto[]> GetSpaceEpics(
+    public Task<EpicListDto[]> GetSpaceEpics(
         long id,
         CancellationToken cancellationToken = default) => 
         epicsService.GetSpaceEpics(

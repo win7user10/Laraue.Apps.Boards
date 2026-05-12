@@ -10,7 +10,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IEpicsService
 {
-    Task<EpicCountDto[]> GetSpaceEpics(
+    Task<EpicListDto[]> GetSpaceEpics(
         GetEpicsRequest request,
         CancellationToken cancellationToken);
     
@@ -42,7 +42,7 @@ public class EpicsService(
     ISpacesAccessService spacesAccessService)
     : IEpicsService
 {
-    public Task<EpicCountDto[]> GetSpaceEpics(
+    public Task<EpicListDto[]> GetSpaceEpics(
         GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
@@ -50,13 +50,11 @@ public class EpicsService(
             request.AuthData,
             new Filter { SpaceId = request.SpaceId },
             epics => epics
-                .Select(x => new EpicCountDto
+                .Select(x => new EpicListDto
                 {
                     Id = x.Epic.Id,
                     Name = x.Epic.Name,
-                    IssuesCount = x.Epic.Statuses!.SelectMany(s => s.Issues!).Count(),
                     Color = x.Epic.Color,
-                    StatusesCount = x.Epic.Statuses!.Count,
                     TouchedAt = x.Epic.TouchedAt,
                     IsDefault = x.Epic.IsDefault,
                 })
@@ -181,13 +179,11 @@ public class EpicsService(
     }
 }
 
-public record EpicCountDto
+public record EpicListDto
 {
     public required long Id { get; set; }
     public required string Name { get; set; }
-    public required int IssuesCount { get; set; }
     public required string? Color { get; set; }
-    public required int StatusesCount { get; set; }
     public required DateTime TouchedAt { get; set; }
     public required bool IsDefault { get; set; }
 }

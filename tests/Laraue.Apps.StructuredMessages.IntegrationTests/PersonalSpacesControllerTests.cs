@@ -167,8 +167,6 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         
         Assert.False(epic!.IsDefault);
         Assert.Equal("#111111", epic.Color);
-        Assert.Equal(2, epic.StatusesCount);
-        Assert.Equal(1, epic.IssuesCount);
     }
     
     [Fact]

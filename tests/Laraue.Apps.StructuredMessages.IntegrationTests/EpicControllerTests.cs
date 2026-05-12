@@ -152,7 +152,6 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         Assert.False(epic.CanUpdateIssues);
     }
     
-    
     [Fact]
     public async Task User_ShouldUpdateEpicInOrganization_WhenHasDirectEditAccess()
     {
@@ -177,5 +176,26 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         
         var epic = await testScope.Database.Epics.FirstAsync(x => x.Id == epicId);
         Assert.Equal("Epic 1", epic.Name);
+    }
+    
+    [Fact]
+    public async Task User_ShouldDeleteNotDefaultEpicInOrganization_WhenHasDirectDeleteAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(ownerId, org => org
+            .AddSpace(participatorId, space => space.AddEpic(participatorId))
+            .AddUser(participatorId, builder => builder
+                .SetEpicAccessLevel(1, 1, EntityAccessLevel.Delete)));
+        
+        var epicId = organization.GetEpic(1, 1).Id;
+        
+        await _epicsController
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.Delete(epicId));
+        
+        var epic = await testScope.Database.Epics.FirstOrDefaultAsyncEF(x => x.Id == epicId);
+        Assert.Null(epic);
     }
 }
