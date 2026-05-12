@@ -385,7 +385,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
     }
     
     [Fact]
-    public async Task User_ShouldNotSetDirectAccessInOwnedOrganization_WhenSpaceOrEpicIsNotExists()
+    public async Task User_ShouldNotSetDirectAccessInOwnedOrganization_WhenDataIsIncorrect()
     {
         using var testScope = host.CreateTestScope();
         var ownerId = await testScope.CreateUser();
@@ -394,7 +394,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(userIdToReceivePermissions));
         
-        var space = organization.Spaces![0];
+        var space = organization.GetSpace(0);
+        var epic = organization.GetEpic(0, 0);
         var organizationUser = organization.Users![1];
 
         var request = new SetPermissionsRequest
@@ -411,7 +412,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                             {
                                 Issues = ChildrenAccessLevel.All,
                             },
-                        }
+                            [epic.Id] = new ()
+                            {
+                                Self = EntityAccessLevel.All, // Attempt to set delete permission for default epic
+                            }
+                        },
+                        Self = EntityAccessLevel.All, // Attempt to set delete permission for default space
                     },
                     [0] = new () // Unexists space
                     {
@@ -428,8 +434,10 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var badRequest = ex.HasInnerException<BadRequestException>();
         var exceptedErrors = new[]
         {
-            "Some spaces are not found in organization: 0",
-            $"Some epics are not found in organization: Space: {space.Id} Epics: 0"
+            $"Space: '{space.Id}'. Attempt to add delete permission to Default space",
+            $"Space: '{space.Id}', Epic: '0'. Entity is not found",
+            $"Space: '{space.Id}', Epic: '{epic.Id}'. Attempt to add delete permission to Default epic",
+            "Space: '0'. Entity is not found",
         };
         Assert.Equal(exceptedErrors, badRequest.Errors["direct"]);
     }

@@ -29,6 +29,11 @@ public interface ISpacesAccessService
         OrganizationAuthData authData,
         long spaceId,
         CancellationToken cancellationToken);
+    
+    Task<ChildrenAccessLevel> GetChildrenAccessLevel(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken);
 }
 
 public class SpacesAccessService(DatabaseContext context, IAccessService accessService) : ISpacesAccessService
@@ -91,6 +96,29 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
             .AnyAsyncEF(
                 sos => sos.SpaceId == spaceId,
                 cancellationToken);
+    }
+
+    public async Task<ChildrenAccessLevel> GetChildrenAccessLevel(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken)
+    {
+        var globalLevels = await accessService
+            .GetChildrenAccessLevels(authData, cancellationToken);
+        
+        var result = globalLevels.EpicsAccessLevel;
+        
+        var spaceDirectPermissions = await context.DirectSpacePermissions
+            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
+            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
+            .Where(sos => sos.SpaceId == spaceId)
+            .Select(sos => new { sos.ChildrenEpicsAccessLevel })
+            .FirstOrDefaultAsyncLinqToDB(cancellationToken);
+        
+        if (spaceDirectPermissions is not null)
+            result |= spaceDirectPermissions.ChildrenEpicsAccessLevel;
+
+        return result;
     }
 
     private IQueryable<SpaceWithAccessLevel> GetGlobalReadableSpacesQuery(OrganizationAuthData authData, EntityAccessLevel accessLevel)

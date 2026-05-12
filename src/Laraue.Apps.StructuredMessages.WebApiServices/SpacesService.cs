@@ -69,9 +69,16 @@ public class SpacesService(
             request.Id,
             cancellationToken);
 
+        var childrenAccessLevel = await spacesAccessService.GetChildrenAccessLevel(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
+
         return new SpaceDto
         {
             CanCreateEpics = canCreateEpics,
+            CanDelete = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+            CanUpdate = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Update),
         };
     }
 
@@ -173,4 +180,6 @@ public record SpaceListDto
 public record SpaceDto
 {
     public required bool CanCreateEpics { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
 }

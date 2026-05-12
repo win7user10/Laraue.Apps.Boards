@@ -169,6 +169,7 @@ public class TelegramAuthService(
             TelegramUserName = user.Username,
             TelegramFirstName = user.FirstName,
             TelegramLastName = user.LastName,
+            Color = Palette.RandomColor(),
         };
         
         context.Users.Add(newUser);

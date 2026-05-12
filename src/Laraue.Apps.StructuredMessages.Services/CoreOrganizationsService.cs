@@ -263,7 +263,9 @@ public class CoreOrganizationsService(
                 Epics = x.ChildrenEpicsAccessLevel,
                 Issues = x.ChildrenIssuesAccessLevel, 
                 Self = x.EntityAccessLevel,
-                DirectEpics = epicAccessLevels[x.SpaceId]
+                DirectEpics = epicAccessLevels.TryGetValue(x.SpaceId, out var directEpics)
+                    ? directEpics
+                    : new Dictionary<long, DirectEpicAccessLevel>()
             });
 
         var permissions = new UserPermissions
@@ -289,17 +291,17 @@ public class CoreOrganizationsService(
     {
         var spaces = await context.Spaces
             .Where(x => x.OrganizationId == organizationId)
-            .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color }, cancellationToken);
+            .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color, x.IsDefault }, cancellationToken);
         
         var epics = await context.Epics
             .Where(x => x.Space!.OrganizationId == organizationId)
-            .Select(x => new { x.Id, x.Name, x.SpaceId, x.Color })
+            .Select(x => new { x.Id, x.Name, x.SpaceId, x.Color, x.IsDefault })
             .ToArrayAsyncEF(cancellationToken);
         
         var epicsBySpaces = epics
             .GroupBy(x => x.SpaceId)
             .ToDictionary(x => x.Key, x => x
-                .Select(y => new PermittableEpic(y.Id, y.Name, y.Color))
+                .Select(y => new PermittableEpic(y.Id, y.Name, y.Color, y.IsDefault ))
                 .ToArray());
 
         return spaces
@@ -307,6 +309,7 @@ public class CoreOrganizationsService(
                 s.Key,
                 s.Value.Name,
                 s.Value.Color,
+                s.Value.IsDefault,
                 epicsBySpaces[s.Key]))
             .ToArray();
     }
@@ -385,5 +388,5 @@ public record DirectEpicAccessLevel
     public EntityAccessLevel Self { get; set; }
 }
 
-public record PermittableSpace(long Id, string Name, string Color, PermittableEpic[] Epics);
-public record PermittableEpic(long Id, string Name, string Color);
+public record PermittableSpace(long Id, string Name, string Color, bool IsDefault, PermittableEpic[] Epics);
+public record PermittableEpic(long Id, string Name, string Color, bool IsDefault);

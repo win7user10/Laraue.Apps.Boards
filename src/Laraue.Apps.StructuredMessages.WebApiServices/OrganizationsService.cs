@@ -191,54 +191,33 @@ public class OrganizationsService(
                 cancellationToken))
                 .ToDictionary(
                     x => x.Id,
-                    x => x.Epics.Select(e => e.Id).ToHashSet());
+                    x => new { Self = x, Epics = x.Epics.ToDictionary(e => e.Id) });
 
-            var incorrectSpaces = new List<long>();
-            var incorrectEpics = new Dictionary<long, List<long>>();
+            var errors = new List<string>();
+            
             foreach (var directSpacePermission in request.UserPermissions.Direct)
             {
-                if (!permittableEntities.TryGetValue(directSpacePermission.Key, out var entity))
+                if (!permittableEntities.TryGetValue(directSpacePermission.Key, out var space))
                 {
-                    incorrectSpaces.Add(directSpacePermission.Key);
+                    errors.Add($"Space: '{directSpacePermission.Key}'. Entity is not found");
                     continue;
                 }
+                if (space.Self.IsDefault && directSpacePermission.Value.Self.HasFlag(EntityAccessLevel.Delete))
+                    errors.Add($"Space: '{directSpacePermission.Key}'. Attempt to add delete permission to Default space");
 
                 foreach (var directEpicPermission in directSpacePermission.Value.DirectEpics)
                 {
-                    if (!entity.Contains(directEpicPermission.Key))
-                    {
-                        incorrectEpics.TryAdd(directSpacePermission.Key, []);
-                        incorrectEpics[directSpacePermission.Key].Add(directEpicPermission.Key);
-                    }
+                    if (!space.Epics.TryGetValue(directEpicPermission.Key, out var epic))
+                        errors.Add($"Space: '{directSpacePermission.Key}', Epic: '{directEpicPermission.Key}'. Entity is not found");
+                    else if (epic.IsDefault && directEpicPermission.Value.Self.HasFlag(EntityAccessLevel.Delete))
+                        errors.Add($"Space: '{directSpacePermission.Key}', Epic: '{directEpicPermission.Key}'. Attempt to add delete permission to Default epic");
                 }
             }
 
-            if (incorrectSpaces.Count > 0 || incorrectEpics.Count > 0)
+            if (errors.Count != 0)
             {
-                var errors = new List<string>();
-                
-                if (incorrectSpaces.Count > 0)
-                    errors.Add($"Some spaces are not found in organization: {string.Join(',', incorrectSpaces)}");
-                
-                if (incorrectEpics.Count > 0)
-                {
-                    var sb = new StringBuilder();
-                    sb.Append("Some epics are not found in organization:");
-                    foreach (var epic in incorrectEpics)
-                    {
-                        sb
-                            .Append(' ')
-                            .Append("Space: ")
-                            .Append(epic.Key)
-                            .Append(" Epics: ")
-                            .Append(string.Join(", ", epic.Value));
-                    }
-                    
-                    errors.Add(sb.ToString());
-                }
-
                 throw new BadRequestException(
-                    new Dictionary<string, string?[]>()
+                    new Dictionary<string, string?[]>
                     {
                         [nameof(UserPermissions.Direct)] = errors.ToArray(),
                     });
