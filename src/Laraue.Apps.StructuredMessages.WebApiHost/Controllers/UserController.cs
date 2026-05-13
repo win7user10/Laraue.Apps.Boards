@@ -21,7 +21,7 @@ public class UserController(DatabaseContext context) : ControllerBase
             {
                 Username = x.TelegramUserName,
                 LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
-                Color = Palette.DefaultUserColor,
+                Color = x.Color,
                 FirstName = x.TelegramFirstName,
                 LastName = x.TelegramLastName,
                 TelegramId = x.TelegramId,

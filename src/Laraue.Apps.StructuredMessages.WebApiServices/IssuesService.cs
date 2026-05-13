@@ -529,12 +529,13 @@ public class IssuesService(
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = x.Status!.EpicId,
+            EpicId = x.Status!.EpicId,
             StatusId = x.StatusId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,
             TelegramUsername = x.User.TelegramUserName,
+            UserColor = x.User.Color,
         });
     }
     
@@ -550,10 +551,11 @@ public class IssuesService(
             Id = source.Id,
             StatusId = source.StatusId,
             Content = source.Content,
-            EpicId = source.CategoryId,
+            EpicId = source.EpicId,
             Sender = senderData.Sender,
             SenderInitial = senderData.Initial,
-            Time = source.Time
+            Time = source.Time,
+            SenderColor = source.UserColor,
         };
     }
 }
@@ -609,7 +611,8 @@ public class IssueListDtoData
     public required string? TelegramFirstName { get; set; }
     public required string? TelegramLastName { get; set; }
     public required string? Content { get; set; }
-    public required long CategoryId { get; set; }
+    public required string UserColor { get; set; }
+    public required long EpicId { get; set; }
     public required long StatusId { get; set; }
 }
 
@@ -625,6 +628,7 @@ public class IssueListDto : ICanContainMedia
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
+    public required string SenderColor { get; set; }
     public required string? Content { get; set; }
     public required long EpicId { get; set; }
     public required long StatusId { get; set; }

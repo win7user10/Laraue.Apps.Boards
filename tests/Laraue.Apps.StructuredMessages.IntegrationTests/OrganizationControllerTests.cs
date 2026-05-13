@@ -82,9 +82,10 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .WithName("Org 1")
             .WithColor("#ffffff")
             .AddUser(user2Id, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
+                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
+                .SetAdminAccessLevel(AdminAccessLevel.DeleteOrganization)));
         
-        await testScope.InitializeOrganization(user2Id, org => org
+        await testScope.InitializePersonalOrganization(user2Id, org => org
             .WithName("Org 2")
             .WithColor("#000000"));
         
@@ -95,9 +96,10 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var organization = Assert.Single(organizations!);
         
         Assert.True(organization.CanCreateSpaces);
+        Assert.True(organization.CanDelete);
+        Assert.True(organization.CanUpdate);
         Assert.Equal("Org 1", organization.Name);
         Assert.Equal("#ffffff", organization.Color);
-        Assert.Equal(1, organization.SpacesCount);
         
         // Second user see owned organization and organization where he was added
         organizations = await _organizationsController
@@ -105,17 +107,21 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetOrganizations());
         
         Assert.Equal(2, organizations!.Length);
-        var (organization1, organization2) = (organizations[0], organizations[1]);
+        var (personalOrganization, additionalOrganization) = (organizations[1], organizations[0]);
         
-        Assert.True(organization1.CanCreateSpaces);
-        Assert.Equal("Org 1", organization1.Name);
-        Assert.Equal("#ffffff", organization1.Color);
-        Assert.Equal(1, organization1.SpacesCount);
+        Assert.False(personalOrganization.IsPersonal);
+        Assert.True(personalOrganization.CanCreateSpaces);
+        Assert.True(personalOrganization.CanDelete);
+        Assert.False(personalOrganization.CanUpdate);
+        Assert.Equal("Org 1", personalOrganization.Name);
+        Assert.Equal("#ffffff", personalOrganization.Color);
         
-        Assert.True(organization2.CanCreateSpaces);
-        Assert.Equal("Org 2", organization2.Name);
-        Assert.Equal("#000000", organization2.Color);
-        Assert.Equal(1, organization2.SpacesCount);
+        Assert.True(additionalOrganization.IsPersonal);
+        Assert.True(additionalOrganization.CanCreateSpaces);
+        Assert.False(additionalOrganization.CanDelete);
+        Assert.True(additionalOrganization.CanUpdate);
+        Assert.Equal("Org 2", additionalOrganization.Name);
+        Assert.Equal("#000000", additionalOrganization.Color);
     }
     
     [Fact]

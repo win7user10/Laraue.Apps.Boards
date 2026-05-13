@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Text;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
@@ -70,19 +69,9 @@ public class OrganizationsService(
     {
         var allOrganizations = await organizationAccessService.GetAvailable(
             request.UserId,
-            organizationUsers => organizationUsers
+            organizationUsers => Project(organizationUsers
                 .OrderByDescending(x => x.Organization!.Type)
-                .ThenBy(x => x.Organization!.Name)
-                .Select(x => new OrganizationDto
-                {
-                    Id = x.Organization!.Id,
-                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
-                    Name = x.Organization.Name,
-                    Color = x.Organization.Color,
-                    SpacesCount = x.Organization.Spaces!.Count,
-                    IsPersonal = x.Organization.Type == OrganizationType.Personal,
-                    AdminAccessLevel = x.AdminAccessLevel,
-                })
+                .ThenBy(x => x.Organization!.Name))
                 .ToListAsyncEF(cancellationToken));
 
         return allOrganizations.ToArray();
@@ -92,19 +81,26 @@ public class OrganizationsService(
     {
         return organizationAccessService.GetAvailable(
             request.AuthData.UserId,
-            organizations => organizations
-                .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
-                .Select(x => new OrganizationDto
-                {
-                    Id = x.Organization!.Id,
-                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
-                    Name = x.Organization.Name,
-                    Color = x.Organization.Color,
-                    SpacesCount = x.Organization.Spaces!.Count,
-                    IsPersonal = x.Organization.Type == OrganizationType.Personal,
-                    AdminAccessLevel = x.AdminAccessLevel,
-                })
+            organizations => Project(organizations
+                .Where(o => o.OrganizationId == request.AuthData.OrganizationId))
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
+    }
+
+    private IQueryable<OrganizationDto> Project(IQueryable<OrganizationUser> query)
+    {
+        return query
+            .Select(x => new OrganizationDto
+            {
+                Id = x.Organization!.Id,
+                CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                CanUpdate = x.AdminAccessLevel.HasFlag(AdminAccessLevel.UpdateOrganization),
+                CanDelete = x.Organization.Type != OrganizationType.Personal &&
+                            x.AdminAccessLevel.HasFlag(AdminAccessLevel.DeleteOrganization),
+                Name = x.Organization.Name,
+                Color = x.Organization.Color,
+                IsPersonal = x.Organization.Type == OrganizationType.Personal,
+                CanManagePermissions = x.AdminAccessLevel.HasFlag(AdminAccessLevel.ManagePermissions),
+            });
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -285,7 +281,7 @@ public class OrganizationsService(
                 Username = x.User.TelegramUserName,
                 Initials = null,
                 IsOwner = x.Organization!.OwnerId == x.UserId,
-                ChildrenAccessLevel = x.SpacesAccessLevel,
+                AdminAccessLevel = x.AdminAccessLevel,
             })
             .ToArrayAsyncEF(cancellationToken);
 
@@ -361,9 +357,10 @@ public record OrganizationDto
     public long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
-    public required int SpacesCount { get; set; }
     public required bool CanCreateSpaces { get; set; }
-    public required AdminAccessLevel AdminAccessLevel { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
+    public required bool CanManagePermissions { get; set; }
     public required bool IsPersonal { get; set; }
 }
 
@@ -406,7 +403,7 @@ public record OrganizationMember
     public required string Color { get; set; }
     public string? Initials { get; set; }
     public required bool IsOwner { get; set; }
-    public required ChildrenAccessLevel ChildrenAccessLevel { get; set; }
+    public required AdminAccessLevel AdminAccessLevel { get; set; }
 }
 
 public record GetPermittableEntitiesRequest

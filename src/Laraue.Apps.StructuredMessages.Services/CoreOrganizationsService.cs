@@ -3,6 +3,7 @@ using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -98,6 +99,14 @@ public class CoreOrganizationsService(
 
     public async Task Delete(long id, CancellationToken cancellationToken)
     {
+        var isPersonalOrganization = await context.Organizations
+            .Where(o => o.Type == OrganizationType.Personal)
+            .Where(o => o.Id == id)
+            .AnyAsyncEF(cancellationToken);
+
+        if (isPersonalOrganization)
+            throw new ForbiddenException("Personal organization cannot be deleted.");
+        
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         var spaceIds = context.Spaces

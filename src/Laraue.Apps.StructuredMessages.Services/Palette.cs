@@ -20,7 +20,8 @@ public static class Palette
         "#2f81f7",
         "#a371f7",
         "#f778ba",
-        "#ff7b72"
+        "#ff7b72",
+        "#41b6d2",
     ];
 
     public static string FirstColor => Colors[0];

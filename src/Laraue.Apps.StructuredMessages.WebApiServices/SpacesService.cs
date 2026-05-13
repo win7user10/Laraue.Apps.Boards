@@ -46,7 +46,6 @@ public class SpacesService(
                     Id = x.Space.Id,
                     Name = x.Space.Name,
                     Color = x.Space.Color,
-                    EpicsCount = x.Space.Epics!.Count,
                     CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
                     CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
                 })
@@ -172,7 +171,6 @@ public record SpaceListDto
     public long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
-    public required int EpicsCount { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
 }
