@@ -79,7 +79,8 @@ public class WebApiTestHostScope : IDisposable
     {
         return InitializeOrganization(userId, (initializer) =>
         {
-            setupInitializer?.Invoke(initializer.SetIsPersonal(true));
+            initializer.SetIsPersonal(true);
+            setupInitializer?.Invoke(initializer);
         });
     }
     

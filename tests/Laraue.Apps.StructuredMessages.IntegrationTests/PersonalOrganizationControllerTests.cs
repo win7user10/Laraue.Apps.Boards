@@ -2,6 +2,7 @@
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;
@@ -66,18 +67,18 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
     }
     
     [Fact]
-    public async Task User_ShouldDeletePersonalOrganization_Always()
+    public async Task User_ShouldNotDeletePersonalOrganization_Always()
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         var organization = await testScope.InitializePersonalOrganization(userId);
         
-        await _organizationsController
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => _organizationsController
             .WithUserAuthorization(userId)
-            .Execute(x => x.Delete(organization.Id));
+            .Execute(x => x.Delete(organization.Id)));
 
-        var organizations = await testScope.Database.Organizations.ToListAsyncEF();
-        Assert.Empty(organizations);
+        var forbidden = exception.HasInnerException<NotFoundException>();
+        Assert.Equal($"Organization: {organization.Id} is unavailable or permission: DeleteOrganization is missing", forbidden.Message);
     }
     
     [Fact]
@@ -118,5 +119,23 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
             .Execute(x => x.GetAll());
         
         Assert.NotNull(getSpacesResponse);
+    }
+    
+    [Fact]
+    public async Task User_ShouldViewOrganization_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var ownerId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(ownerId);
+        
+        var result = await _organizationsController
+            .WithOrganizationAuthorization(organization.Id, ownerId)
+            .Execute(x => x.GetOrganization());
+        
+        Assert.NotNull(result);
+        Assert.False(result.CanDelete);
+        Assert.True(result.CanUpdate);
+        Assert.False(result.CanManage);
+        Assert.True(result.CanCreateSpaces);
     }
 }
