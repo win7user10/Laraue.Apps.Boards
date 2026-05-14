@@ -4,8 +4,10 @@ using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.EFCore.Extensions;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
@@ -35,6 +37,18 @@ public interface IOrganizationsService
         JoinOrganizationRequest request,
         CancellationToken cancellationToken);
     
+    Task Leave(
+        LeaveOrganizationRequest request,
+        CancellationToken cancellationToken);
+    
+    Task RevokeAccess(
+        RevokeAccessRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<string> RegenerateJoinCode(
+        RegenerateJoinCodeRequest request,
+        CancellationToken cancellationToken);
+    
     Task SetUserPermissions(
         SetPermissionsRequest request,
         CancellationToken cancellationToken);
@@ -49,6 +63,10 @@ public interface IOrganizationsService
     
     Task<OrganizationMember[]> GetOrganizationMembers(
         GetOrganizationMembersRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<string?> GetOrganizationJoinCode(
+        GetOrganizationJoinCodeRequest request,
         CancellationToken cancellationToken);
     
     Task<PermittableSpace[]> GetPermittableEntities(
@@ -99,7 +117,7 @@ public class OrganizationsService(
                 Name = x.Organization.Name,
                 Color = x.Organization.Color,
                 IsPersonal = x.Organization.Type == OrganizationType.Personal,
-                CanManagePermissions = x.AdminAccessLevel.HasFlag(AdminAccessLevel.ManagePermissions),
+                CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
             });
     }
 
@@ -166,11 +184,61 @@ public class OrganizationsService(
             cancellationToken);
     }
 
+    public async Task Leave(LeaveOrganizationRequest request, CancellationToken cancellationToken)
+    {
+        await context.OrganizationUsers
+            .Where(x => x.UserId == request.UserId)
+            .Where(x => x.OrganizationId == request.OrganizationId)
+            .DeleteOrThrowNotFoundLinq2DbAsync(
+                "Organization is not found or user is not a participator of organization", 
+                cancellationToken);
+    }
+
+    public async Task RevokeAccess(RevokeAccessRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.Manage,
+            cancellationToken);
+        
+        var userData = await context.OrganizationUsers
+            .Where(x => x.Id == request.OrganizationUserId)
+            .Select(x => new
+            {
+                IsOwner = x.Organization!.OwnerId == x.UserId,
+            })
+            .FirstOrThrowNotFoundEFAsync("User is not found in organization", cancellationToken);
+
+        if (userData.IsOwner)
+            throw new ForbiddenException("Owner access can't be revoked");
+
+        await context.OrganizationUsers
+            .Where(x => x.Id == request.OrganizationUserId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task<string> RegenerateJoinCode(RegenerateJoinCodeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.Manage,
+            cancellationToken);
+
+        var newCode = StringGenerator.GenerateJoinCode();
+        await context.Organizations
+            .Where(x => x.Id == request.AuthData.OrganizationId)
+            .ExecuteUpdateAsync(u => u
+                    .SetProperty(p => p.JoinCode, newCode),
+                cancellationToken);
+        
+        return newCode;
+    }
+
     public async Task SetUserPermissions(SetPermissionsRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AdminAccessLevel.ManagePermissions,
+            AdminAccessLevel.Manage,
             cancellationToken);
         
         await context.OrganizationUsers
@@ -234,7 +302,7 @@ public class OrganizationsService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AdminAccessLevel.ManagePermissions,
+            AdminAccessLevel.Manage,
             cancellationToken);
         
         await context.OrganizationUsers
@@ -267,15 +335,15 @@ public class OrganizationsService(
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AdminAccessLevel.ManagePermissions,
+            AdminAccessLevel.Manage,
             cancellationToken);
 
         var data = await context.OrganizationUsers
             .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
             .Select(x => new OrganizationMember
             {
-                Color = Palette.DefaultUserColor,
-                FirstName = x.User!.TelegramFirstName,
+                Color = x.User!.Color,
+                FirstName = x.User.TelegramFirstName,
                 LastName = x.User.TelegramLastName,
                 OrganizationUserId = x.Id,
                 Username = x.User.TelegramUserName,
@@ -296,13 +364,26 @@ public class OrganizationsService(
         return data;
     }
 
+    public async Task<string?> GetOrganizationJoinCode(GetOrganizationJoinCodeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.Manage,
+            cancellationToken);
+
+        return await context.Organizations
+            .Where(o => o.Id == request.AuthData.OrganizationId)
+            .Select(x => x.JoinCode)
+            .FirstOrDefaultAsyncEF(cancellationToken);
+    }
+
     public async Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
-            AdminAccessLevel.ManagePermissions,
+            AdminAccessLevel.Manage,
             cancellationToken);
 
         return await coreOrganizationsService.GetPermittableEntities(
@@ -360,7 +441,7 @@ public record OrganizationDto
     public required bool CanCreateSpaces { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
-    public required bool CanManagePermissions { get; set; }
+    public required bool CanManage { get; set; }
     public required bool IsPersonal { get; set; }
 }
 
@@ -368,6 +449,23 @@ public record JoinOrganizationRequest
 {
     public Guid UserId { get; set; }
     public required string JoinCode { get; set; }
+}
+
+public record RevokeAccessRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long OrganizationUserId { get; set; }
+}
+
+public record RegenerateJoinCodeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+}
+
+public record LeaveOrganizationRequest
+{
+    public Guid UserId { get; set; }
+    public long OrganizationId { get; set; }
 }
 
 public record SetPermissionsRequest
@@ -390,6 +488,11 @@ public record LoginRequest
 }
 
 public record GetOrganizationMembersRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+}
+
+public record GetOrganizationJoinCodeRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
 }

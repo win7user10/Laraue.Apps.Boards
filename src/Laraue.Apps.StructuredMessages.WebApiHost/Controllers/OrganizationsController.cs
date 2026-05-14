@@ -78,6 +78,61 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             cancellationToken);
     }
     
+    [HttpPost("{id:long}/leave")]
+    public Task Leave(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.Leave(
+            new LeaveOrganizationRequest
+            {
+                UserId = HttpContext.User.GetId(),
+                OrganizationId = id,
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPost("regenerate-join-code")]
+    public Task<string> RegenerateCode(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.RegenerateJoinCode(
+            new RegenerateJoinCodeRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("join-code")]
+    public Task<string?> GetJoinCode(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetOrganizationJoinCode(
+            new GetOrganizationJoinCodeRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+            },
+            cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPost("revoke-access/{organizationUserId:long}")]
+    public Task RevokeAccess(
+        long organizationUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.RevokeAccess(
+            new RevokeAccessRequest
+            {
+                OrganizationUserId = organizationUserId,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+            },
+            cancellationToken);
+    }
+    
     [HttpPost("login")]
     public Task<string> Login(
         [FromBody] LoginRequest request,

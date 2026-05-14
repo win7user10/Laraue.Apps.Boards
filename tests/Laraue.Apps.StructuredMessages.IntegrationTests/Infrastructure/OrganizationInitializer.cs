@@ -16,7 +16,7 @@ public class OrganizationInitializer(
     private string _organizationName = "TestOrganization";
     private string _organizationColor = "#ffffff";
     private DateTime _timestamp = DateTime.UtcNow;
-    private bool _isPersonal = false;
+    private bool _isPersonal;
 
     private readonly List<SpaceBuilder> _spaces =
     [

@@ -4,8 +4,8 @@
 public enum AdminAccessLevel : byte
 {
     None = 0,
-    ManagePermissions = 1,
+    Manage = 1,
     UpdateOrganization = 2,
     DeleteOrganization = 4,
-    All = ManagePermissions | UpdateOrganization | DeleteOrganization,
+    All = Manage | UpdateOrganization | DeleteOrganization,
 }
