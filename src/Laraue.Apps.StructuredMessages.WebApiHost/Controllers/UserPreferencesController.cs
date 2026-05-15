@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/user-preferences")]
 public class UserPreferencesController(IUserPreferencesService service) : ControllerBase
@@ -24,13 +24,5 @@ public class UserPreferencesController(IUserPreferencesService service) : Contro
         CancellationToken cancellationToken)
     {
         return service.UpdateEpicSortOrder(HttpContext.User.GetId(), epicSortOrder, cancellationToken);
-    }
-    
-    [HttpPut("space/{spaceId}")]
-    public Task UpdateSpaceId(
-        [FromRoute] long spaceId,
-        CancellationToken cancellationToken)
-    {
-        return service.UpdateSpace(HttpContext.User.GetId(), spaceId, cancellationToken);
     }
 }

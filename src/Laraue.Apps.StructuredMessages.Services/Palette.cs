@@ -3,7 +3,7 @@
 public static class Palette
 {
     public const string DefaultStatusColor = "#dda61b";
-    public const string DefaultUserColor = "#3fb950";
+    public const string DefaultBacklogColor = "#2f81f7";
     
     private static readonly Random Random = new (); 
     public static readonly string[] Colors =
@@ -19,7 +19,8 @@ public static class Palette
         "#2f81f7",
         "#a371f7",
         "#f778ba",
-        "#ff7b72"
+        "#ff7b72",
+        "#41b6d2",
     ];
 
     public static string FirstColor => Colors[0];

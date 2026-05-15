@@ -10,7 +10,7 @@ public class Epic
     public required string Name { get; set; }
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
@@ -18,7 +18,7 @@ public class Epic
     /// <summary>
     /// The space the epic belongs to.
     /// </summary>
-    public long? SpaceId { get; set; }
+    public long SpaceId { get; set; }
     public Space? Space { get; set; }
 
     /// <summary>
@@ -36,7 +36,9 @@ public class Epic
     /// Property to sort epics.
     /// </summary>
     public DateTime TouchedAt { get; set; }
+    
+    public bool IsDefault { get; set; }
 
-    public IList<Issue>? Issues { get; set; }
     public IList<Status>? Statuses { get; set; }
+    public IList<DirectEpicPermission>? Users { get; set; }
 }

@@ -2,6 +2,9 @@
 
 namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
+/// <summary>
+/// Space is the direct alternative of Jira Space (ex Project).
+/// </summary>
 public class Space
 {
     public long Id { get; set; }
@@ -10,10 +13,13 @@ public class Space
     public required string Name { get; set; }
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public required string Color { get; set; }
     
     public Guid CreatorId { get; set; }
     public User? Creator { get; set; }
+    
+    public long OrganizationId { get; set; }
+    public Organization? Organization { get; set; }
     
     /// <summary>
     /// Epic creation date.
@@ -25,8 +31,11 @@ public class Space
     /// </summary>
     public DateTime UpdatedAt { get; set; }
     
+    public bool IsDefault { get; set; }
+    
     /// <summary>
     /// Epics linked to the space.
     /// </summary>
     public IList<Epic>? Epics { get; set; }
+    public IList<DirectSpacePermission>? Users { get; set; }
 }

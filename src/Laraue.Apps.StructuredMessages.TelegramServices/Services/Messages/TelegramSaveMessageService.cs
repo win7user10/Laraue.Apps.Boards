@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot;
@@ -255,13 +256,15 @@ public class TelegramSaveMessageService(
         var cardForMessageIsCreated = (firstGroupMessageData?.CardId).HasValue;
         if (!cardForMessageIsCreated)
         {
+            var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
             var card = new Issue
             {
                 Content = request.Text,
                 UserId = request.UserId,
+                StatusId = statusId,
                 CreatedAt = request.SentAt,
                 TelegramMessageId = savedMessage.Id,
-                TelegramMessage = savedMessage
+                TelegramMessage = savedMessage,
             };
                 
             context.Add(card);
@@ -311,20 +314,23 @@ public class TelegramSaveMessageService(
             .Where(x => x.ExternalChatId == request.ExternalUserId)
             .Select(x => new
             {
-                CardId = x.Issue != null ? (long?)x.Issue.Id : null,
+                IssueId = x.Issue != null ? (long?)x.Issue.Id : null,
                 x.Id,
             })
             .FirstOrDefaultAsync(cancellationToken);
         
         // Message is not stored, save it // TODO - store only if it is the first message
-        if (savedMessage?.CardId is null)
+        if (savedMessage?.IssueId is null)
         {
+            var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
+            
             var card = new Issue
             {
                 Content = request.Text,
                 UserId = request.UserId,
                 CreatedAt = request.SentAt,
                 TelegramMessageId = savedMessage?.Id,
+                StatusId = statusId,
                 TelegramMessage = savedMessage is null
                     ? new TelegramMessage
                     {
@@ -356,6 +362,26 @@ public class TelegramSaveMessageService(
         };
     }
 
+    private async Task<long> GetStatusIdToSaveMessage(Guid userId, CancellationToken cancellationToken)
+    {
+        var organizationData = await context.Organizations
+            .Where(o => o.Type == OrganizationType.Personal)
+            .Where(o => o.OwnerId == userId)
+            .Select(o => new { o.Id })
+            .FirstOrThrowNotFoundEFAsync($"Personal org is not defined for user: {userId}", cancellationToken);
+        
+        var statusData = await context.Statuses
+            .Where(s => 
+                s.Epic!.IsDefault
+                && s.Epic.Space!.IsDefault
+                && s.Epic.Space.OrganizationId == organizationData.Id)
+            .OrderBy(s => s.SortOrder)
+            .Select(s => new { s.Id })
+            .FirstOrThrowNotFoundEFAsync("Status to save TG message is not defined", cancellationToken);
+        
+        return statusData.Id;
+    }
+    
     private async Task<long> GetOrCreateTelegramMediaGroupId(
         string groupId,
         CancellationToken cancellationToken)

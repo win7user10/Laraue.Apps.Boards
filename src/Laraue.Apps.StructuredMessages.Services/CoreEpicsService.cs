@@ -11,17 +11,12 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreEpicsService
 {
-    Task<MessageCategoryListDto[]> GetList(
-        Guid userId,
-        CancellationToken cancellationToken);
-    
     Task<long> Create(
-        CreateMessageCategoryRequest request,
-        CancellationToken cancellationToken);
-    
-    Task<bool> UserHasAccessToEpic(
+        long spaceId,
         Guid userId,
-        long id,
+        string name,
+        string color,
+        Status[]? statuses,
         CancellationToken cancellationToken);
     
     Task ChangeStatusesOrder(
@@ -41,41 +36,31 @@ public interface ICoreEpicsService
 public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
     : ICoreEpicsService
 {
-    public Task<MessageCategoryListDto[]> GetList(
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        return context.Epics
-            .Where(x => x.UserId == userId)
-            .Select(x => new MessageCategoryListDto
-            {
-                Name = x.Name,
-                Id = x.Id
-            })
-            .ToArrayAsyncEF(cancellationToken);
-    }
-
     public async Task<long> Create(
-        CreateMessageCategoryRequest request,
+        long spaceId,
+        Guid userId,
+        string name,
+        string color,
+        Status[]? statuses,
         CancellationToken cancellationToken)
     {
         var dateTime = dateTimeProvider.UtcNow;
         
         var category = new Epic
         {
-            Name = request.Name,
-            UserId = request.UserId,
-            Color = request.Color ?? Palette.RandomColor(),
+            Name = name,
+            UserId = userId,
+            Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
             TouchedAt = dateTime,
-            SpaceId = request.SpaceId,
+            SpaceId = spaceId,
         };
         
-        var statuses = request.Statuses ?? [
+        statuses ??= [
             new Status
             {
-                Name = CardsDefaults.DefaultStatusName,
+                Name = IssueDefaults.DefaultStatusName,
                 Color = Palette.DefaultStatusColor
             }];
 
@@ -92,14 +77,6 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         await context.SaveChangesAsync(cancellationToken);
 
         return category.Id;
-    }
-
-    public Task<bool> UserHasAccessToEpic(Guid userId, long id, CancellationToken cancellationToken)
-    {
-        return context.Epics
-            .Where(x => x.UserId == userId)
-            .Where(x => x.Id == id)
-            .AnyAsyncEF(cancellationToken);
     }
 
     public async Task ChangeStatusesOrder(
@@ -139,11 +116,27 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        var defaultEpic = await context.Epics
+            .Where(x => x.Id == request.Id)
+            .Select(x => x.Space!)
+            .Select(o => o.Epics!.First(y => y.IsDefault))
+            .Select(e => new
+            {
+                EpicId = e.Id, 
+                NewStatusId = (long?)e.Statuses!.OrderBy(o => o.SortOrder).FirstOrDefault()!.Id, // Status should be taken from FE in future iterations
+            })
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        if (defaultEpic is null)
+            throw new NotFoundException($"Backlog for space with Epic:{request.Id} is not found");
+            
+        if (defaultEpic.EpicId == request.Id)
+            throw new ForbiddenException("Default Epic can not be deleted");
+        
         await context.Issues
-            .Where(x => x.EpicId == request.Id)
+            .Where(x => x.Status!.EpicId == request.Id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.EpicId, (long?)null)
-                .SetProperty(p => p.StatusId, (long?)null),
+                .SetProperty(p => p.StatusId, defaultEpic.NewStatusId),
                 cancellationToken);
         
         await context.Statuses
@@ -178,12 +171,6 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
     }
 }
 
-public class MessageCategoryListDto
-{
-    public long Id { get; set; }
-    public required string Name { get; set; }
-}
-
 public class ChangeStatusesOrderRequest
 {
     public required long CategoryId { get; set; }
@@ -192,15 +179,6 @@ public class ChangeStatusesOrderRequest
     /// Order map, status id -> order value.
     /// </summary>
     public required IReadOnlyDictionary<long, int> Order { get; set; }
-}
-
-public class CreateMessageCategoryRequest
-{
-    public required string Name { get; set; }
-    public string? Color { get; set; }
-    public required Guid UserId { get; set; }
-    public required long? SpaceId { get; set; }
-    public Status[]? Statuses { get; set; }
 }
 
 public class Status

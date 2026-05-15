@@ -17,11 +17,6 @@ public interface ICoreStatusService
         long epicId,
         CancellationToken cancellationToken);
     
-    Task<bool> UserHasAccessToStatus(
-        Guid userId,
-        long id,
-        CancellationToken cancellationToken);
-    
     Task Delete(
         DeleteStatusRequest request,
         CancellationToken cancellationToken);
@@ -72,14 +67,6 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
             .ToArrayAsyncEF(cancellationToken);
     }
 
-    public Task<bool> UserHasAccessToStatus(Guid userId, long id, CancellationToken cancellationToken)
-    {
-        return context.Statuses
-            .Where(x => x.Epic!.UserId == userId)
-            .Where(x => x.Id == id)
-            .AnyAsyncEF(cancellationToken);
-    }
-
     public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -87,7 +74,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
         var categoryData = await context.Statuses
             .Where(x => x.Id == request.Id)
             .Select(x => new { MessageCategoryId = x.EpicId })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"Status: {request.Id} is not found", cancellationToken);
         
         var newStatusId = await context.Statuses
             .Where(x => x.EpicId == categoryData.MessageCategoryId)

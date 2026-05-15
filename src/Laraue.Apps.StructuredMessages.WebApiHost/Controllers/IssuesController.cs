@@ -5,48 +5,50 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/issues")]
-public class IssuesController(IIssuesService messagesService) : ControllerBase
+public class IssuesController(IIssuesService issuesService) : ControllerBase
 {
-    [HttpGet]
-    public Task<BatchResult<MessageListDto>> GetMessages(
-        [FromQuery] GetMessagesRequest request,
-        CancellationToken cancellationToken)
+    [HttpGet("by-status/{statusId:long}")]
+    public Task<BatchResult<IssueListDto>> GetIssuesByStatus(
+        long statusId,
+        [FromQuery] GetIssuesRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.GetMessages(
+        return issuesService.GetIssues(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                StatusId = statusId,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
     
     
     [HttpGet("{id:long}")]
-    public Task<MessageDetailDto> GetMessage(
+    public Task<IssueDetailDto> GetIssue(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.GetMessage(
-            new GetMessageRequest
+        return issuesService.GetIssue(
+            new GetIssueRequest
             {
-                UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                IssueId = id,
             },
             cancellationToken);
     }
     
     [HttpGet("board")]
-    public Task<ColumnMessages[]> GetBoard(
+    public Task<ColumnIssues[]> GetBoard(
         [FromQuery] GetBoardRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.GetBoard(
+        return issuesService.GetBoard(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -54,13 +56,13 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpPut("{id:long}/move")]
     public Task Move(
         long id,
-        MoveCardRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] MoveIssueRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.Move(
+        return issuesService.Move(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
                 IssueId = id
             },
             cancellationToken);
@@ -69,26 +71,26 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.DeleteMessage(
-            new DeleteMessageRequest
+        return issuesService.Delete(
+            new DeleteIssueRequest
             {
-                UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                IssueId = id,
             },
             cancellationToken);
     }
     
     [HttpPost]
     public Task<long> Create(
-        [FromBody] CreateMessageRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] CreateIssueRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.CreateMessage(
+        return issuesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -96,40 +98,40 @@ public class IssuesController(IIssuesService messagesService) : ControllerBase
     [HttpPut("{id:long}")]
     public Task Update(
         [FromRoute] long id,
-        [FromBody] EditMessageRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateIssueRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.EditMessage(
+        return issuesService.Update(
             request with
             {
-                UserId = HttpContext.User.GetId(),
-                MessageId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                Id = id,
             },
             cancellationToken);
     }
     
     [HttpGet("search")]
-    public Task<IShortPaginatedResult<MessageListDto>> Search(
+    public Task<ShortPaginatedResult<IssueListDto>> Search(
         [FromQuery] SearchRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.Search(
+        return issuesService.Search(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
 
     [HttpGet("summary")]
-    public Task<CategorySummary[]> GetBoardSummary(
+    public Task<EpicSummary[]> GetBoardSummary(
         [FromQuery] GetBoardSummaryRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        return messagesService.GetBoardSummary(
+        return issuesService.GetBoardSummary(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

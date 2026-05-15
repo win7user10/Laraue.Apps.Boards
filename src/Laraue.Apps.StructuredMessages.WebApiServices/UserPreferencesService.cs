@@ -10,17 +10,12 @@ public interface IUserPreferencesService
         EpicSortOrder epicSortOrder,
         CancellationToken cancellationToken = default);
     
-    Task UpdateSpace(
-        Guid userId,
-        long spaceId,
-        CancellationToken cancellationToken = default);
-    
     Task<UserPreferencesResponse> GetPreferences(
         Guid userId,
         CancellationToken cancellationToken);
 }
 
-public class UserPreferencesService(ICoreUserPreferencesService coreService, ICoreSpacesService spacesService) : IUserPreferencesService
+public class UserPreferencesService(ICoreUserPreferencesService coreService) : IUserPreferencesService
 {
     public Task UpdateEpicSortOrder(
         Guid userId,
@@ -31,23 +26,6 @@ public class UserPreferencesService(ICoreUserPreferencesService coreService, ICo
             .Update(
                 userId,
                 update => update.SetProperty(p => p.EpicSortOrder, epicSortOrder),
-                cancellationToken);
-    }
-
-    public async Task UpdateSpace(Guid userId, long spaceId, CancellationToken cancellationToken = default)
-    {
-        var value = IdService.ToNullableId(spaceId);
-        if (value.HasValue && !await spacesService.UserHasAccessToSpace(
-            userId,
-            spaceId,
-            AccessType.Read,
-            cancellationToken))
-            return;
-        
-        await coreService
-            .Update(
-                userId,
-                update => update.SetProperty(p => p.SpaceId, value),
                 cancellationToken);
     }
 

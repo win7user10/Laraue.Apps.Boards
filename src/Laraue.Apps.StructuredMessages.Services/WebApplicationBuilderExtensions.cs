@@ -33,11 +33,19 @@ public static class WebApplicationBuilderExtensions
         {
             builder.Services
                 .AddSingleton<IDateTimeProvider, DateTimeProvider>()
+                .AddScoped<IAccessService, AccessService>()
                 .AddScoped<ICoreIssuesService, CoreIssuesService>()
+                .AddScoped<IIssuesAccessService, IssuesAccessService>()
                 .AddScoped<ICoreEpicsService, CoreEpicsService>()
+                .AddScoped<IEpicsAccessService, EpicsAccessService>()
                 .AddScoped<ICoreStatusService, CoreStatusService>()
+                .AddScoped<IStatusAccessService, StatusAccessService>()
                 .AddScoped<ICoreUserPreferencesService, CoreUserPreferencesService>()
+                .AddScoped<ICoreUserOrganizationPreferencesService, CoreUserOrganizationPreferencesService>()
                 .AddScoped<ICoreSpacesService, CoreSpacesService>()
+                .AddScoped<ISpacesAccessService, SpacesAccessService>()
+                .AddScoped<ICoreOrganizationsService, CoreOrganizationsService>()
+                .AddScoped<IOrganizationAccessService, OrganizationAccessService>()
                 .AddSingleton<IFileStorage, FileStorage>();
 
             builder.Services.AddMemoryCache();

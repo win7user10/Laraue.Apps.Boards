@@ -4,20 +4,20 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/spaces")]
-public class SpacesController(ISpacesService spacesService) : ControllerBase
+public class SpacesController(ISpacesService spacesService, IEpicsService epicsService) : ControllerBase
 {
     [HttpPost]
     public Task<long> Create(
         [FromBody] CreateSpaceRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -25,14 +25,14 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     [HttpPut("{id:long}")]
     public Task Update(
         long id,
-        [FromBody] EditSpaceRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateSpaceRequest request,
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Update(
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -40,26 +40,50 @@ public class SpacesController(ISpacesService spacesService) : ControllerBase
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return spacesService.Delete(
             new DeleteSpaceRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
     
     [HttpGet]
-    public Task<GetSpacesResponse> Get(
-        CancellationToken cancellationToken)
+    public Task<SpaceListDto[]> GetAll(
+        CancellationToken cancellationToken = default)
     {
         return spacesService.GetSpaces(
             new GetSpacesRequest
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
+    
+    [HttpGet("{id:long}/epics")]
+    public Task<EpicListDto[]> GetSpaceEpics(
+        long id,
+        CancellationToken cancellationToken = default) => 
+        epicsService.GetSpaceEpics(
+            new GetEpicsRequest
+            {
+                SpaceId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    
+    [HttpGet("{id:long}")]
+    public Task<SpaceDto> GetSpace(
+        long id,
+        CancellationToken cancellationToken = default) => 
+        spacesService.GetSpace(
+            new GetSpaceRequest
+            {
+                Id = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
 }

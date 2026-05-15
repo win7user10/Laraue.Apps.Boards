@@ -15,9 +15,14 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     
     public DbSet<User> Users { get; init; }
     public DbSet<UserPreferences> UserPreferences { get; init; }
+    public DbSet<UserOrganizationPreferences> UserOrganizationPreferences { get; init; }
     public DbSet<Issue> Issues { get; init; }
     public DbSet<Epic> Epics { get; init; }
+    public DbSet<DirectEpicPermission> DirectEpicPermissions { get; init; }
     public DbSet<Space> Spaces { get; init; }
+    public DbSet<DirectSpacePermission> DirectSpacePermissions { get; init; }
+    public DbSet<Organization> Organizations { get; init; }
+    public DbSet<OrganizationUser> OrganizationUsers { get; init; }
     public DbSet<Status> Statuses { get; init; }
     public DbSet<TelegramFile> TelegramFiles { get; init; }
     public DbSet<TelegramMessagePhoto> TelegramPhotos { get; init; }
@@ -66,6 +71,23 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
         modelBuilder.Entity<UserPreferences>(entity =>
         {
             entity.HasKey(x => x.UserId);
+        });
+        
+        modelBuilder.Entity<UserOrganizationPreferences>(entity =>
+        {
+            entity.HasKey(x => new { x.OrganizationId, x.UserId });
+        });
+        
+        modelBuilder.Entity<Organization>(entity =>
+        {
+            entity
+                .HasIndex(x => new { x.OwnerId, x.Type })
+                .HasFilter("type = 1")
+                .IsUnique();
+            
+            entity
+                .HasIndex(x => x.JoinCode)
+                .IsUnique();
         });
     }
 }

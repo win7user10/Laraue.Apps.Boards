@@ -1,10 +1,13 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
+﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.DataAccess.Extensions;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.Contracts;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DataAccess.Extensions;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -14,80 +17,88 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IIssuesService
 {
-    Task<BatchResult<MessageListDto>> GetMessages(
-        GetMessagesRequest request,
+    Task<BatchResult<IssueListDto>> GetIssues(
+        GetIssuesRequest request,
         CancellationToken cancellationToken);
     
-    Task<ColumnMessages[]> GetBoard(
+    Task<ColumnIssues[]> GetBoard(
         GetBoardRequest request,
         CancellationToken cancellationToken);
     
-    Task<CategorySummary[]> GetBoardSummary(
+    Task<EpicSummary[]> GetBoardSummary(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken);
 
     Task Move(
-        MoveCardRequest request,
+        MoveIssueRequest request,
         CancellationToken ct);
     
-    Task DeleteMessage(
-        DeleteMessageRequest request,
+    Task Delete(
+        DeleteIssueRequest request,
         CancellationToken ct);
     
-    Task<long> CreateMessage(
-        CreateMessageRequest request,
+    Task<long> Create(
+        CreateIssueRequest request,
         CancellationToken ct);
     
-    Task EditMessage(
-        EditMessageRequest request,
+    Task Update(
+        UpdateIssueRequest request,
         CancellationToken ct);
     
-    Task<IShortPaginatedResult<MessageListDto>> Search(
+    Task<ShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct);
     
-    Task<MessageDetailDto> GetMessage(
-        GetMessageRequest request,
+    Task<IssueDetailDto> GetIssue(
+        GetIssueRequest request,
         CancellationToken cancellationToken);
 }
 
 public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService messageService,
-    ICoreEpicsService epicsService,
     IDateTimeProvider dateTimeProvider,
-    ICoreSpacesService coreSpacesService,
-    ICoreStatusService statusService)
+    IIssuesAccessService issuesAccessService,
+    IEpicsAccessService epicsAccessService,
+    IStatusAccessService statusAccessService)
     : IIssuesService
 {
-    public async Task<BatchResult<MessageListDto>> GetMessages(
-        GetMessagesRequest request,
+    public async Task<BatchResult<IssueListDto>> GetIssues(
+        GetIssuesRequest request,
         CancellationToken cancellationToken)
     {
-        var statusId = IdService.ToNullableId(request.StatusId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-
-        var query = context
-            .Issues
-            .Where(x => x.SpaceId == spaceId)
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.StatusId == statusId);
+        var statusData = await context.Statuses
+            .Where(x => x.Id == request.StatusId)
+            .Select(x => new { x.EpicId })
+            .FirstOrThrowNotFoundEFAsync("Status is not found", cancellationToken);
         
-        if (!string.IsNullOrEmpty(request.SearchString))
-            query = query
-                .Where(x => EF.Functions.ILike(
-                    x.Content!,
-                    request.SearchString.AsSearchable()));
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            statusData.EpicId,
+            ChildrenAccessLevel.Read,
+            cancellationToken);
 
-        var result = await ToBatchResult(ProjectToTemporaryDto(query
-            .OrderByDescending(x => x.Id)), request);
+        var query = context.Issues
+            .Where(i => i.StatusId == request.StatusId);
+            
+        if (!string.IsNullOrEmpty(request.SearchString))
+        {
+            query = query
+                .Where(x => x.Content!
+                    .ILike(request.SearchString.AsSearchable()));
+        }
+
+        var ordered = query.OrderByDescending(x => x.Id);
+        var temporaryResult = ProjectToTemporaryDto(ordered);
+        var result = await ToBatchResult(temporaryResult, request, cancellationToken);
+
         var projected = result.Data
             .Select(Map)
             .ToArray();
         
         await Enrich(projected, cancellationToken);
 
-        return new BatchResult<MessageListDto>
+        return new BatchResult<IssueListDto>
         {
             HasNext = result.HasNext,
             Data = projected,
@@ -97,12 +108,13 @@ public class IssuesService(
 
     private static async Task<BatchResult<T>> ToBatchResult<T>(
         IQueryable<T> queryable,
-        BatchRequest request)
+        BatchRequest request,
+        CancellationToken cancellationToken)
     {
         var requested = await queryable
             .Skip(request.Skip)
             .Take(request.Take + 1)
-            .ToListAsyncEF();
+            .ToListAsyncLinqToDB(cancellationToken);
         
         var hasNext = request.Take < requested.Count;
         var result = requested.Take(request.Take).ToArray();
@@ -115,36 +127,26 @@ public class IssuesService(
         };
     }
 
-    public async Task<ColumnMessages[]> GetBoard(
+    public async Task<ColumnIssues[]> GetBoard(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        var categoryId = IdService.ToNullableId(request.CategoryId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.EpicId,
+            ChildrenAccessLevel.Read,
+            cancellationToken);
+        
+        var statusIds = await context.Statuses
+            .Where(x => x.EpicId == request.EpicId)
+            .Select(x => x.Id)
+            .ToListAsyncEF(cancellationToken);
 
-        var statusIds = new List<long?>();
-        if (categoryId is null)
-            statusIds.Add(null);
-        else
-        {
-            statusIds = await context.Statuses
-                .Where(x => x.Epic!.SpaceId == spaceId)
-                .Where(x => x.EpicId == categoryId.Value)
-                .Where(x => x.Epic!.UserId == request.UserId)
-                .Select(x => (long?)x.Id)
-                .ToListAsyncEF(cancellationToken);
-        }
-
-        if (statusIds.Count == 0)
-            throw new NotFoundException();
-
-        var result = new List<ColumnMessages>();
+        var result = new List<ColumnIssues>();
         foreach (var statusId in statusIds)
         {
             var query = context
                 .Issues
-                .Where(x => x.UserId == request.UserId)
-                .Where(x => x.SpaceId == spaceId)
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
@@ -163,17 +165,17 @@ public class IssuesService(
                     },
                     cancellationToken);
 
-            var mappedStatusResult = new InitialBatchResult<MessageListDto>()
+            var mappedStatusResult = new InitialBatchResult<IssueListDto>()
             {
                 Data = statusResult.Data.Select(Map).ToArray(),
                 HasNext = statusResult.HasNextPage,
-                Offset = request.Take,
+                Offset = statusResult.Data.Count,
                 TotalCount = statusResult.Total,
             };
             
-            result.Add(new ColumnMessages
+            result.Add(new ColumnIssues
             {
-                StatusId = IdService.ToNotNullableId(statusId),
+                StatusId = statusId,
                 Items = mappedStatusResult,
             });
         }
@@ -187,26 +189,27 @@ public class IssuesService(
         return result.ToArray();
     }
 
-    public async Task<CategorySummary[]> GetBoardSummary(
+    public async Task<EpicSummary[]> GetBoardSummary(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        
-        var categoryById = (await context.Epics
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == spaceId)
-            .Select(x => new
-            {
-                x.Id,
-                x.Color,
-                x.Name,
-            })
-            .ToArrayAsyncEF(cancellationToken))
-            .ToDictionary(x => x.Id);
+        var epics = await epicsAccessService.GetAvailable(
+            request.AuthData,
+            new Filter { SpaceId = request.SpaceId },
+            epics => epics
+                .Select(x => new
+                {
+                    x.Epic.Id,
+                    x.Epic.Color,
+                    x.Epic.Name,
+                })
+                .ToArrayAsyncEF(cancellationToken),
+            cancellationToken);
+
+        var epicById = epics.ToDictionary(x => x.Id);
         
         var statusByCategoryId = (await context.Statuses
-            .Where(x => categoryById.Keys.Contains(x.EpicId))
+            .Where(x => epicById.Keys.Contains(x.EpicId))
             .Select(x => new
             {
                 x.Id,
@@ -219,20 +222,19 @@ public class IssuesService(
          .ToLookup(x => x.MessageCategoryId);
         
         var counts = (await context.Issues
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == spaceId)
+            .Where(x =>  epics.Select(e => e.Id).Contains(x.Status!.EpicId))
             .Select(x => x)
             .GroupBy(x => x.StatusId)
             .Select(x => new
             {
-                Id = IdService.ToNotNullableId(x.Key),
+                Id = x.Key,
                 Count = x.Count(),
             })
             .ToArrayAsyncEF(cancellationToken))
             .ToDictionary(x => x.Id, x => x.Count);
 
-        var result = categoryById
-            .Select(category => new CategorySummary
+        var result = epicById
+            .Select(category => new EpicSummary
             {
                 Id = category.Key,
                 Color = category.Value.Color,
@@ -254,138 +256,137 @@ public class IssuesService(
         return result;
     }
 
-    public async Task Move(MoveCardRequest request, CancellationToken ct)
+    public async Task Move(MoveIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.IssueId, ct))
-            throw new NotFoundException("Card not found");
+        // Check that can move Issue
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Update,
+            ct);
         
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue && !await coreSpacesService.UserHasAccessToSpace(request.UserId, request.SpaceId, AccessType.CreateItems, ct))
-            throw new NotFoundException("Space not found");
-        
-        var epicId = IdService.ToNullableId(request.EpicId);
-        if (epicId.HasValue && !await epicsService.UserHasAccessToEpic(request.UserId, request.EpicId, ct))
-            throw new NotFoundException("Epic not found");
-        
-        if (!await statusService.UserHasAccessToStatus(request.UserId, request.StatusId, ct))
-            throw new NotFoundException("Status not found");
+        // Check that can move to specified status
+        await statusAccessService.CanMoveToStatusOrThrow(
+            request.AuthData,
+            request.StatusId,
+            ct);
         
         await messageService.Move(
             request.IssueId,
-            request.SpaceId,
-            request.EpicId,
             request.StatusId,
             ct);
     }
 
-    public async Task DeleteMessage(DeleteMessageRequest request, CancellationToken ct)
+    public async Task Delete(DeleteIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Delete,
+            ct);
 
-        await messageService.DeleteMessage(request.MessageId, ct);
+        await messageService.Delete(request.IssueId, ct);
     }
 
-    public async Task<long> CreateMessage(CreateMessageRequest request, CancellationToken ct)
+    public async Task<long> Create(CreateIssueRequest request, CancellationToken ct)
     {
-        var categoryId = IdService.ToNullableId(request.CategoryId);
-        var statusId = IdService.ToNullableId(request.StatusId);
-        var spaceId = IdService.ToNullableId(request.SpaceId);
+        var validationData = await context.Statuses
+            .Where(s => s.Id == request.StatusId)
+            .Select(x => new { x.EpicId, x.Epic!.SpaceId })
+            .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", ct);
 
-        if (categoryId.HasValue
-            && !await epicsService.UserHasAccessToEpic(
-                request.UserId, request.CategoryId, ct))
-                    throw new BadRequestException(
-                        nameof(categoryId),
-                        "Category is not found");
-        
-        if (spaceId.HasValue
-            && !await coreSpacesService.UserHasAccessToSpace(
-                request.UserId,
-                request.SpaceId,
-                AccessType.CreateItems,
-                ct))
-            throw new BadRequestException(
-                nameof(categoryId),
-                "Space is not found");
+        try
+        {
+            await epicsAccessService.HasAccessOrThrow(
+                request.AuthData,
+                validationData.EpicId,
+                ChildrenAccessLevel.Create,
+                ct);
+        }
+        catch (NotFoundException)
+        {
+            throw new NotFoundException(
+                $"Status: {request.StatusId} is not found, or {ChildrenAccessLevel.Create} permission is missing for Epic contains this status");
+        }
 
         return await messageService.Create(
-            new SaveMessageRequest
+            new Services.CreateIssueRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
                 Text = request.Content,
-                UserId = request.UserId,
-                CategoryId = categoryId,
-                StatusId = statusId,
-                SpaceId = spaceId,
+                UserId = request.AuthData.UserId,
+                StatusId = request.StatusId,
             },
             ct);
     }
 
-    public async Task EditMessage(EditMessageRequest request, CancellationToken ct)
+    public async Task Update(UpdateIssueRequest request, CancellationToken ct)
     {
-        if (!await messageService.UserHasAccessToMessage(request.UserId, request.MessageId, ct)) 
-            throw new NotFoundException();
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.Id,
+            EntityAccessLevel.Update,
+            ct);
         
         await messageService.Update(
-            request.MessageId,
+            request.Id,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
             ct);
     }
 
-    public async Task<IShortPaginatedResult<MessageListDto>> Search(
+    public async Task<ShortPaginatedResult<IssueListDto>> Search(
         SearchRequest request,
         CancellationToken ct)
     {
-        var query = context.Issues
-            .Where(x => x.UserId == request.UserId);
+        var result = await issuesAccessService.GetAvailable(
+            request.AuthData,
+            issues =>
+            {
+                if (request.EpicId.HasValue)
+                    issues = issues.Where(x => x.Status!.EpicId == request.EpicId);
         
-        var categoryId = IdService.ToNullableId(request.EpicId);
-        if (categoryId.HasValue)
-            query = query.Where(x => x.EpicId == categoryId);
+                if (request.SpaceId.HasValue)
+                    issues = issues.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
         
-        var spaceId = IdService.ToNullableId(request.SpaceId);
-        if (spaceId.HasValue)
-            query = query.Where(x => x.SpaceId == spaceId);
-        
-        if (!string.IsNullOrEmpty(request.SearchString))
-            query = query
-                .Where(x => EF.Functions.ILike(
-                    x.Content!,
-                    request.SearchString.AsSearchable()));
+                if (!string.IsNullOrEmpty(request.SearchString))
+                    issues = issues
+                        .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
 
-        var result = await ProjectToTemporaryDto(query)
-            .ShortPaginateEFAsync(request, ct);
-
+                return ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
+                    .ShortPaginateLinq2DbAsync(request, ct);
+            }, ct);
+        
         var mapped = result.MapTo(Map);
         await Enrich(mapped.Data, ct);
         
         return mapped;
     }
 
-    public async Task<MessageDetailDto> GetMessage(
-        GetMessageRequest request,
+    public async Task<IssueDetailDto> GetIssue(
+        GetIssueRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await messageService.UserHasAccessToMessage(
-            request.UserId, request.MessageId, cancellationToken))
-            throw new NotFoundException();
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Read,
+            cancellationToken);
 
         var result = await context.Issues
-            .Where(x => x.Id == request.MessageId)
+            .Where(x => x.Id == request.IssueId)
             .Select(x => new MessageDetailDtoData
             {
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
-                CategoryName = x.Epic!.Name,
+                CategoryName = x.Status!.Epic!.Name,
                 StatusName = x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
-                CategoryColor = x.Epic.Color,
+                CategoryColor = x.Status.Epic.Color,
                 StatusColor = x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
@@ -393,19 +394,18 @@ public class IssuesService(
         var sender = UserInitialsUtility.GetInitials(
             result.TelegramUsername,
             result.TelegramFirstName,
-            result.TelegramLastName,
-            result.TelegramId);;
+            result.TelegramLastName);;
 
-        return new MessageDetailDto
+        return new IssueDetailDto
         {
             Id = result.Id,
             Content = result.Content,
             Sender = sender.Sender,
             SenderInitial = sender.Initial,
             Time = result.Time,
-            CategoryName = result.CategoryName,
+            EpicName = result.CategoryName,
             StatusName = result.StatusName,
-            CategoryColor = result.CategoryColor,
+            EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
         };
     }
@@ -521,89 +521,88 @@ public class IssuesService(
         }
     }
 
-    private static IQueryable<MessageListDtoData> ProjectToTemporaryDto(
+    private static IQueryable<IssueListDtoData> ProjectToTemporaryDto(
         IQueryable<Issue> queryable)
     {
-        return queryable.Select(x => new MessageListDtoData
+        return queryable.Select(x => new IssueListDtoData
         {
             Id = x.Id,
             Content = x.Content,
             Time = x.CreatedAt,
-            CategoryId = IdService.ToNotNullableId(x.EpicId),
-            StatusId = IdService.ToNotNullableId(x.StatusId),
+            EpicId = x.Status!.EpicId,
+            StatusId = x.StatusId,
             TelegramFirstName = x.User!.TelegramFirstName,
             TelegramLastName = x.User!.TelegramLastName,
             TelegramId = x.User.TelegramId,
             TelegramUsername = x.User.TelegramUserName,
+            UserColor = x.User.Color,
         });
     }
     
-    private static MessageListDto Map(MessageListDtoData source)
+    private static IssueListDto Map(IssueListDtoData source)
     {
         var senderData = UserInitialsUtility.GetInitials(
             source.TelegramUsername,
             source.TelegramFirstName,
-            source.TelegramLastName,
-            source.TelegramId);
+            source.TelegramLastName);
 
-        return new MessageListDto
+        return new IssueListDto
         {
             Id = source.Id,
             StatusId = source.StatusId,
             Content = source.Content,
-            CategoryId = source.CategoryId,
+            EpicId = source.EpicId,
             Sender = senderData.Sender,
             SenderInitial = senderData.Initial,
-            Time = source.Time
+            Time = source.Time,
+            SenderColor = source.UserColor,
         };
     }
 }
 
-public record MoveCardRequest
+public record MoveIssueRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long IssueId { get; set; }
-    public long SpaceId { get; set; }
-    public long EpicId { get; set; }
     public long StatusId { get; set; }
 }
 
-public record GetMessagesRequest : BatchRequest
+public record GetIssuesRequest : BatchRequest
 {
-    public Guid UserId { get; set; }
-    public long SpaceId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public string? SearchString { get; set; }
 }
 
-public record GetMessageRequest
+public record GetIssueRequest
 {
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long IssueId { get; set; }
 }
 
 public record GetBoardRequest
 {
-    public Guid UserId { get; set; }
-    public long CategoryId { get; set; }
-    public long SpaceId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long EpicId { get; set; }
+    
+    [Range(1, 100)]
     public int Take { get; init; }
     public string? SearchString { get; init; }
 }
 
 public record GetBoardSummaryRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long SpaceId { get; set; }
 }
 
-public record ColumnMessages
+public record ColumnIssues
 {
     public required long StatusId { get; set; }
-    public required InitialBatchResult<MessageListDto> Items { get; set; }
+    public required InitialBatchResult<IssueListDto> Items { get; set; }
 }
 
-public class MessageListDtoData
+public class IssueListDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -612,7 +611,8 @@ public class MessageListDtoData
     public required string? TelegramFirstName { get; set; }
     public required string? TelegramLastName { get; set; }
     public required string? Content { get; set; }
-    public required long CategoryId { get; set; }
+    public required string UserColor { get; set; }
+    public required long EpicId { get; set; }
     public required long StatusId { get; set; }
 }
 
@@ -622,14 +622,15 @@ public interface ICanContainMedia
     public List<MediaInfo> Media { get; set; }
 }
 
-public class MessageListDto : ICanContainMedia
+public class IssueListDto : ICanContainMedia
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
+    public required string SenderColor { get; set; }
     public required string? Content { get; set; }
-    public required long CategoryId { get; set; }
+    public required long EpicId { get; set; }
     public required long StatusId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
 }
@@ -647,31 +648,29 @@ public enum MediaType
     Video,
 }
 
-public record DeleteMessageRequest
+public record DeleteIssueRequest
 {
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long IssueId { get; set; }
 }
 
-public record CreateMessageRequest
+public record CreateIssueRequest
 {
-    public Guid UserId { get; set; }
-    public long SpaceId { get; set; }
-    public long CategoryId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public required string Content { get; set; }
 }
 
-public record EditMessageRequest
+public record UpdateIssueRequest
 {
-    public Guid UserId { get; set; }
-    public long MessageId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long Id { get; set; }
     public required string Content { get; set; }
 }
 
 public record SearchRequest : IPaginationData
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long? EpicId { get; set; }
     public long? SpaceId { get; set; }
     public string? SearchString { get; set; }
@@ -679,15 +678,15 @@ public record SearchRequest : IPaginationData
     public int PerPage { get; init; }
 }
 
-public class MessageDetailDto
+public class IssueDetailDto
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
     public string? SenderInitial { get; set; }
     public required string? Content { get; set; }
-    public required string? CategoryName { get; set; }
-    public required string? CategoryColor { get; set; }
+    public required string? EpicName { get; set; }
+    public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
 }
@@ -734,7 +733,7 @@ public class ColumnSummary
     public required int SortOrder { get; set; }
 }
 
-public record CategorySummary
+public record EpicSummary
 {
     public required long Id { get; set; }
     public required string Name { get; set; }

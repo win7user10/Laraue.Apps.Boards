@@ -27,7 +27,7 @@ public class TelegramFilesController(
         var fileData = await db.TelegramFiles
             .Where(x => x.Id == id)
             .Select(x => new { x.FileUniqueId, x.MimeType, x.FileId })
-            .FirstOrThrowNotFoundEFAsync(cancellationToken);
+            .FirstOrThrowNotFoundEFAsync("File is not found", cancellationToken);
 
         var fileExtension = ExtensionUtility.GetExtension(fileData.MimeType);
         var physicalPath = ShardedPathStrategy.GetPath(fileData.FileUniqueId, fileExtension);

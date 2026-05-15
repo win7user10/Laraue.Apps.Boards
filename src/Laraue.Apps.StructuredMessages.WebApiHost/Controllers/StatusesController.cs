@@ -6,7 +6,7 @@ using DeleteStatusRequest = Laraue.Apps.StructuredMessages.WebApiServices.Delete
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/statuses")]
 public class StatusesController(IStatusesService statusesService)
@@ -20,7 +20,7 @@ public class StatusesController(IStatusesService statusesService)
         return statusesService.CreateStatus(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -34,7 +34,7 @@ public class StatusesController(IStatusesService statusesService)
             new DeleteStatusRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -49,7 +49,7 @@ public class StatusesController(IStatusesService statusesService)
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -62,7 +62,7 @@ public class StatusesController(IStatusesService statusesService)
         return statusesService.GetStatuses(
             request with
             {
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

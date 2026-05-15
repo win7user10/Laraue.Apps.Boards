@@ -5,8 +5,7 @@ public static class UserInitialsUtility
     public static UserInitials GetInitials(
         string? username,
         string? firstName,
-        string? lastName,
-        long telegramId)
+        string? lastName)
     {
         var sender = username;
         var initial = sender?.Length > 1 ? sender[..2] : "";
@@ -30,8 +29,8 @@ public static class UserInitialsUtility
             }
             else
             {
-                sender = telegramId.ToString();
-                initial = "ID";
+                sender = "Unknown";
+                initial = "UN";
             }
         }
 

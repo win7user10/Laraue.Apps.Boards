@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DateTime.Services.Abstractions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -10,6 +11,7 @@ namespace Laraue.Apps.StructuredMessages.Services;
 public interface ICoreSpacesService
 {
     Task<long> Create(
+        long organizationId,
         Guid creatorId,
         string name,
         string color,
@@ -23,12 +25,6 @@ public interface ICoreSpacesService
     Task Delete(
         long id,
         CancellationToken cancellationToken);
-    
-    Task<bool> UserHasAccessToSpace(
-        Guid userId,
-        long spaceId,
-        AccessType accessType,
-        CancellationToken cancellationToken);
 }
 
 public class CoreSpacesService(
@@ -37,6 +33,7 @@ public class CoreSpacesService(
     : ICoreSpacesService
 {
     public async Task<long> Create(
+        long organizationId,
         Guid creatorId,
         string name,
         string color,
@@ -51,6 +48,11 @@ public class CoreSpacesService(
             Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
+            OrganizationId = organizationId,
+            Epics = new List<Epic>
+            {
+                OrganizationDefaults.GetNewBacklogEpicEntity(creatorId, dateTime)
+            }
         };
         
         context.Spaces.Add(entity);
@@ -79,12 +81,31 @@ public class CoreSpacesService(
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        var defaultSpace = await context.Spaces
+            .Where(x => x.Id == id)
+            .Select(x => x.Organization!)
+            .Select(o => o.Spaces!.First(y => y.IsDefault))
+            .Select(s => new
+            {
+                SpaceId = s.Id, 
+                NewStatusId = (long?)s.Epics!.FirstOrDefault(e => e.IsDefault)!.Statuses!.OrderBy(o => o.SortOrder).FirstOrDefault()!.Id, // Status should be taken from FE in future iterations
+            })
+            .FirstOrDefaultAsyncEF(cancellationToken);
+        
+        if (defaultSpace is null)
+            throw new NotFoundException($"Default Organization Space for Space:{id} is not found");
+            
+        if (defaultSpace.SpaceId == id)
+            throw new ForbiddenException("Default Space can not be deleted");
+        
+        // The situation should not happen in real App as soon as Backlog Epic is always required for Space. This line will be dropped when status id will be taken from FE. 
+        if (defaultSpace.NewStatusId is null)
+            throw new BadRequestException(nameof(id), $"Backlog or default status for Backlog was not found in Default Space to move issues from deleting Space:{id}");
+        
         await context.Issues
-            .Where(x => x.SpaceId == id)
+            .Where(x => x.Status!.Epic!.SpaceId == id)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.SpaceId, (long?)null)
-                .SetProperty(p => p.EpicId, (long?)null)
-                .SetProperty(p => p.StatusId, (long?)null),
+                .SetProperty(p => p.StatusId, defaultSpace.NewStatusId),
                 cancellationToken);
         
         await context.Statuses
@@ -100,17 +121,5 @@ public class CoreSpacesService(
             .ExecuteDeleteAsync(cancellationToken);
         
         await transaction.CommitAsync(cancellationToken);
-    }
-
-    public Task<bool> UserHasAccessToSpace(
-        Guid userId,
-        long spaceId,
-        AccessType accessType,
-        CancellationToken cancellationToken)
-    {
-        return context.Spaces
-            .Where(x => x.CreatorId == userId)
-            .Where(x => x.Id == spaceId)
-            .AnyAsyncEF(cancellationToken);
     }
 }

@@ -26,8 +26,8 @@ public class TelegramMessageServiceRepository(DatabaseContext databaseContext)
             .Select(x => new MessageDto
             {
                 UserId = x.UserId,
-                CategoryId = x.EpicId,
-                CategoryName = x.Epic!.Name,
+                CategoryId = x.Status!.EpicId,
+                CategoryName = x.Status.Epic!.Name,
                 Id = x.Id,
                 StatusId = x.StatusId,
                 StatusName = x.Status!.Name,

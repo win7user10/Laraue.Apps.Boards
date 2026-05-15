@@ -1,0 +1,502 @@
+﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Apps.StructuredMessages.Services;
+using Status = Laraue.Apps.StructuredMessages.DataAccess.Models.Status;
+
+namespace Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
+
+public class OrganizationInitializer(
+    DatabaseContext context,
+    ICoreOrganizationsService coreOrganizationsService,
+    Guid ownerId)
+{
+    private readonly Dictionary<Guid, Action<PermissionBuilder>> _organizationUsers = new();
+    
+    private string _organizationName = "TestOrganization";
+    private string _organizationColor = "#ffffff";
+    private DateTime _timestamp = DateTime.UtcNow;
+    private bool _isPersonal;
+
+    private readonly List<SpaceBuilder> _spaces =
+    [
+        new SpaceBuilder(ownerId, DateTime.UtcNow)
+            .WithName("Default Space")
+            .SetAsDefault()
+            .AddEpic(ownerId, e => e
+                .AddStatus(s => s.WithName("New"))
+                .SetAsDefault()
+                .WithName("Backlog"))
+    ];
+    
+    public OrganizationInitializer WithName(string name)
+    {
+        _organizationName = name;
+
+        return this;
+    }
+
+    public OrganizationInitializer WithColor(string color)
+    {
+        _organizationColor = color;
+
+        return this;
+    }
+
+    public OrganizationInitializer WithTimestamp(DateTime timestamp)
+    {
+        _timestamp = timestamp;
+
+        return this;
+    }
+
+    public OrganizationInitializer SetIsPersonal(bool isPersonal)
+    {
+        _isPersonal = isPersonal;
+
+        return this;
+    }
+
+    public async Task<Organization> Initialize()
+    {
+        var organization = OrganizationDefaults.GetNewOrganizationEntity(
+            ownerId,
+            _organizationName,
+            _organizationColor,
+            _timestamp,
+            _isPersonal);
+
+        organization.Spaces = new List<Space>(); // Add all children manually
+
+        for (var index = 0; index < _spaces.Count; index++)
+        {
+            var space = _spaces[index];
+            var spaceEntity = new Space
+            {
+                Name = space.SpaceName,
+                Color = space.SpaceColor,
+                CreatedAt = space.Timestamp,
+                UpdatedAt = space.Timestamp,
+                CreatorId = space.CreatorId,
+                IsDefault = space.IsDefault,
+                Epics = index == 0 ? new List<Epic>() : new List<Epic>
+                {
+                    OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
+                }
+            };
+
+            foreach (var epic in space.Epics)
+            {
+                var epicEntity = new Epic
+                {
+                    Name = epic.EpicName,
+                    Color = epic.EpicColor,
+                    CreatedAt = epic.Timestamp,
+                    UpdatedAt = epic.Timestamp,
+                    TouchedAt = epic.Timestamp,
+                    UserId = epic.CreatorId,
+                    IsDefault = epic.IsDefault,
+                    Statuses = index == 0 ? new List<Status>() : new List<Status>
+                    {
+                        OrganizationDefaults.GetNewStatusEntity(),
+                    }
+                };
+
+                foreach (var status in epic.Statuses)
+                {
+                    var statusEntity = new Status
+                    {
+                        Name = status.StatusName,
+                        Color = status.StatusColor,
+                    };
+
+                    epicEntity.Statuses.Add(statusEntity);
+                }
+
+                foreach (var issuesByStatusIndex in epic.Issues)
+                {
+                    var statusForIssue = epicEntity.Statuses[issuesByStatusIndex.Key];
+                    statusForIssue.Issues ??= new List<Issue>();
+                    foreach (var issue in issuesByStatusIndex.Value)
+                    {
+                        statusForIssue.Issues.Add(new Issue
+                        {
+                            Content = issue.Content,
+                            UserId = issue.CreatorId,
+                            CreatedAt = issue.Timestamp,
+                            UpdatedAt = issue.Timestamp,
+                        });
+                    }
+                }
+
+                spaceEntity.Epics.Add(epicEntity);
+            }
+
+            organization.Spaces!.Add(spaceEntity);
+        }
+
+        context.Add(organization);
+        await context.SaveChangesAsync();
+
+        foreach (var user in _organizationUsers)
+        {
+            var builder = new PermissionBuilder();
+            user.Value.Invoke(builder);
+
+            var userPermissions = new UserPermissions
+            {
+                Global = builder.Permissions.GlobalAccessLevels,
+                Admin = builder.Permissions.Administrative,
+                Direct = builder.Permissions.DirectAccessLevels
+                    .ToDictionary(
+                        x => organization.Spaces![x.Key].Id,
+                        x =>
+                        {
+                            var spacePermission = organization.Spaces![x.Key];
+                            return new DirectSpaceAccessLevel
+                            {
+                                Epics = x.Value.Epics,
+                                Issues = x.Value.Issues,
+                                Self = x.Value.Self,
+                                DirectEpics = x.Value.DirectEpics
+                                    .ToDictionary(
+                                        y => spacePermission.Epics![y.Key].Id,
+                                        y => y.Value)
+                            };
+                        })
+            };
+            
+            var organizationUserId = await coreOrganizationsService.AddMember(organization.Id, user.Key, CancellationToken.None);
+            await coreOrganizationsService.SetUserPermissions(
+                organizationUserId,
+                userPermissions,
+                CancellationToken.None);
+        }
+        
+        return organization;
+    }
+
+    public OrganizationInitializer AddUser(Guid userId)
+    {
+        return AddUser(userId, _ => {});
+    }
+
+    public OrganizationInitializer AddUser(Guid userId, Action<PermissionBuilder> permissionBuilder)
+    {
+        _organizationUsers[userId] = permissionBuilder;
+
+        return this;
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId)
+    {
+        return AddSpace(creatorId, _ => {});
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId, Action<SpaceBuilder> spaceBuilder)
+    {
+        var builder = new SpaceBuilder(creatorId, _timestamp);
+        spaceBuilder(builder);
+        
+        _spaces.Add(builder);
+
+        return this;
+    }
+
+    public OrganizationInitializer AddIssue(
+        int spaceIndex,
+        int epicIndex,
+        int statusIndex,
+        Guid creatorId,
+        Action<IssueBuilder> setupIssue)
+    {
+        _spaces[spaceIndex].Epics[epicIndex].AddIssue(creatorId, statusIndex, setupIssue);
+
+        return this;
+    }
+    
+    public OrganizationInitializer AddIssueToDefaultStatus(
+        Guid creatorId,
+        Action<IssueBuilder> setupIssue)
+    {
+        return AddIssue(0, 0, 0, creatorId, setupIssue);
+    }
+    
+    public OrganizationInitializer AddIssueToDefaultStatus(
+        Guid creatorId)
+    {
+        return AddIssueToDefaultStatus(creatorId, _ => {});
+    }
+
+    public record TestUserPermissions
+    {
+        public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
+        public Dictionary<int, TestDirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
+        public AdminAccessLevel Administrative { get; set; }
+    }
+    
+    public record TestDirectSpaceAccessLevel
+    {
+        public ChildrenAccessLevel Epics { get; set; }
+        public ChildrenAccessLevel Issues { get; set; }
+        public EntityAccessLevel Self { get; set; }
+        public Dictionary<int, DirectEpicAccessLevel> DirectEpics { get; set; } = new();
+    }
+    
+    public class PermissionBuilder
+    {
+        public TestUserPermissions Permissions { get; set; } = new();
+        
+        public PermissionBuilder SetAdminAccessLevel(AdminAccessLevel adminAccessLevel)
+        {
+            Permissions.Administrative = adminAccessLevel;
+            return this;
+        }
+    
+        public PermissionBuilder SetSpacesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Spaces = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetSpaceAccessLevel(int index, EntityAccessLevel entityAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Self = entityAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetSpaceEpicsAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Epics = childrenAccessLevel;
+            
+            return this;
+        }
+        
+    
+        public PermissionBuilder SetSpaceIssuesAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectSpacesLevels(index).Issues = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel entityAccessLevel)
+        {
+            return SetEpicAccessLevel(0, 0, entityAccessLevel);
+        }
+    
+        public PermissionBuilder SetEpicsAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Epics = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetIssuesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        {
+            Permissions.GlobalAccessLevels.Issues = childrenAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetEpicAccessLevel(int spaceIndex, int epicIndex, EntityAccessLevel entityAccessLevel)
+        {
+            GetDirectEpicsLevels(spaceIndex, epicIndex).Self = entityAccessLevel;
+            
+            return this;
+        }
+    
+        public PermissionBuilder SetEpicIssuesAccessLevel(int spaceIndex, int epicIndex, ChildrenAccessLevel childrenAccessLevel)
+        {
+            GetDirectEpicsLevels(spaceIndex, epicIndex).Issues = childrenAccessLevel;
+            
+            return this;
+        }
+
+        private TestDirectSpaceAccessLevel GetDirectSpacesLevels(int spaceIndex)
+        {
+            if (!Permissions.DirectAccessLevels.ContainsKey(spaceIndex))
+                Permissions.DirectAccessLevels[spaceIndex] = new TestDirectSpaceAccessLevel();
+            
+            return Permissions.DirectAccessLevels[spaceIndex];
+        }
+        
+
+        private DirectEpicAccessLevel GetDirectEpicsLevels(int spaceIndex, int epicIndex)
+        {
+            var spaceLevels = GetDirectSpacesLevels(spaceIndex);
+            if (!spaceLevels.DirectEpics.ContainsKey(epicIndex))
+                spaceLevels.DirectEpics[epicIndex] = new DirectEpicAccessLevel();
+            
+            return spaceLevels.DirectEpics[epicIndex];
+        }
+    }
+
+    public class SpaceBuilder(Guid creatorId, DateTime timestamp)
+    {
+        public string SpaceName { get; private set; } = "AdditionalSpace";
+        public string SpaceColor { get; private set; }  = "#ffffff";
+        public DateTime Timestamp { get; private set; }  = timestamp;
+        public Guid CreatorId { get; private set; }  = creatorId;
+        public List<EpicBuilder> Epics { get;} = new();
+        public bool IsDefault { get; private set; }
+
+        public SpaceBuilder WithName(string name)
+        {
+            SpaceName = name;
+
+            return this;
+        }
+        
+        public SpaceBuilder WithColor(string color)
+        {
+            SpaceColor = color;
+
+            return this;
+        }
+
+        public SpaceBuilder SetAsDefault()
+        {
+            IsDefault = true;
+            return this;
+        }
+        
+        public SpaceBuilder WithTimestamp(DateTime timestamp)
+        {
+            Timestamp = timestamp;
+
+            return this;
+        }
+
+        public SpaceBuilder AddEpic(Guid creatorId)
+        {
+            return AddEpic(creatorId, _ => {});
+        }
+
+        public SpaceBuilder AddEpic(Guid creatorId, Action<EpicBuilder> epicBuilder)
+        {
+            var builder = new EpicBuilder(creatorId, Timestamp);
+            epicBuilder(builder);
+            Epics.Add(builder);
+
+            return this;
+        }
+    }
+    
+    public class EpicBuilder(Guid creatorId, DateTime timestamp)
+    {
+        public string EpicName { get; private set; } = "AdditionalEpic";
+        public string EpicColor { get; private set; }  = "#121212";
+        public DateTime Timestamp { get; private set; }  = timestamp;
+        public Guid CreatorId { get; private set; }  = creatorId;
+        public bool IsDefault { get; private set; }
+        public List<StatusBuilder> Statuses  { get; private set; } = new ();
+        public Dictionary<int, List<IssueBuilder>> Issues  { get; private set; } = new ();
+        
+        public EpicBuilder WithName(string name)
+        {
+            EpicName = name;
+
+            return this;
+        }
+        
+        public EpicBuilder WithColor(string color)
+        {
+            EpicColor = color;
+
+            return this;
+        }
+        
+        public EpicBuilder WithTimestamp(DateTime value)
+        {
+            Timestamp = value;
+
+            return this;
+        }
+        
+        public EpicBuilder AddStatus(Action<StatusBuilder> statusBuilder)
+        {
+            var builder = new StatusBuilder();
+            statusBuilder(builder);
+            
+            Statuses.Add(builder);
+
+            return this;
+        }
+        
+        public EpicBuilder AddStatus()
+        {
+            return AddStatus(_ => { });
+        }
+
+        public EpicBuilder SetAsDefault()
+        {
+            IsDefault = true;
+            return this;
+        }
+
+        public EpicBuilder AddIssue(Guid creatorId, int statusIndex)
+        {
+            return AddIssue(creatorId, statusIndex, _ => { });
+        }
+
+        public EpicBuilder AddIssue(Guid creatorId, int statusIndex, Action<IssueBuilder> issueBuilder)
+        {
+            var builder = new IssueBuilder(creatorId);
+            issueBuilder(builder);
+
+            if (!Issues.ContainsKey(statusIndex))
+                Issues[statusIndex] = [];
+            Issues[statusIndex].Add(builder);
+
+            return this;
+        }
+    }
+
+    public class StatusBuilder
+    {
+        public string StatusName { get; private set; } = "AdditionalStatus";
+        public string StatusColor { get; private set; } = "#ffffff";
+        
+        public StatusBuilder WithName(string name)
+        {
+            StatusName = name;
+
+            return this;
+        }
+        
+        public StatusBuilder WithColor(string color)
+        {
+            StatusColor = color;
+
+            return this;
+        }
+    }
+
+    public class IssueBuilder(Guid creatorId)
+    {
+        public Guid CreatorId { get; } = creatorId;
+        public DateTime Timestamp { get; private set; } = DateTime.UtcNow;
+        public string Content { get; private set; } = "IssueContent";
+        
+        public IssueBuilder WithContent(string name)
+        {
+            Content = name;
+
+            return this;
+        }
+        
+        public IssueBuilder WithTimestamp(DateTime timestamp)
+        {
+            Timestamp = timestamp;
+
+            return this;
+        }
+    }
+
+    public class DirectAccess : Dictionary<int, EntityAccessLevel>
+    {
+    }
+}

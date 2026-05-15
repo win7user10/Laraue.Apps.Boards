@@ -1,15 +1,18 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface ISpacesService
 {
-    Task<GetSpacesResponse> GetSpaces(
+    Task<SpaceListDto[]> GetSpaces(
         GetSpacesRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<SpaceDto> GetSpace(
+        GetSpaceRequest request,
         CancellationToken cancellationToken);
     
     Task<long> Create(
@@ -17,7 +20,7 @@ public interface ISpacesService
         CancellationToken cancellationToken);
     
     Task Update(
-        EditSpaceRequest request,
+        UpdateSpaceRequest request,
         CancellationToken cancellationToken);
     
     Task Delete(
@@ -25,53 +28,80 @@ public interface ISpacesService
         CancellationToken cancellationToken);
 }
 
-public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext context)
+public class SpacesService(
+    ICoreSpacesService coreSpacesService,
+    ISpacesAccessService spacesAccessService,
+    IOrganizationAccessService organizationAccessService)
     : ISpacesService
 {
-    public async Task<GetSpacesResponse> GetSpaces(
+    public async Task<SpaceListDto[]> GetSpaces(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        var spaces = await context.Spaces
-            .Where(x => x.CreatorId == request.UserId)
-            .Select(x => new SpaceDto
-            {
-                Id = x.Id,
-                Name = x.Name,
-                Color = x.Color,
-                EpicsCount = x.Epics!.Count
-            })
-            .ToArrayAsyncEF(cancellationToken);
+        var spaces = await spacesAccessService.GetAvailableForRead(
+            request.AuthData,
+            items => items
+                .Select(x => new SpaceListDto
+                {
+                    Id = x.Space.Id,
+                    Name = x.Space.Name,
+                    Color = x.Space.Color,
+                    CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
+                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
+                })
+                .ToArrayAsyncLinqToDB(cancellationToken),
+            cancellationToken);
+        
+        return spaces;
+    }
 
-        var noEpicsCount = await context.Epics
-            .Where(x => x.UserId == request.UserId)
-            .Where(x => x.SpaceId == null)
-            .CountAsyncEF(cancellationToken);
+    public async Task<SpaceDto> GetSpace(GetSpaceRequest request, CancellationToken cancellationToken)
+    {
+        await spacesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.Id,
+            EntityAccessLevel.Read,
+            cancellationToken);
+        
+        var canCreateEpics = await spacesAccessService.CanCreateEpics(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
 
-        return new GetSpacesResponse
+        var childrenAccessLevel = await spacesAccessService.GetChildrenAccessLevel(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
+
+        return new SpaceDto
         {
-            Spaces = spaces,
-            NoSpaceEpicsCount = noEpicsCount
+            CanCreateEpics = canCreateEpics,
+            CanDelete = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+            CanUpdate = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Update),
         };
     }
 
-    public Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
+    public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
     {
-        return coreSpacesService.Create(
-            request.UserId,
+        await organizationAccessService.CanCreateSpacesOrThrow(
+            request.AuthData,
+            cancellationToken);
+
+        return await coreSpacesService.Create(
+            request.AuthData.OrganizationId,
+            request.AuthData.UserId,
             request.Name,
             request.Color,
             cancellationToken);
     }
 
-    public async Task Update(EditSpaceRequest request, CancellationToken cancellationToken)
+    public async Task Update(UpdateSpaceRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreSpacesService.UserHasAccessToSpace(
-            request.UserId,
+        await spacesAccessService.HasAccessOrThrow(
+            request.AuthData,
             request.Id,
-            AccessType.Update,
-            cancellationToken))
-            throw new NotFoundException();
+            EntityAccessLevel.Update,
+            cancellationToken);
 
         await coreSpacesService.Update(
             request.Id,
@@ -83,12 +113,11 @@ public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext
 
     public async Task Delete(DeleteSpaceRequest request, CancellationToken cancellationToken)
     {
-        if (!await coreSpacesService.UserHasAccessToSpace(
-            request.UserId,
+        await spacesAccessService.HasAccessOrThrow(
+            request.AuthData,
             request.Id,
-            AccessType.Delete,
-            cancellationToken))
-            throw new NotFoundException();
+            EntityAccessLevel.Delete,
+            cancellationToken);
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
     }
@@ -96,7 +125,7 @@ public class SpacesService(ICoreSpacesService coreSpacesService, DatabaseContext
 
 public record CreateSpaceRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -106,10 +135,11 @@ public record CreateSpaceRequest
     public required string Color { get; set; }
 }
 
-public record EditSpaceRequest
+public record UpdateSpaceRequest
 {
+    public OrganizationAuthData AuthData { get; set; } = new();
+    
     public long Id { get; set; }
-    public Guid UserId { get; set; }
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -121,25 +151,33 @@ public record EditSpaceRequest
 
 public record DeleteSpaceRequest
 {
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
-    public Guid UserId { get; set; }
+}
+
+public record GetSpaceRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+    public required long Id { get; set; }
 }
 
 public record GetSpacesRequest
 {
-    public Guid UserId { get; set; }
+    public required OrganizationAuthData AuthData { get; set; }
 }
 
-public record SpaceDto
+public record SpaceListDto
 {
     public long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
-    public required int EpicsCount { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
 }
 
-public record GetSpacesResponse
+public record SpaceDto
 {
-    public required SpaceDto[] Spaces { get; set; }
-    public required int NoSpaceEpicsCount { get; set; }
+    public required bool CanCreateEpics { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
 }

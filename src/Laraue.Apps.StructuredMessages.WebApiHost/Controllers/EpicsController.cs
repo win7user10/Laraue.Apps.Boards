@@ -4,42 +4,33 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
 [Route("/api/epics")]
 public class EpicsController(IEpicsService categoriesService)
     : ControllerBase
 {
-    [HttpGet]
-    public Task<EpicCountResult> GetCategoriesWithCount([FromQuery] GetEpicsRequest request, CancellationToken cancellationToken) => 
-        categoriesService.GetEpicsWithCount(
-            request with
-            {
-                UserId = HttpContext.User.GetId()
-            },
-            cancellationToken);
-    
     [HttpGet("{id}")]
-    public Task<CategoryDto> GetCategory(
+    public Task<EpicDto> Get(
         [FromRoute] long id,
-        CancellationToken cancellationToken) => 
+        CancellationToken cancellationToken = default) => 
         categoriesService.GetEpic(
-            new GetCategoryRequest
+            new GetEpicRequest
             {
-                UserId = HttpContext.User.GetId(),
-                CategoryId = id
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                Id = id
             },
             cancellationToken);
 
     [HttpPost]
-    public Task<long> CreateCategory(
-        [FromBody] CreateCategoryRequest request,
-        CancellationToken cancellationToken)
+    public Task<long> Create(
+        [FromBody] CreateEpicRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return categoriesService.CreateCategory(
+        return categoriesService.Create(
             request with
             {
-                UserId = HttpContext.User.GetId()
+                AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
     }
@@ -48,29 +39,29 @@ public class EpicsController(IEpicsService categoriesService)
     public Task ChangeStatusesOrder(
         [FromRoute] long id,
         [FromBody] IReadOnlyDictionary<long, int> order,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.ChangeStatusesOrder(
             new ChangeStatusesOrderRequest
             {
-                CategoryId = id,
+                EpicId = id,
                 Order = order,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
     
     [HttpPut("{id:long}")]
-    public Task Edit(
+    public Task Update(
         long id,
-        [FromBody] EditCategoryRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateEpicRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return categoriesService.Edit(
+        return categoriesService.Update(
             request with
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }
@@ -79,13 +70,13 @@ public class EpicsController(IEpicsService categoriesService)
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return categoriesService.Delete(
-            new DeleteCategoryRequest
+            new DeleteEpicRequest
             {
                 Id = id,
-                UserId = HttpContext.User.GetId(),
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
             },
             cancellationToken);
     }

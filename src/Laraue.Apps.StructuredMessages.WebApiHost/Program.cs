@@ -35,13 +35,16 @@ using (var scope = app.Services.CreateScope())
 
 var origins = builder
     .Configuration
-    .GetRequiredSection("Cors:Hosts")
+    .GetSection("Cors:Hosts")
     .Get<string[]>();
 
-app.UseCors(corsPolicyBuilder =>
-    corsPolicyBuilder.WithOrigins(origins)
-        .AllowCredentials()
-        .AllowAnyMethod()
-        .AllowAnyHeader());
+if (origins is not null)
+{
+    app.UseCors(corsPolicyBuilder =>
+        corsPolicyBuilder.WithOrigins(origins)
+            .AllowCredentials()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+}
 
 app.Run();

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.Exceptions.Web;
 
@@ -24,23 +25,25 @@ public interface IStatusesService
 }
 
 public class StatusesService(
-    ICoreEpicsService epicsesService,
-    ICoreStatusService statusService) : IStatusesService
+    ICoreStatusService statusService,
+    IEpicsAccessService epicsAccessService,
+    IStatusAccessService statusAccessService)
+    : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await epicsesService
-            .UserHasAccessToEpic(request.UserId, request.CategoryId, cancellationToken))
-            throw new BadRequestException(
-                nameof(request.CategoryId),
-                "Invalid category");
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.EpicId,
+            ChildrenAccessLevel.Update,
+            cancellationToken);
 
         return await statusService.Create(
             new CreateMessageCategoryStatusRequest
             {
-                CategoryId = request.CategoryId,
+                CategoryId = request.EpicId,
                 Name = request.Name,
                 Color = request.Color,
             },
@@ -49,9 +52,10 @@ public class StatusesService(
 
     public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
     {
-        if (!await statusService.UserHasAccessToStatus(
-            request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException("Status is not found");
+        await statusAccessService.CanModifyStatusOrThrow(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
 
         await statusService.Delete(
             new Services.DeleteStatusRequest
@@ -63,9 +67,10 @@ public class StatusesService(
 
     public async Task Edit(EditStatusRequest request, CancellationToken cancellationToken)
     {
-        if (!await statusService.UserHasAccessToStatus(
-                request.UserId, request.Id, cancellationToken))
-            throw new NotFoundException("Status is not found");
+        await statusAccessService.CanModifyStatusOrThrow(
+            request.AuthData,
+            request.Id,
+            cancellationToken);
 
         await statusService.Update(
             request.Id,
@@ -77,11 +82,11 @@ public class StatusesService(
 
     public async Task<MessageStatusDto[]> GetStatuses(GetStatusesRequest request, CancellationToken cancellationToken)
     {
-        if (!await epicsesService.UserHasAccessToEpic(
-            request.UserId,
+        await epicsAccessService.HasAccessOrThrow(
+            request.AuthData,
             request.EpicId,
-            cancellationToken))
-            throw new NotFoundException("Epic is not found");
+            ChildrenAccessLevel.Read,
+            cancellationToken);
 
         return await statusService.GetStatuses(
             request.EpicId,
@@ -91,7 +96,7 @@ public class StatusesService(
 
 public record CreateStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     
     [MaxLength(128)]
     public required string Name { get; set; }
@@ -99,18 +104,18 @@ public record CreateStatusRequest
     [MaxLength(7)]
     public required string Color { get; set; }
     
-    public required long CategoryId { get; set; }
+    public required long EpicId { get; set; }
 }
 
 public record DeleteStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public required long Id { get; set; }
 }
 
 public record EditStatusRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
     
     [MaxLength(7)]
@@ -120,6 +125,6 @@ public record EditStatusRequest
 
 public record GetStatusesRequest
 {
-    public Guid UserId { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
     public required long EpicId { get; set; }
 }

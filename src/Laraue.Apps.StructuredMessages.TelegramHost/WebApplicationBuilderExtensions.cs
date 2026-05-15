@@ -2,7 +2,6 @@
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Apps.StructuredMessages.TelegramServices;
-using Laraue.Apps.StructuredMessages.TelegramServices.Services.Categories;
 using Laraue.Apps.StructuredMessages.TelegramServices.Services.Messages;
 using Laraue.Telegram.NET.Authentication.Extensions;
 using Laraue.Telegram.NET.Core;
@@ -55,7 +54,6 @@ public static class WebApplicationBuilderExtensions
             builder.Services
                 .AddScoped<ITelegramMessageService, TelegramMessageService>()
                 .AddScoped<ITelegramMessageServiceRepository, TelegramMessageServiceRepository>()
-                .AddScoped<ITelegramMessageCategoryService, TelegramMessageCategoryService>()
                 .AddScoped<ITelegramCommandsService, TelegramCommandsService>()
                 .AddScoped<ITelegramSaveMessageService, TelegramSaveMessageService>();
 

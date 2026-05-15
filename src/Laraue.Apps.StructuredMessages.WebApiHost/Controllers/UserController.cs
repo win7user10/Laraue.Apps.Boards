@@ -1,12 +1,13 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Apps.StructuredMessages.WebApiServices;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/user")]
 public class UserController(DatabaseContext context) : ControllerBase
@@ -20,19 +21,18 @@ public class UserController(DatabaseContext context) : ControllerBase
             {
                 Username = x.TelegramUserName,
                 LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
-                Color = Palette.DefaultUserColor,
+                Color = x.Color,
                 FirstName = x.TelegramFirstName,
                 LastName = x.TelegramLastName,
                 TelegramId = x.TelegramId,
                 Palette = Palette.Colors
             })
-            .FirstOrThrowNotFoundEFAsync(ct);
+            .FirstOrThrowNotFoundEFAsync("User is not found", ct);
 
         var initials = UserInitialsUtility.GetInitials(
             user.Username,
             user.FirstName,
-            user.LastName,
-            user.TelegramId);
+            user.LastName);
 
         user.Initials = initials.Initial;
         return user;
