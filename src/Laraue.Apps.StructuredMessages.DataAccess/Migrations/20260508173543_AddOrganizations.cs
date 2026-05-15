@@ -180,7 +180,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             migrationBuilder.Sql(@"
 INSERT INTO organizations (name, owner_id, type, color, created_at, updated_at)
 SELECT
-    'Personal',
+    CASE WHEN u.telegram_language_code = 'ru' THEN 'Без организации' ELSE 'No organization' END,
     u.id,
     1,
     '#3fb950',

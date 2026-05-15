@@ -10,30 +10,34 @@ namespace Laraue.Apps.StructuredMessages.TelegramServices;
 public class TelegramUserQueryService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
     : ITelegramUserQueryService<User, Guid>
 {
-    public Task<User?> FindAsync(long telegramId)
+    public Task<User?> FindAsync(long telegramId, CancellationToken cancellationToken = default)
     {
         return context.Users
             .Where(u => u.TelegramId == telegramId)
-            .FirstOrDefaultAsyncEF();
+            .FirstOrDefaultAsyncEF(cancellationToken);
     }
 
-    public async Task<Guid> CreateAsync(User user)
+    public async Task<Guid> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         var timestamp = dateTimeProvider.UtcNow;
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         
         user.Color = Palette.RandomColor();
-        user.Organizations = new List<Organization>
-        {
-            OrganizationDefaults.GetNewOrganizationEntity(
-                user.Id,
-                "Personal",
-                Palette.RandomColor(),
-                timestamp,
-                isPersonal: true)
-        };
-        
         context.Users.Add(user);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
+
+        var organization = OrganizationDefaults.GetNewOrganizationEntity(
+            user.Id,
+            user.TelegramLanguageCode == "ru" ? "Без организации" : "No organization", // TODO - move to lang files
+            Palette.RandomColor(),
+            timestamp,
+            isPersonal: true);
+        
+        context.Organizations.Add(organization);
+        await context.SaveChangesAsync(cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
         
         return user.Id;
     }

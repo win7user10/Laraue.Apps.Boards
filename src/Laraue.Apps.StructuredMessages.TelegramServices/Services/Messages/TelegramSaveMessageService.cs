@@ -256,7 +256,7 @@ public class TelegramSaveMessageService(
         var cardForMessageIsCreated = (firstGroupMessageData?.CardId).HasValue;
         if (!cardForMessageIsCreated)
         {
-            var statusId = await GetStatusIdToSaveMessage(cancellationToken);
+            var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
             var card = new Issue
             {
                 Content = request.Text,
@@ -322,7 +322,7 @@ public class TelegramSaveMessageService(
         // Message is not stored, save it // TODO - store only if it is the first message
         if (savedMessage?.IssueId is null)
         {
-            var statusId = await GetStatusIdToSaveMessage(cancellationToken);
+            var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
             
             var card = new Issue
             {
@@ -362,10 +362,19 @@ public class TelegramSaveMessageService(
         };
     }
 
-    private async Task<long> GetStatusIdToSaveMessage(CancellationToken cancellationToken)
+    private async Task<long> GetStatusIdToSaveMessage(Guid userId, CancellationToken cancellationToken)
     {
+        var organizationData = await context.Organizations
+            .Where(o => o.Type == OrganizationType.Personal)
+            .Where(o => o.OwnerId == userId)
+            .Select(o => new { o.Id })
+            .FirstOrThrowNotFoundEFAsync($"Personal org is not defined for user: {userId}", cancellationToken);
+        
         var statusData = await context.Statuses
-            .Where(s => s.Epic!.IsDefault && s.Epic.Space!.IsDefault)
+            .Where(s => 
+                s.Epic!.IsDefault
+                && s.Epic.Space!.IsDefault
+                && s.Epic.Space.OrganizationId == organizationData.Id)
             .OrderBy(s => s.SortOrder)
             .Select(s => new { s.Id })
             .FirstOrThrowNotFoundEFAsync("Status to save TG message is not defined", cancellationToken);
