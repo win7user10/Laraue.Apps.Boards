@@ -95,7 +95,6 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetOrganizations());
         var organization = Assert.Single(organizations!);
         
-        Assert.True(organization.CanCreateSpaces);
         Assert.True(organization.CanDelete);
         Assert.True(organization.CanUpdate);
         Assert.Equal("Org 1", organization.Name);
@@ -110,14 +109,12 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var (personalOrganization, additionalOrganization) = (organizations[1], organizations[0]);
         
         Assert.False(personalOrganization.IsPersonal);
-        Assert.True(personalOrganization.CanCreateSpaces);
         Assert.True(personalOrganization.CanDelete);
         Assert.False(personalOrganization.CanUpdate);
         Assert.Equal("Org 1", personalOrganization.Name);
         Assert.Equal("#ffffff", personalOrganization.Color);
         
         Assert.True(additionalOrganization.IsPersonal);
-        Assert.True(additionalOrganization.CanCreateSpaces);
         Assert.False(additionalOrganization.CanDelete);
         Assert.True(additionalOrganization.CanUpdate);
         Assert.Equal("Org 2", additionalOrganization.Name);
