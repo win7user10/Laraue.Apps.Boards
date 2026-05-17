@@ -16,6 +16,10 @@ public interface IMassMovementService
         MoveSpaceEpicsRequest request,
         CancellationToken cancellationToken);
     
+    Task MoveEpic(
+        MoveEpicRequest request,
+        CancellationToken cancellationToken);
+    
     Task<DestinationSpace[]> GetDestinationSpaces(
         GetDestinationSpacesRequest request,
         CancellationToken cancellationToken);
@@ -45,10 +49,7 @@ public class MassMovementService(
 
     public async Task MoveSpaceEpics(MoveSpaceEpicsRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
-            request.AuthData,
-            AdminAccessLevel.MassMove,
-            cancellationToken);
+        await HasMassMovePermissionOrThrow(request.AuthData, cancellationToken);
 
         var sourceSpaceBelongsToCurrentOrganization = await context.Spaces
             .Where(x => x.Id == request.SpaceId)
@@ -58,25 +59,33 @@ public class MassMovementService(
         if (!sourceSpaceBelongsToCurrentOrganization)
             throw new ForbiddenException($"Space is not exists: {request.SpaceId} in organization");
 
-        var canCreateEpicsInNewSpace = await spacesAccessService.CanCreateEpics(
-            request.AuthData,
-            request.NewSpaceId,
-            cancellationToken);
-        
-        if (!canCreateEpicsInNewSpace)
-            throw new ForbiddenException($"Space is not exists: {request.NewSpaceId} or epic creation is forbidden");
+        await CanCreateEpicsOrThrow(request.AuthData, request.NewSpaceId, cancellationToken);
 
         await massMovementService.MoveSpaceEpics(request.SpaceId, request.NewSpaceId, cancellationToken);
+    }
+
+    public async Task MoveEpic(MoveEpicRequest request, CancellationToken cancellationToken)
+    {
+        await HasMassMovePermissionOrThrow(request.AuthData, cancellationToken);
+        
+        var sourceEpicBelongsToCurrentOrganization = await context.Epics
+            .Where(x => x.Id == request.Id)
+            .Where(x => x.Space!.OrganizationId == request.AuthData.OrganizationId)
+            .AnyAsyncEF(cancellationToken);
+        
+        if (!sourceEpicBelongsToCurrentOrganization)
+            throw new ForbiddenException($"Epic is not exists: {request.Id} in organization");
+        
+        await CanCreateEpicsOrThrow(request.AuthData, request.NewSpaceId, cancellationToken);
+        
+        await massMovementService.MoveEpic(request.Id, request.NewSpaceId, cancellationToken);
     }
 
     public async Task<DestinationSpace[]> GetDestinationSpaces(
         GetDestinationSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
-            request.AuthData,
-            AdminAccessLevel.MassMove,
-            cancellationToken);
+        await HasMassMovePermissionOrThrow(request.AuthData, cancellationToken);
         
         return await spacesAccessService.GetAvailableForRead(
             request.AuthData with { OrganizationId = request.OrganizationId },
@@ -91,6 +100,51 @@ public class MassMovementService(
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
     }
+
+    private async Task CanCreateEpicsOrThrow(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken)
+    {
+        var canCreateEpicsInNewSpace = await spacesAccessService.CanCreateEpics(
+            authData,
+            spaceId,
+            cancellationToken);
+        
+        if (!canCreateEpicsInNewSpace)
+            throw new ForbiddenException($"Space is not exists: {spaceId} or epic creation is forbidden");
+    }
+    
+    private Task HasMassMovePermissionOrThrow(
+        OrganizationAuthData authData,
+        CancellationToken cancellationToken)
+    {
+        return organizationAccessService.HasAccessOrThrow(
+            authData,
+            AdminAccessLevel.MassMove,
+            cancellationToken);
+    }
+}
+
+public record MoveSpaceRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long Id { get; set; }
+    public long NewOrganizationId { get; set; }
+}
+
+public record MoveSpaceEpicsRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long SpaceId { get; set; }
+    public long NewSpaceId { get; set; }
+}
+
+public record MoveEpicRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long Id { get; set; }
+    public long NewSpaceId { get; set; }
 }
 
 public record GetDestinationSpacesRequest

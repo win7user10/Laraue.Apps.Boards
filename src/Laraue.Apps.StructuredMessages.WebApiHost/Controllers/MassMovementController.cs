@@ -41,6 +41,22 @@ public class MassMovementController(IMassMovementService service) : ControllerBa
             cancellationToken);
     }
     
+    [HttpPost("epic/{id:long}/to-space/{newSpaceId:long}")]
+    public Task MoveEpic(
+        long id,
+        long newSpaceId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.MoveEpic(
+            new MoveEpicRequest
+            {
+                Id = id,
+                NewSpaceId = newSpaceId,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+    
     [HttpGet("organization/{id:long}/spaces")]
     public Task<DestinationSpace[]> GetDestinationSpaces(
         long id,

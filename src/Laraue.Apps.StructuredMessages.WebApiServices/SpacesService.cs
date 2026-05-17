@@ -159,20 +159,6 @@ public record DeleteSpaceRequest
     public long Id { get; set; }
 }
 
-public record MoveSpaceRequest
-{
-    public OrganizationAuthData AuthData { get; set; } = new();
-    public long Id { get; set; }
-    public long NewOrganizationId { get; set; }
-}
-
-public record MoveSpaceEpicsRequest
-{
-    public OrganizationAuthData AuthData { get; set; } = new();
-    public long SpaceId { get; set; }
-    public long NewSpaceId { get; set; }
-}
-
 public record GetSpaceRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
