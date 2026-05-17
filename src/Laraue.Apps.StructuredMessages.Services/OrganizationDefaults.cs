@@ -17,7 +17,9 @@ public class OrganizationDefaults
             EpicsAccessLevel = ChildrenAccessLevel.All,
             SpacesAccessLevel = ChildrenAccessLevel.All,
             IssuesAccessLevel = ChildrenAccessLevel.All,
-            AdminAccessLevel = isPersonal ? AdminAccessLevel.UpdateOrganization : AdminAccessLevel.All,
+            AdminAccessLevel = isPersonal
+                ? AdminAccessLevel.UpdateOrganization | AdminAccessLevel.MassMove
+                : AdminAccessLevel.All,
             UserId = userId,
         };
         

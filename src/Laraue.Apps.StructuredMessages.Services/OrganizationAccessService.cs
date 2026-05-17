@@ -13,7 +13,8 @@ public interface IOrganizationAccessService
         Func<IQueryable<OrganizationUser>, Task<T>> map);
     
     Task CanCreateSpacesOrThrow(
-        OrganizationAuthData authData,
+        long organizationId,
+        Guid userId,
         CancellationToken cancellationToken);
     
     Task HasAccessOrThrow(
@@ -33,18 +34,19 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
     }
 
     public async Task CanCreateSpacesOrThrow(
-        OrganizationAuthData authData,
+        long organizationId,
+        Guid userId,
         CancellationToken cancellationToken)
     {
-        var result = await GetAvailable(authData.UserId, (organizationUsers) =>
+        var result = await GetAvailable(userId, (organizationUsers) =>
         {
             return organizationUsers
-                .Where(ou => ou.OrganizationId == authData.OrganizationId)
+                .Where(ou => ou.OrganizationId == organizationId)
                 .AnyAsyncEF(ou => ou.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create), cancellationToken);
         });
         
         if (!result)
-            throw new NotFoundException($"Organization: {authData.OrganizationId} is unavailable or permission: {ChildrenAccessLevel.Create} for spaces is missing");
+            throw new NotFoundException($"Organization: {organizationId} is unavailable or permission: {ChildrenAccessLevel.Create} for spaces is missing");
     }
 
     public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)

@@ -1,0 +1,57 @@
+﻿using Laraue.Apps.StructuredMessages.WebApiServices;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
+
+[Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+[ApiController]
+[Route("/api/mass-movement")]
+public class MassMovementController(IMassMovementService service) : ControllerBase
+{
+    [HttpPost("space/{id:long}/to-organization/{organizationId:long}")]
+    public Task MoveSpace(
+        long id,
+        long organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.MoveSpace(
+            new MoveSpaceRequest
+            {
+                Id = id,
+                NewOrganizationId = organizationId,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+    
+    [HttpPost("space/{id:long}/epics-to-space/{newSpaceId:long}")]
+    public Task MoveSpaceEpics(
+        long id,
+        long newSpaceId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.MoveSpaceEpics(
+            new MoveSpaceEpicsRequest
+            {
+                SpaceId = id,
+                NewSpaceId = newSpaceId,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+    
+    [HttpGet("organization/{id:long}/spaces")]
+    public Task<DestinationSpace[]> GetDestinationSpaces(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        return service.GetDestinationSpaces(
+            new GetDestinationSpacesRequest
+            {
+                OrganizationId = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+}

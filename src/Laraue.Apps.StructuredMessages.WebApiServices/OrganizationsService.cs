@@ -99,6 +99,7 @@ public class OrganizationsService(
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     IsPersonal = x.Organization.Type == OrganizationType.Personal,
+                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
                 })
                 .ToListAsyncEF(cancellationToken));
 
@@ -118,6 +119,7 @@ public class OrganizationsService(
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
+                    CanMassMove = x.AdminAccessLevel.HasFlag(AdminAccessLevel.MassMove),
                 })
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
     }
@@ -442,6 +444,7 @@ public record OrganizationListDto
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
     public required bool IsPersonal { get; set; }
+    public required bool CanCreateSpaces { get; set; }
 }
 
 public record OrganizationDto
@@ -450,6 +453,7 @@ public record OrganizationDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required bool CanCreateSpaces { get; set; }
+    public required bool CanMassMove { get; set; }
     public required bool CanManage { get; set; }
 }
 

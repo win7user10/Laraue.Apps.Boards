@@ -1,6 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -84,7 +87,8 @@ public class SpacesService(
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.CanCreateSpacesOrThrow(
-            request.AuthData,
+            request.AuthData.OrganizationId,
+            request.AuthData.UserId,
             cancellationToken);
 
         return await coreSpacesService.Create(
@@ -153,6 +157,20 @@ public record DeleteSpaceRequest
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
+}
+
+public record MoveSpaceRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long Id { get; set; }
+    public long NewOrganizationId { get; set; }
+}
+
+public record MoveSpaceEpicsRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long SpaceId { get; set; }
+    public long NewSpaceId { get; set; }
 }
 
 public record GetSpaceRequest
