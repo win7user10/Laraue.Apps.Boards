@@ -13,7 +13,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
 public interface IOrganizationsService
 {
-    Task<OrganizationDto[]> GetOrganizations(
+    Task<OrganizationListDto[]> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken);
     
@@ -81,15 +81,25 @@ public class OrganizationsService(
     IOrganizationAccessService organizationAccessService)
     : IOrganizationsService
 {
-    public async Task<OrganizationDto[]> GetOrganizations(
+    public async Task<OrganizationListDto[]> GetOrganizations(
         GetOrganizationsRequest request,
         CancellationToken cancellationToken)
     {
         var allOrganizations = await organizationAccessService.GetAvailable(
             request.UserId,
-            organizationUsers => Project(organizationUsers
+            organizationUsers => organizationUsers
                 .OrderByDescending(x => x.Organization!.Type)
-                .ThenBy(x => x.Organization!.Name))
+                .ThenBy(x => x.Organization!.Name)
+                .Select(x => new OrganizationListDto
+                {
+                    Id = x.Organization!.Id,
+                    CanUpdate = x.AdminAccessLevel.HasFlag(AdminAccessLevel.UpdateOrganization),
+                    CanDelete = x.Organization.Type != OrganizationType.Personal &&
+                                x.AdminAccessLevel.HasFlag(AdminAccessLevel.DeleteOrganization),
+                    Name = x.Organization.Name,
+                    Color = x.Organization.Color,
+                    IsPersonal = x.Organization.Type == OrganizationType.Personal,
+                })
                 .ToListAsyncEF(cancellationToken));
 
         return allOrganizations.ToArray();
@@ -99,26 +109,17 @@ public class OrganizationsService(
     {
         return organizationAccessService.GetAvailable(
             request.AuthData.UserId,
-            organizations => Project(organizations
-                .Where(o => o.OrganizationId == request.AuthData.OrganizationId))
+            organizations => organizations
+                .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
+                .Select(x => new OrganizationDto
+                {
+                    Id = x.Organization!.Id,
+                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                    Name = x.Organization.Name,
+                    Color = x.Organization.Color,
+                    CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
+                })
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
-    }
-
-    private IQueryable<OrganizationDto> Project(IQueryable<OrganizationUser> query)
-    {
-        return query
-            .Select(x => new OrganizationDto
-            {
-                Id = x.Organization!.Id,
-                CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
-                CanUpdate = x.AdminAccessLevel.HasFlag(AdminAccessLevel.UpdateOrganization),
-                CanDelete = x.Organization.Type != OrganizationType.Personal &&
-                            x.AdminAccessLevel.HasFlag(AdminAccessLevel.DeleteOrganization),
-                Name = x.Organization.Name,
-                Color = x.Organization.Color,
-                IsPersonal = x.Organization.Type == OrganizationType.Personal,
-                CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
-            });
     }
 
     public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -433,16 +434,23 @@ public record GetOrganizationRequest
     public required OrganizationAuthData AuthData { get; set; }
 }
 
+public record OrganizationListDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
+    public required string? Color { get; set; }
+    public required bool CanUpdate { get; set; }
+    public required bool CanDelete { get; set; }
+    public required bool IsPersonal { get; set; }
+}
+
 public record OrganizationDto
 {
     public long Id { get; set; }
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required bool CanCreateSpaces { get; set; }
-    public required bool CanUpdate { get; set; }
-    public required bool CanDelete { get; set; }
     public required bool CanManage { get; set; }
-    public required bool IsPersonal { get; set; }
 }
 
 public record JoinOrganizationRequest

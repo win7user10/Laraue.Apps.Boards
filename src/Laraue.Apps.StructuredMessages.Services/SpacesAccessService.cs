@@ -83,19 +83,9 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         long spaceId,
         CancellationToken cancellationToken)
     {
-        var accessLevels = await accessService
-            .GetChildrenAccessLevels(authData, cancellationToken);
+        var accessLevel = await GetChildrenAccessLevel(authData, spaceId, cancellationToken);
         
-        if (accessLevels.EpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            return true;
-
-        return await context.DirectSpacePermissions
-            .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
-            .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.ChildrenEpicsAccessLevel.HasFlag(ChildrenAccessLevel.Create))
-            .AnyAsyncEF(
-                sos => sos.SpaceId == spaceId,
-                cancellationToken);
+        return accessLevel.HasFlag(ChildrenAccessLevel.Create);
     }
 
     public async Task<ChildrenAccessLevel> GetChildrenAccessLevel(

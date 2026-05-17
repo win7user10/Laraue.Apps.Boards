@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -24,6 +25,22 @@ public interface ICoreSpacesService
     
     Task Delete(
         long id,
+        CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Move space to the new organization.
+    /// </summary>
+    Task Move(
+        long spaceId,
+        long newOrganizationId,
+        CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Move space epics to the new space of any organization.
+    /// </summary>
+    Task MoveEpics(
+        long spaceId,
+        long newSpaceId,
         CancellationToken cancellationToken);
 }
 
@@ -79,8 +96,6 @@ public class CoreSpacesService(
 
     public async Task Delete(long id, CancellationToken cancellationToken)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
         var defaultSpace = await context.Spaces
             .Where(x => x.Id == id)
             .Select(x => x.Organization!)
@@ -102,6 +117,8 @@ public class CoreSpacesService(
         if (defaultSpace.NewStatusId is null)
             throw new BadRequestException(nameof(id), $"Backlog or default status for Backlog was not found in Default Space to move issues from deleting Space:{id}");
         
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
         await context.Issues
             .Where(x => x.Status!.Epic!.SpaceId == id)
             .ExecuteUpdateAsync(u => u
@@ -121,5 +138,31 @@ public class CoreSpacesService(
             .ExecuteDeleteAsync(cancellationToken);
         
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task Move(long spaceId, long newOrganizationId, CancellationToken cancellationToken)
+    {
+        var sourceData = await context.Spaces
+            .Where(x => x.Id == spaceId)
+            .Select(x => new { x.IsDefault })
+            .FirstOrThrowNotFoundEFAsync($"Space: {spaceId} is not found", cancellationToken);
+        
+        if (sourceData.IsDefault)
+            throw new ForbiddenException("Default space cannot be moved. Move space epics instead.");
+
+        await context.Spaces
+            .Where(x => x.Id == spaceId)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(p => p.OrganizationId, newOrganizationId),
+                cancellationToken);
+    }
+
+    public async Task MoveEpics(long spaceId, long newSpaceId, CancellationToken cancellationToken)
+    {
+        await context.Epics
+            .Where(x => x.SpaceId == spaceId)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(epic => epic.SpaceId, newSpaceId),
+                cancellationToken);
     }
 }

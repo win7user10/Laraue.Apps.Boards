@@ -53,7 +53,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
     }
     
     [HttpGet]
-    public Task<OrganizationDto[]> GetOrganizations(
+    public Task<OrganizationListDto[]> GetOrganizations(
         CancellationToken cancellationToken = default)
     {
         return organizationsService.GetOrganizations(
@@ -202,7 +202,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             },
             cancellationToken);
     }
-    
+
     [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
     [HttpGet("members")]
     public Task<OrganizationMember[]> GetOrganizationMembers(
