@@ -78,4 +78,48 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var notMovedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == backlogEpic.Id);
         Assert.Equal(sourceSpace.Id, notMovedEpic.SpaceId);
     }
+    
+    [Fact]
+    public async Task User_ShouldMoveNotDefaultEpic_WhenHasMassMovePermission()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var personalOrganization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId)));
+        var organization = await testScope.InitializeOrganization(userId);
+        var epicToMove = personalOrganization.GetEpic(1, 1);
+        var spaceToReceive = organization.GetSpace(0);
+        
+        await _controller
+            .WithOrganizationAuthorization(personalOrganization.Id, userId)
+            .Execute(x => x.MoveEpic(epicToMove.Id, spaceToReceive.Id));
+        
+        var movedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == epicToMove.Id);
+        Assert.Equal(spaceToReceive.Id, movedEpic.SpaceId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotMoveDefaultEpic_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var personalOrganization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId)));
+        var organization = await testScope.InitializeOrganization(userId);
+        var epicToMove = personalOrganization.GetEpic(1, 0);
+        var spaceToReceive = organization.GetSpace(0);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _controller
+            .WithOrganizationAuthorization(personalOrganization.Id, userId)
+            .Execute(x => x.MoveEpic(epicToMove.Id, spaceToReceive.Id)));
+        
+        var forbidden = ex.HasInnerException<ForbiddenException>();
+        Assert.Equal("Default epic cannot be moved.", forbidden.Message);
+    }
 }

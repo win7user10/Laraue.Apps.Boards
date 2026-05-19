@@ -69,7 +69,7 @@ public class CoreMassMovementService(DatabaseContext context) : ICoreMassMovemen
             .FirstOrThrowNotFoundEFAsync($"Epic: {epicId} is not found", cancellationToken);
         
         if (sourceData.IsDefault)
-            throw new ForbiddenException("Default epic cannot be moved. Move epic issues instead.");
+            throw new ForbiddenException("Default epic cannot be moved.");
         
         await context.Epics
             .Where(x => x.Id == epicId)
