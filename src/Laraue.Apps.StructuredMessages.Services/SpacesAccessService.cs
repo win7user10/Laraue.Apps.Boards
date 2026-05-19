@@ -180,7 +180,7 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         return context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.EntityAccessLevel.HasFlag(ChildrenAccessLevel.Read));
+            .Where(sos => (sos.EntityAccessLevel & EntityAccessLevel.Read) == EntityAccessLevel.Read);
     }
 }
 

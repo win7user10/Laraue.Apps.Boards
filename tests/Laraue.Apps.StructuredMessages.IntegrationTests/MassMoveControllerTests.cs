@@ -176,4 +176,34 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var movedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == epicToMove.Id);
         Assert.Equal(spaceToReceive.Id, movedEpic.SpaceId);
     }
+
+    [Fact]
+    public async Task GetDestinationSpaces_ShouldReturnOnlySpaces_WhereUserCanCreateEpics()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        
+        var sourceOrganization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u
+                    .SetAdminAccessLevel(AdminAccessLevel.MassMove)));
+        
+        var destinationOrganization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddSpace(userId)
+                .AddSpace(userId, s => s.WithName("Allowed"))
+                .AddUser(participatorId, u => u // User has create epics access only to last space
+                    .SetSpaceEpicsAccessLevel(2, ChildrenAccessLevel.Create)));
+        
+        var allowedSpaces = await _controller
+            .WithOrganizationAuthorization(sourceOrganization.Id, participatorId)
+            .Execute(x => x.GetDestinationSpaces(destinationOrganization.Id));
+        
+        Assert.NotNull(allowedSpaces);
+        var allowedSpace = Assert.Single(allowedSpaces);
+        Assert.Equal("Allowed", allowedSpace.Name);
+    }
 }

@@ -363,7 +363,10 @@ public class CoreOrganizationsService(
                 }
             }
             
-            if (directSpaceAccess.Value.Issues > ChildrenAccessLevel.None || directSpaceAccess.Value.Self > EntityAccessLevel.None)
+            if (
+                directSpaceAccess.Value.Issues > ChildrenAccessLevel.None
+                    || directSpaceAccess.Value.Epics > ChildrenAccessLevel.None
+                    || directSpaceAccess.Value.Self > EntityAccessLevel.None)
                 directSpaceAccess.Value.Self |= EntityAccessLevel.Read;
         }
     }
