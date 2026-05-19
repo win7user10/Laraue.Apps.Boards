@@ -46,14 +46,19 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         var accessLevels = await accessService
             .GetChildrenAccessLevels(authData, cancellationToken);
         
-        var accessToViewSpaces = accessLevels.SpacesAccessLevel;
-        if (accessToViewSpaces.HasFlag(ChildrenAccessLevel.Read))
-            return await map(GetGlobalReadableSpacesQuery(authData, accessLevels.SpacesAccessLevel.ToEntityAccessLevel()));
+        var spaceAccessLevel = accessLevels.SpacesAccessLevel;
+        var epicsAccessLevel = accessLevels.EpicsAccessLevel;
+        if (spaceAccessLevel.HasFlag(ChildrenAccessLevel.Read))
+            return await map(GetGlobalReadableSpacesQuery(
+                authData,
+                accessLevels.SpacesAccessLevel.ToEntityAccessLevel(),
+                epicsAccessLevel));
         
         return await map(GetDirectReadableSpacesQuery(authData)
             .Select(x => new SpaceWithAccessLevel(
                 x.Space!,
-                x.EntityAccessLevel))); 
+                x.EntityAccessLevel,
+                x.ChildrenEpicsAccessLevel))); 
     }
 
     public async Task HasAccessOrThrow(
@@ -121,7 +126,10 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         return result;
     }
 
-    private IQueryable<SpaceWithAccessLevel> GetGlobalReadableSpacesQuery(OrganizationAuthData authData, EntityAccessLevel accessLevel)
+    private IQueryable<SpaceWithAccessLevel> GetGlobalReadableSpacesQuery(
+        OrganizationAuthData authData,
+        EntityAccessLevel accessLevel,
+        ChildrenAccessLevel epicAccessLevel)
     {
         return context.Spaces
             .Where(s => s.OrganizationId == authData.OrganizationId)
@@ -133,7 +141,8 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
                 spaceUser.Space,
                 MergeGlobalAndDirectLevels(
                     spaceUser,
-                    AdjustSpaceAccessLevel(spaceUser, accessLevel))));
+                    AdjustSpaceAccessLevel(spaceUser, accessLevel)),
+                MergeGlobalAndDirectEpicLevels(spaceUser, epicAccessLevel)));
     }
 
     [ExpressionMethod(nameof(AdjustSpaceAccessLevelImpl))]
@@ -143,6 +152,16 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
     private static Expression<Func<SpaceWithPermission, EntityAccessLevel, EntityAccessLevel>> AdjustSpaceAccessLevelImpl()
         => (spaceUser, globalAccessLevel) => spaceUser.Space.IsDefault
             ? globalAccessLevel & (EntityAccessLevel.Read | EntityAccessLevel.Update)
+            : globalAccessLevel;
+    
+
+    [ExpressionMethod(nameof(MergeGlobalAndDirectEpicLevelsImpl))]
+    private static ChildrenAccessLevel MergeGlobalAndDirectEpicLevels(SpaceWithPermission spaceUser, ChildrenAccessLevel globalAccessLevel)
+        => throw new InvalidOperationException("LINQ translation only.");
+    
+    private static Expression<Func<SpaceWithPermission, ChildrenAccessLevel, ChildrenAccessLevel>> MergeGlobalAndDirectEpicLevelsImpl()
+        => (spaceUser, globalAccessLevel) => spaceUser.DirectSpacePermission != null
+            ? spaceUser.DirectSpacePermission.ChildrenEpicsAccessLevel | globalAccessLevel
             : globalAccessLevel;
 
     [ExpressionMethod(nameof(MergeGlobalAndDirectLevelsImpl))]
@@ -161,8 +180,11 @@ public class SpacesAccessService(DatabaseContext context, IAccessService accessS
         return context.DirectSpacePermissions
             .Where(sos => sos.OrganizationUser!.OrganizationId == authData.OrganizationId)
             .Where(sos => sos.OrganizationUser!.UserId == authData.UserId)
-            .Where(sos => sos.EntityAccessLevel.HasFlag(ChildrenAccessLevel.Read));
+            .Where(sos => (sos.EntityAccessLevel & EntityAccessLevel.Read) == EntityAccessLevel.Read);
     }
 }
 
-public record SpaceWithAccessLevel(Space Space, EntityAccessLevel EntityAccessLevel);
+public record SpaceWithAccessLevel(
+    Space Space,
+    EntityAccessLevel EntityAccessLevel,
+    ChildrenAccessLevel ChildrenAccessLevel);

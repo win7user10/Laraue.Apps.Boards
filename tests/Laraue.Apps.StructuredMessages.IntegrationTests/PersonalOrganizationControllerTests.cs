@@ -133,9 +133,8 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
             .Execute(x => x.GetOrganization());
         
         Assert.NotNull(result);
-        Assert.False(result.CanDelete);
-        Assert.True(result.CanUpdate);
         Assert.False(result.CanManage);
+        Assert.True(result.CanMassMove);
         Assert.True(result.CanCreateSpaces);
     }
 }

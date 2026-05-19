@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -79,8 +80,6 @@ public class CoreSpacesService(
 
     public async Task Delete(long id, CancellationToken cancellationToken)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
         var defaultSpace = await context.Spaces
             .Where(x => x.Id == id)
             .Select(x => x.Organization!)
@@ -102,6 +101,8 @@ public class CoreSpacesService(
         if (defaultSpace.NewStatusId is null)
             throw new BadRequestException(nameof(id), $"Backlog or default status for Backlog was not found in Default Space to move issues from deleting Space:{id}");
         
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
         await context.Issues
             .Where(x => x.Status!.Epic!.SpaceId == id)
             .ExecuteUpdateAsync(u => u
