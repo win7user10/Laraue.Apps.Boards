@@ -35,10 +35,7 @@ public class MassMovementService(
 {
     public async Task MoveSpace(MoveSpaceRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
-            request.AuthData,
-            AdminAccessLevel.MassMove,
-            cancellationToken);
+        await HasMassMovePermissionOrThrow(request.AuthData, cancellationToken);
 
         await organizationAccessService.CanCreateSpacesOrThrow(
             request.NewOrganizationId,
