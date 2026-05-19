@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
@@ -59,7 +60,7 @@ public class MassMovementService(
         if (!sourceSpaceBelongsToCurrentOrganization)
             throw new ForbiddenException($"Space is not exists: {request.SpaceId} in organization");
 
-        await CanCreateEpicsOrThrow(request.AuthData, request.NewSpaceId, cancellationToken);
+        await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
 
         await massMovementService.MoveSpaceEpics(request.SpaceId, request.NewSpaceId, cancellationToken);
     }
@@ -76,7 +77,7 @@ public class MassMovementService(
         if (!sourceEpicBelongsToCurrentOrganization)
             throw new ForbiddenException($"Epic is not exists: {request.Id} in organization");
         
-        await CanCreateEpicsOrThrow(request.AuthData, request.NewSpaceId, cancellationToken);
+        await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
         
         await massMovementService.MoveEpic(request.Id, request.NewSpaceId, cancellationToken);
     }
@@ -102,17 +103,27 @@ public class MassMovementService(
     }
 
     private async Task CanCreateEpicsOrThrow(
-        OrganizationAuthData authData,
+        Guid userId,
         long spaceId,
         CancellationToken cancellationToken)
     {
+        var organizationId = await context.Spaces
+            .Where(x => x.Id == spaceId)
+            .Select(x => x.OrganizationId)
+            .FirstOrThrowNotFoundEFAsync(SpaceIsNotExistsError(spaceId), cancellationToken);
+
         var canCreateEpicsInNewSpace = await spacesAccessService.CanCreateEpics(
-            authData,
+            new OrganizationAuthData { OrganizationId = organizationId, UserId = userId },
             spaceId,
             cancellationToken);
         
         if (!canCreateEpicsInNewSpace)
-            throw new ForbiddenException($"Space is not exists: {spaceId} or epic creation is forbidden");
+            throw new ForbiddenException(SpaceIsNotExistsError(spaceId));
+    }
+
+    private static string SpaceIsNotExistsError(long spaceId)
+    {
+        return $"Space is not exists: {spaceId} or epic creation is forbidden";
     }
     
     private Task HasMassMovePermissionOrThrow(
