@@ -42,7 +42,7 @@ public class CoreMassMovementService(DatabaseContext context) : ICoreMassMovemen
             .FirstOrThrowNotFoundEFAsync($"Space: {spaceId} is not found", cancellationToken);
         
         if (sourceData.IsDefault)
-            throw new ForbiddenException("Default space cannot be moved. Move space epics instead.");
+            throw new ForbiddenException("Default space cannot be moved.");
 
         await context.Spaces
             .Where(x => x.Id == spaceId)
