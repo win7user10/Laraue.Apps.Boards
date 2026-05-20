@@ -9,7 +9,7 @@ namespace Laraue.Apps.StructuredMessages.IntegrationTests;
 [Collection("IntegrationTest")]
 public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApiTestHost>
 {
-    private readonly Proxy<MassMovementController> _controller = host.Controller<MassMovementController>();
+    private readonly Proxy<MovementController> _controller = host.Controller<MovementController>();
     
     [Fact]
     public async Task User_ShouldMoveNotDefaultSpace_WhenHasMassMovePermission()
@@ -205,5 +205,154 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         Assert.NotNull(allowedSpaces);
         var allowedSpace = Assert.Single(allowedSpaces);
         Assert.Equal("Allowed", allowedSpace.Name);
+    }
+
+    [Fact]
+    public async Task User_ShouldMoveIssue_WhenIsOwner()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e.AddStatus()))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        await _controller
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.MoveIssue(
+                issue.Id,
+                newStatus.Id));
+
+        issue = await testScope.Database.Issues.FirstOrDefaultAsyncEF(e => e.Id == issue.Id);
+        Assert.NotNull(issue);
+        Assert.Equal(newStatus.Id, issue.StatusId);
+    }
+
+    [Fact]
+    public async Task User_ShouldMoveIssue_WhenHasCreateIssuesAccessInEpicAndIssueUpdateAccess()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Create | ChildrenAccessLevel.Update))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e.AddStatus()))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        await _controller
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.MoveIssue(issue.Id, newStatus.Id));
+
+        issue = await testScope.Database.Issues.FirstOrDefaultAsyncEF(e => e.Id == issue.Id);
+        Assert.NotNull(issue);
+        Assert.Equal(newStatus.Id, issue.StatusId);
+    }
+
+    [Fact]
+    public async Task User_ShouldNotMoveIssue_WhenHasCreateIssuesAccessInEpicButIssueUpdateAccessMissing()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Create))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e.AddStatus()))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _controller
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.MoveIssue(issue.Id, newStatus.Id)));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Update is missing", notFound.Message);
+    }
+
+    [Fact]
+    public async Task User_ShouldNotMoveIssue_WhenHasIssueUpdateAccessButCreateIssueAccessIsMissing()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var participatorId = await testScope.CreateUser();
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Update))
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e.AddStatus()))
+                .AddIssueToDefaultStatus(userId));
+
+        var issue = organization.GetIssue(0, 0, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _controller
+            .WithOrganizationAuthorization(organization.Id, participatorId)
+            .Execute(x => x.MoveIssue(issue.Id, newStatus.Id)));
+        
+        var notFound = ex.HasInnerException<NotFoundException>();
+        Assert.Equal($"Status: {newStatus.Id} is not exists or permission: Update missing on Epic", notFound.Message);
+    }
+    
+    
+    [Fact]
+    public async Task User_ShouldMovePersonalIssue_WhenStatusExists()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddStatus(st => st.WithName("Beautiful status"))
+                        .AddIssue(userId, 0))));
+
+        var issue = organization.GetIssue(1, 1, 0, 0);
+        var newStatus = organization.GetStatus(1, 1, 1);
+        
+        await _controller
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.MoveIssue(issue.Id, newStatus.Id));
+
+        issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
+        Assert.Equal(newStatus.Id, issue.StatusId);
+    }
+    
+    [Fact]
+    public async Task User_ShouldNotMovePersonalIssue_WhenStatusNotExists()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddSpace(userId, s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0))));
+
+        var issue = organization.GetIssue(1, 1, 0, 0);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _controller
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.MoveIssue(issue.Id, 0)));
+        
+        var notFoundException = ex.HasInnerException<NotFoundException>();
+        Assert.Equal("Status: 0 is not exists or permission: Update missing on Epic", notFoundException.Message);
     }
 }

@@ -93,62 +93,6 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
     }
     
     [Fact]
-    public async Task User_ShouldMovePersonalIssue_WhenStatusExists()
-    {
-        using var testScope = host.CreateTestScope();
-        var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
-            userId,
-            o => o
-                .AddSpace(userId, s => s
-                    .AddEpic(userId, e => e
-                        .AddStatus(st => st.WithName("Beautiful status"))
-                        .AddIssue(userId, 0))));
-
-        var issue = organization.GetIssue(1, 1, 0, 0);
-        var newStatus = organization.GetStatus(1, 1, 1);
-        
-        await _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Move(
-                issue.Id,
-                new MoveIssueRequest
-                {
-                    StatusId = newStatus.Id,
-                }));
-
-        issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
-        Assert.Equal(newStatus.Id, issue.StatusId);
-    }
-    
-    [Fact]
-    public async Task User_ShouldNotMovePersonalIssue_WhenStatusNotExists()
-    {
-        using var testScope = host.CreateTestScope();
-        var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(
-            userId,
-            o => o
-                .AddSpace(userId, s => s
-                    .AddEpic(userId, e => e
-                        .AddIssue(userId, 0))));
-
-        var issue = organization.GetIssue(1, 1, 0, 0);
-
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _issuesController
-            .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Move(
-                issue.Id,
-                new MoveIssueRequest
-                {
-                    StatusId = 0,
-                })));
-        
-        var notFoundException = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Status: 0 is not exists or permission: Update missing on Epic", notFoundException.Message);
-    }
-    
-    [Fact]
     public async Task User_ShouldGetPersonalIssue_Always()
     {
         using var testScope = host.CreateTestScope();

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface ICoreMassMovementService
+public interface ICoreMovementService
 {
     /// <summary>
     /// Move space to the new organization.
@@ -30,9 +30,17 @@ public interface ICoreMassMovementService
         long epicId,
         long newSpaceId,
         CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Move issue to new status.
+    /// </summary>
+    Task MoveIssue(
+        long issueId,
+        long statusId,
+        CancellationToken ct);
 }
 
-public class CoreMassMovementService(DatabaseContext context) : ICoreMassMovementService
+public class CoreMovementService(DatabaseContext context, ICoreIssuesService issuesService) : ICoreMovementService
 {
     public async Task MoveSpace(long spaceId, long newOrganizationId, CancellationToken cancellationToken)
     {
@@ -76,5 +84,16 @@ public class CoreMassMovementService(DatabaseContext context) : ICoreMassMovemen
             .ExecuteUpdateAsync(u => u
                 .SetProperty(epic => epic.SpaceId, newSpaceId),
                 cancellationToken);
+    }
+    
+    public async Task MoveIssue(
+        long issueId,
+        long statusId,
+        CancellationToken ct)
+    {
+        await issuesService.Update(
+            issueId,
+            update => update.SetProperty(x => x.StatusId, statusId),
+            ct);
     }
 }

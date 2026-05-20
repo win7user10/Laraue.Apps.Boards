@@ -7,7 +7,7 @@ using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
 
-public interface IMassMovementService
+public interface IMovementService
 {
     Task MoveSpace(
         MoveSpaceRequest request,
@@ -24,14 +24,20 @@ public interface IMassMovementService
     Task<DestinationSpace[]> GetDestinationSpaces(
         GetDestinationSpacesRequest request,
         CancellationToken cancellationToken);
+
+    Task MoveIssue(
+        MoveIssueRequest request,
+        CancellationToken ct);
 }
 
-public class MassMovementService(
-    ICoreMassMovementService massMovementService,
+public class MovementService(
+    ICoreMovementService movementService,
     ISpacesAccessService spacesAccessService,
     IOrganizationAccessService organizationAccessService,
-    DatabaseContext context)
-    : IMassMovementService
+    DatabaseContext context,
+    IStatusAccessService statusAccessService,
+    IIssuesAccessService issuesAccessService)
+    : IMovementService
 {
     public async Task MoveSpace(MoveSpaceRequest request, CancellationToken cancellationToken)
     {
@@ -42,7 +48,7 @@ public class MassMovementService(
             request.AuthData.UserId,
             cancellationToken);
             
-        await massMovementService.MoveSpace(request.Id, request.NewOrganizationId, cancellationToken);
+        await movementService.MoveSpace(request.Id, request.NewOrganizationId, cancellationToken);
     }
 
     public async Task MoveSpaceEpics(MoveSpaceEpicsRequest request, CancellationToken cancellationToken)
@@ -59,7 +65,7 @@ public class MassMovementService(
 
         await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
 
-        await massMovementService.MoveSpaceEpics(request.SpaceId, request.NewSpaceId, cancellationToken);
+        await movementService.MoveSpaceEpics(request.SpaceId, request.NewSpaceId, cancellationToken);
     }
 
     public async Task MoveEpic(MoveEpicRequest request, CancellationToken cancellationToken)
@@ -76,7 +82,7 @@ public class MassMovementService(
         
         await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
         
-        await massMovementService.MoveEpic(request.Id, request.NewSpaceId, cancellationToken);
+        await movementService.MoveEpic(request.Id, request.NewSpaceId, cancellationToken);
     }
 
     public async Task<DestinationSpace[]> GetDestinationSpaces(
@@ -97,6 +103,27 @@ public class MassMovementService(
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
+    }
+
+    public async Task MoveIssue(MoveIssueRequest request, CancellationToken ct)
+    {
+        // Check that can move Issue
+        await issuesAccessService.HasAccessOrThrow(
+            request.AuthData,
+            request.IssueId,
+            EntityAccessLevel.Update,
+            ct);
+        
+        // Check that can move to specified status
+        await statusAccessService.CanMoveToStatusOrThrow(
+            request.AuthData,
+            request.StatusId,
+            ct);
+        
+        await movementService.MoveIssue(
+            request.IssueId,
+            request.StatusId,
+            ct);
     }
 
     private async Task CanCreateEpicsOrThrow(
@@ -166,4 +193,11 @@ public record DestinationSpace
     public required long Id { get; set; }
     public required string Name { get; set; }
     public required string Color { get; set; }
+}
+
+public record MoveIssueRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    public long IssueId { get; set; }
+    public long StatusId { get; set; }
 }

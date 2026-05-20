@@ -57,6 +57,7 @@ public class CoreStatusService(DatabaseContext context) : ICoreStatusService
     {
         return context.Statuses
             .Where(x => x.EpicId == epicId)
+            .OrderBy(x => x.SortOrder)
             .Select(x => new MessageStatusDto
             {
                 Id = x.Id,

@@ -6,8 +6,8 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 
 [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
 [ApiController]
-[Route("/api/mass-movement")]
-public class MassMovementController(IMassMovementService service) : ControllerBase
+[Route("/api/movement")]
+public class MovementController(IMovementService service) : ControllerBase
 {
     [HttpPost("space/{id:long}/to-organization/{organizationId:long}")]
     public Task MoveSpace(
@@ -67,6 +67,22 @@ public class MassMovementController(IMassMovementService service) : ControllerBa
             {
                 OrganizationId = id,
                 AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+    
+    [HttpPost("issue/{id:long}/move-to-status/{statusId:long}")]
+    public Task MoveIssue(
+        long id,
+        long statusId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.MoveIssue(
+            new MoveIssueRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData(),
+                IssueId = id,
+                StatusId = statusId
             },
             cancellationToken);
     }

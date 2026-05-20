@@ -28,10 +28,6 @@ public interface IIssuesService
     Task<EpicSummary[]> GetBoardSummary(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken);
-
-    Task Move(
-        MoveIssueRequest request,
-        CancellationToken ct);
     
     Task Delete(
         DeleteIssueRequest request,
@@ -56,11 +52,10 @@ public interface IIssuesService
 
 public class IssuesService(
     DatabaseContext context,
-    ICoreIssuesService messageService,
+    ICoreIssuesService issuesService,
     IDateTimeProvider dateTimeProvider,
     IIssuesAccessService issuesAccessService,
-    IEpicsAccessService epicsAccessService,
-    IStatusAccessService statusAccessService)
+    IEpicsAccessService epicsAccessService)
     : IIssuesService
 {
     public async Task<BatchResult<IssueListDto>> GetIssues(
@@ -256,27 +251,6 @@ public class IssuesService(
         return result;
     }
 
-    public async Task Move(MoveIssueRequest request, CancellationToken ct)
-    {
-        // Check that can move Issue
-        await issuesAccessService.HasAccessOrThrow(
-            request.AuthData,
-            request.IssueId,
-            EntityAccessLevel.Update,
-            ct);
-        
-        // Check that can move to specified status
-        await statusAccessService.CanMoveToStatusOrThrow(
-            request.AuthData,
-            request.StatusId,
-            ct);
-        
-        await messageService.Move(
-            request.IssueId,
-            request.StatusId,
-            ct);
-    }
-
     public async Task Delete(DeleteIssueRequest request, CancellationToken ct)
     {
         await issuesAccessService.HasAccessOrThrow(
@@ -285,7 +259,7 @@ public class IssuesService(
             EntityAccessLevel.Delete,
             ct);
 
-        await messageService.Delete(request.IssueId, ct);
+        await issuesService.Delete(request.IssueId, ct);
     }
 
     public async Task<long> Create(CreateIssueRequest request, CancellationToken ct)
@@ -309,7 +283,7 @@ public class IssuesService(
                 $"Status: {request.StatusId} is not found, or {ChildrenAccessLevel.Create} permission is missing for Epic contains this status");
         }
 
-        return await messageService.Create(
+        return await issuesService.Create(
             new Services.CreateIssueRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
@@ -328,7 +302,7 @@ public class IssuesService(
             EntityAccessLevel.Update,
             ct);
         
-        await messageService.Update(
+        await issuesService.Update(
             request.Id,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
@@ -558,13 +532,6 @@ public class IssuesService(
             SenderColor = source.UserColor,
         };
     }
-}
-
-public record MoveIssueRequest
-{
-    public OrganizationAuthData AuthData { get; set; } = new();
-    public long IssueId { get; set; }
-    public long StatusId { get; set; }
 }
 
 public record GetIssuesRequest : BatchRequest

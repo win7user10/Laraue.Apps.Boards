@@ -53,21 +53,6 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
             cancellationToken);
     }
     
-    [HttpPut("{id:long}/move")]
-    public Task Move(
-        long id,
-        [FromBody] MoveIssueRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return issuesService.Move(
-            request with
-            {
-                AuthData = HttpContext.User.GetOrganizationAuthData(),
-                IssueId = id
-            },
-            cancellationToken);
-    }
-    
     [HttpDelete("{id:long}")]
     public Task Delete(
         long id,

@@ -31,7 +31,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<IUserOrganizationPreferencesService, UserOrganizationPreferencesService>()
                 .AddScoped<ISpacesService, SpacesService>()
                 .AddScoped<IOrganizationsService, OrganizationsService>()
-                .AddScoped<IMassMovementService, MassMovementService>();
+                .AddScoped<IMovementService, MovementService>();
 
             builder.Services
                 .AddSingleton<IDateTimeProvider, DateTimeProvider>()

@@ -17,11 +17,6 @@ public interface ICoreIssuesService
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken);
     
-    Task Move(
-        long issueId,
-        long statusId,
-        CancellationToken ct);
-    
     Task Delete(
         long id,
         CancellationToken cancellationToken);
@@ -70,17 +65,6 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
                 cancellationToken);
         
         await TouchMessageBoard(messageId, date, cancellationToken);
-    }
-
-    public async Task Move(
-        long issueId,
-        long statusId,
-        CancellationToken ct)
-    {
-        await Update(
-            issueId,
-            update => update.SetProperty(x => x.StatusId, statusId),
-            ct);
     }
 
     public Task Delete(long id, CancellationToken cancellationToken)
