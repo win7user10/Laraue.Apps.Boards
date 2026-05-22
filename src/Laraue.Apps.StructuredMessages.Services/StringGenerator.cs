@@ -11,6 +11,11 @@ public static class StringGenerator
         return GenerateRandomString(8);
     }
     
+    public static string GenerateOrganizationPostfix()
+    {
+        return GenerateRandomString(4);
+    }
+    
     private static string GenerateRandomString(int length)
     {
         return string.Create(length, (chars: Chars, length), (span, state) =>

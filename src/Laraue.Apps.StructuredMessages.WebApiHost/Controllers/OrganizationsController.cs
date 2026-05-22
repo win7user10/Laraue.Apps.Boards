@@ -11,7 +11,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class OrganizationsController(IOrganizationsService organizationsService) : ControllerBase
 {
     [HttpPost]
-    public Task<long> Create(
+    public Task<CreateOrganizationResponse> Create(
         [FromBody] CreateOrganizationRequest request,
         CancellationToken cancellationToken = default)
     {

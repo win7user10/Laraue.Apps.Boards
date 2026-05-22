@@ -22,13 +22,14 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
         
-        var newId = await _organizationsController
+        var response = await _organizationsController
             .WithUserAuthorization(userId)
             .Execute(x => x.Create(
                 new CreateOrganizationRequest
                 {
                     Name = "Org 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Slug = "org"
                 }));
 
         var organizations = await testScope.Database.Organizations.ToListAsyncEF();
@@ -37,7 +38,9 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal("Org 1", organization.Name);
         Assert.Equal("#ffffff", organization.Color);
         Assert.Equal(userId, organization.OwnerId);
-        Assert.Equal(newId, organization.Id);
+        Assert.Equal(response!.Id, organization.Id);
+        Assert.Equal("org", response.Slug);
+        Assert.Equal(4, response.SlugPostfix.Length);
         Assert.Equal(8, organization.JoinCode!.Length);
         Assert.True(organization.CreatedAt != default);
         Assert.True(organization.UpdatedAt != default);

@@ -21,7 +21,7 @@ public interface IOrganizationsService
         GetOrganizationRequest request,
         CancellationToken cancellationToken);
     
-    Task<long> Create(
+    Task<CreateOrganizationResponse> Create(
         CreateOrganizationRequest request,
         CancellationToken cancellationToken);
     
@@ -100,6 +100,8 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     IsPersonal = x.Organization.Type == OrganizationType.Personal,
                     CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                    Slug = x.Organization.Slug,
+                    SlugPostfix = x.Organization.SlugPostfix,
                 })
                 .ToListAsyncEF(cancellationToken));
 
@@ -120,14 +122,17 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
                     CanMassMove = x.AdminAccessLevel.HasFlag(AdminAccessLevel.MassMove),
+                    Slug = x.Organization.Slug,
+                    SlugPostfix = x.Organization.SlugPostfix,
                 })
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
     }
 
-    public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
+    public Task<CreateOrganizationResponse> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
     {
         return coreOrganizationsService.Create(
             request.UserId,
+            request.Slug,
             request.Name,
             request.Color,
             cancellationToken);
@@ -402,6 +407,9 @@ public record CreateOrganizationRequest
     [MaxLength(128)]
     public required string Name { get; set; }
     
+    [MaxLength(64)]
+    public required string Slug { get; set; }
+    
     [MaxLength(7)]
     [MinLength(7)]
     public required string Color { get; set; }
@@ -445,6 +453,8 @@ public record OrganizationListDto
     public required bool CanDelete { get; set; }
     public required bool IsPersonal { get; set; }
     public required bool CanCreateSpaces { get; set; }
+    public required string Slug { get; set; }
+    public required string SlugPostfix { get; set; }
 }
 
 public record OrganizationDto
@@ -455,6 +465,8 @@ public record OrganizationDto
     public required bool CanCreateSpaces { get; set; }
     public required bool CanMassMove { get; set; }
     public required bool CanManage { get; set; }
+    public required string Slug { get; set; }
+    public required string SlugPostfix { get; set; }
 }
 
 public record JoinOrganizationRequest

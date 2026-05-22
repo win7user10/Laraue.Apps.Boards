@@ -88,6 +88,10 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
             entity
                 .HasIndex(x => x.JoinCode)
                 .IsUnique();
+            
+            entity
+                .HasIndex(x => new { x.SlugPostfix, x.Slug })
+                .IsUnique();
         });
     }
 }

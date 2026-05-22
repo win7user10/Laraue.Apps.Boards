@@ -12,8 +12,9 @@ namespace Laraue.Apps.StructuredMessages.Services;
 
 public interface ICoreOrganizationsService
 {
-    Task<long> Create(
+    Task<CreateOrganizationResponse> Create(
         Guid ownerId,
+        string slug,
         string name,
         string color,
         CancellationToken cancellationToken);
@@ -60,8 +61,9 @@ public class CoreOrganizationsService(
     IDateTimeProvider dateTimeProvider)
     : ICoreOrganizationsService
 {
-    public async Task<long> Create(
+    public async Task<CreateOrganizationResponse> Create(
         Guid ownerId,
+        string slug,
         string name,
         string color,
         CancellationToken cancellationToken)
@@ -70,6 +72,7 @@ public class CoreOrganizationsService(
 
         var entity = OrganizationDefaults.GetNewOrganizationEntity(
             ownerId,
+            slug,
             name,
             color,
             timestamp,
@@ -78,7 +81,12 @@ public class CoreOrganizationsService(
         context.Organizations.Add(entity);
         await context.SaveChangesAsync(cancellationToken);
 
-        return entity.Id;
+        return new CreateOrganizationResponse
+        {
+            Slug = entity.Slug,
+            SlugPostfix = entity.SlugPostfix,
+            Id = entity.Id,
+        };
     }
 
     public Task Update(long id, Action<UpdateSettersBuilder<Organization>> setters, CancellationToken cancellationToken)
@@ -402,3 +410,10 @@ public record DirectEpicAccessLevel
 
 public record PermittableSpace(long Id, string Name, string Color, bool IsDefault, PermittableEpic[] Epics);
 public record PermittableEpic(long Id, string Name, string Color, bool IsDefault);
+
+public record CreateOrganizationResponse
+{
+    public long Id { get; set; }
+    public required string Slug { get; set; }
+    public required string SlugPostfix { get; set; }
+}
