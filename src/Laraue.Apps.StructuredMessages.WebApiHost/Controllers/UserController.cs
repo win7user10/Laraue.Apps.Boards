@@ -1,7 +1,5 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.Services;
+﻿using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Apps.StructuredMessages.WebApiServices;
-using Laraue.Core.DataAccess.EFCore.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,43 +8,19 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 [Authorize(AuthenticationSchemes = AuthSchemas.User)]
 [ApiController]
 [Route("/api/user")]
-public class UserController(DatabaseContext context) : ControllerBase
+public class UserController(IUserService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<UserDto> GetAsync(CancellationToken ct)
+    public Task<UserDto> GetAsync(CancellationToken ct)
     {
-        var user = await context.Users
-            .Where(x => x.Id == HttpContext.User.GetId())
-            .Select(x => new UserDto
-            {
-                Username = x.TelegramUserName,
-                LanguageCode = InterfaceLanguage.ForCode(x.TelegramLanguageCode).Code,
-                Color = x.Color,
-                FirstName = x.TelegramFirstName,
-                LastName = x.TelegramLastName,
-                TelegramId = x.TelegramId,
-                Palette = Palette.Colors
-            })
-            .FirstOrThrowNotFoundEFAsync("User is not found", ct);
-
-        var initials = UserInitialsUtility.GetInitials(
-            user.Username,
-            user.FirstName,
-            user.LastName);
-
-        user.Initials = initials.Initial;
-        return user;
+        return service.GetUser(HttpContext.User.GetId(), ct);
     }
-}
-
-public class UserDto
-{
-    public long TelegramId { get; set; }
-    public string? Username { get; set; }
-    public string? FirstName { get; set; }
-    public string? LastName { get; set; }
-    public required string LanguageCode { get; set; }
-    public required string Color { get; set; }
-    public string? Initials { get; set; }
-    public required string[] Palette { get; set; }
+    
+    [HttpPut("settings/epic-sort-order/{epicSortOrder}")]
+    public Task UpdateEpicSortOrder(
+        [FromRoute] EpicSortOrder epicSortOrder,
+        CancellationToken cancellationToken)
+    {
+        return service.UpdateEpicSortOrder(HttpContext.User.GetId(), epicSortOrder, cancellationToken);
+    }
 }

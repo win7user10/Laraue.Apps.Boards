@@ -86,4 +86,9 @@ public class OrganizationDefaults
     {
         return telegramUserName ?? "user";
     }
+    
+    public static string GetPersonalOrganizationName(string? languageCode)
+    {
+        return languageCode == "ru" ? "Personal" : "Личное"; // TODO - move to lang files
+    }
 }

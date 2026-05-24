@@ -178,7 +178,7 @@ public class TelegramAuthService(
         var organization = OrganizationDefaults.GetNewOrganizationEntity(
             newUser.Id,
             OrganizationDefaults.GetPersonalOrganizationSlug(user.Username),
-            newUser.TelegramLanguageCode == "ru" ? "Без организации" : "No organization", // TODO - to lang files
+            OrganizationDefaults.GetPersonalOrganizationName(newUser.TelegramLanguageCode),
             Palette.RandomColor(),
             newUser.CreatedAt,
             isPersonal: true);
