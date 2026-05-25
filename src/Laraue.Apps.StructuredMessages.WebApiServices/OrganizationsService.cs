@@ -442,6 +442,7 @@ public record CreateOrganizationRequest
     
     [MaxLength(64)]
     [MinLength(3)]
+    [RegularExpression("[A-z]*")]
     public required string Slug { get; set; }
     
     [MaxLength(7)]
