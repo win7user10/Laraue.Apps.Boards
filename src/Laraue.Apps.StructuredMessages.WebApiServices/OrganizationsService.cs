@@ -72,13 +72,19 @@ public interface IOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
+    
+    Task UpdateSelectedSpace(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken = default);
 }
 
 public class OrganizationsService(
     ICoreOrganizationsService coreOrganizationsService,
     DatabaseContext context,
     IAuthService authService,
-    IOrganizationAccessService organizationAccessService)
+    IOrganizationAccessService organizationAccessService,
+    ISpacesAccessService spacesAccessService)
     : IOrganizationsService
 {
     public async Task<OrganizationListDto[]> GetOrganizations(
@@ -108,9 +114,9 @@ public class OrganizationsService(
         return allOrganizations.ToArray();
     }
 
-    public Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
+    public async Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
     {
-        return organizationAccessService.GetAvailable(
+        var organization = await organizationAccessService.GetAvailable(
             request.AuthData.UserId,
             organizations => organizations
                 .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
@@ -126,6 +132,13 @@ public class OrganizationsService(
                     SlugPostfix = x.Organization.SlugPostfix,
                 })
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
+
+        organization.Preferences = await coreOrganizationsService.GetPreferences(
+            request.AuthData.OrganizationId,
+            request.AuthData.UserId,
+            cancellationToken);
+
+        return organization;
     }
 
     public Task<CreateOrganizationResponse> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
@@ -398,6 +411,25 @@ public class OrganizationsService(
             request.AuthData.OrganizationId,
             cancellationToken);
     }
+
+    public async Task UpdateSelectedSpace(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken = default)
+    {
+        await spacesAccessService.HasAccessOrThrow(
+            authData,
+            spaceId,
+            EntityAccessLevel.Read,
+            cancellationToken);
+        
+        await coreOrganizationsService
+            .UpdatePreferences(
+                authData.OrganizationId,
+                authData.UserId,
+                update => update.SetProperty(p => p.SelectedSpaceId, spaceId),
+                cancellationToken);
+    }
 }
 
 public record CreateOrganizationRequest
@@ -405,9 +437,11 @@ public record CreateOrganizationRequest
     public Guid UserId { get; set; }
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
     
     [MaxLength(64)]
+    [MinLength(3)]
     public required string Slug { get; set; }
     
     [MaxLength(7)]
@@ -421,6 +455,7 @@ public record EditOrganizationRequest
     public Guid UserId { get; set; }
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
     
     [MaxLength(7)]
@@ -467,6 +502,7 @@ public record OrganizationDto
     public required bool CanManage { get; set; }
     public required string Slug { get; set; }
     public required string SlugPostfix { get; set; }
+    public UserOrganizationPreferencesResponse Preferences { get; set; } = new();
 }
 
 public record JoinOrganizationRequest

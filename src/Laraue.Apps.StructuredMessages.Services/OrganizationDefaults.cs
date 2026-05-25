@@ -89,6 +89,6 @@ public class OrganizationDefaults
     
     public static string GetPersonalOrganizationName(string? languageCode)
     {
-        return languageCode == "ru" ? "Personal" : "Личное"; // TODO - move to lang files
+        return languageCode == "ru" ? "Личное" : "Personal"; // TODO - move to lang files
     }
 }

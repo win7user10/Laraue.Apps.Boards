@@ -54,6 +54,17 @@ public interface ICoreOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         long organizationId,
         CancellationToken cancellationToken);
+    
+    Task UpdatePreferences(
+        long organizationId,
+        Guid userId,
+        Action<UpdateSettersBuilder<UserOrganizationPreferences>> updateSetters,
+        CancellationToken cancellationToken);
+    
+    Task<UserOrganizationPreferencesResponse> GetPreferences(
+        long organizationId,
+        Guid userId,
+        CancellationToken cancellationToken);
 }
 
 public class CoreOrganizationsService(
@@ -330,6 +341,59 @@ public class CoreOrganizationsService(
                 epicsBySpaces[s.Key]))
             .ToArray();
     }
+    
+    public async Task UpdatePreferences(
+        long organizationId,
+        Guid userId,
+        Action<UpdateSettersBuilder<UserOrganizationPreferences>> updateSetters,
+        CancellationToken cancellationToken)
+    {
+        var updatedCount = await context.UserOrganizationPreferences
+            .Where(x => x.UserId == userId)
+            .Where(x => x.OrganizationId == organizationId)
+            .ExecuteUpdateAsync(updateSetters, cancellationToken);
+        
+        if (updatedCount > 0)
+            return;
+        
+        // The first settings setup
+        var preferences = GetDefaultPreferences(organizationId, userId);
+        context.Add(preferences);
+        
+        await context.SaveChangesAsync(cancellationToken);
+        await context.UserOrganizationPreferences
+            .Where(x => x.UserId == userId)
+            .Where(x => x.OrganizationId == organizationId)
+            .ExecuteUpdateAsync(updateSetters, cancellationToken);
+    }
+
+    public async Task<UserOrganizationPreferencesResponse> GetPreferences(
+        long organizationId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var preferences = await context.UserOrganizationPreferences
+            .Where(x => x.UserId == userId)
+            .Where(x => x.OrganizationId == organizationId)
+            .FirstOrDefaultAsyncEF(cancellationToken)
+                ?? GetDefaultPreferences(organizationId, userId);
+
+        return new UserOrganizationPreferencesResponse
+        {
+            SelectedSpaceId = preferences.SelectedSpaceId,
+        };
+    }
+    
+    private static UserOrganizationPreferences GetDefaultPreferences(
+        long organizationId,
+        Guid userId)
+    {
+        return new UserOrganizationPreferences
+        {
+            UserId = userId,
+            OrganizationId = organizationId,
+        };
+    }
 
     /// <summary>
     /// Add explicit implicitly added permissions, e.g. Read is always need when Write is active.
@@ -416,4 +480,9 @@ public record CreateOrganizationResponse
     public long Id { get; set; }
     public required string Slug { get; set; }
     public required string SlugPostfix { get; set; }
+}
+
+public record UserOrganizationPreferencesResponse
+{
+    public long? SelectedSpaceId { get; init; }
 }
