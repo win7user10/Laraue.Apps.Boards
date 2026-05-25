@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore.Query;
 
 namespace Laraue.Apps.StructuredMessages.Services;
 
-public interface ICoreUserPreferencesService
+public interface ICoreUserService
 {
-    Task Update(
+    Task UpdatePreferences(
         Guid userId,
         Action<UpdateSettersBuilder<UserPreferences>> updateSetters,
         CancellationToken cancellationToken);
@@ -18,9 +18,9 @@ public interface ICoreUserPreferencesService
         CancellationToken cancellationToken);
 }
 
-public class CoreUserPreferencesService(DatabaseContext context) : ICoreUserPreferencesService
+public class CoreUserService(DatabaseContext context) : ICoreUserService
 {
-    public async Task Update(
+    public async Task UpdatePreferences(
         Guid userId,
         Action<UpdateSettersBuilder<UserPreferences>> updateSetters,
         CancellationToken cancellationToken)
@@ -69,5 +69,5 @@ public class CoreUserPreferencesService(DatabaseContext context) : ICoreUserPref
 
 public record UserPreferencesResponse
 {
-    public required EpicSortOrder EpicSortOrder { get; init; }
+    public EpicSortOrder EpicSortOrder { get; init; }
 }

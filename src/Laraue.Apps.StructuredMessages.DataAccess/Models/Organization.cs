@@ -46,7 +46,19 @@ public class Organization
     /// </summary>
     [MaxLength(8)]
     public string? JoinCode { get; set; }
+
+    /// <summary>
+    /// Organization slug. The public name to access this organization. 
+    /// </summary>
+    [MaxLength(64)]
+    public string Slug { get; set; } = string.Empty;
     
+    /// <summary>
+    /// Postfix to allow slugs be ununique and make it harder to access something else organization.
+    /// </summary>
+    [MaxLength(4)]
+    public string SlugPostfix { get; set; } = string.Empty;
+
     /// <summary>
     /// Users of organization.
     /// </summary>

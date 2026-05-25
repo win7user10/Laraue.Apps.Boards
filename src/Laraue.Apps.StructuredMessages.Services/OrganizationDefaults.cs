@@ -7,6 +7,7 @@ public class OrganizationDefaults
 {
     public static Organization GetNewOrganizationEntity(
         Guid userId,
+        string slug,
         string organizationName,
         string organizationColor,
         DateTime timestamp,
@@ -32,6 +33,8 @@ public class OrganizationDefaults
             UpdatedAt = timestamp,
             Type = isPersonal ? OrganizationType.Personal : OrganizationType.Organization,
             JoinCode = isPersonal ? null : StringGenerator.GenerateJoinCode(),
+            SlugPostfix = StringGenerator.GenerateOrganizationPostfix(),
+            Slug = slug,
             Users = new List<OrganizationUser> { organizationUser },
             Spaces = new List<Space>
             {
@@ -77,5 +80,15 @@ public class OrganizationDefaults
             Color = Palette.RandomColor(),
             SortOrder = 0,
         };
+    }
+
+    public static string GetPersonalOrganizationSlug(string? telegramUserName)
+    {
+        return telegramUserName ?? "user";
+    }
+    
+    public static string GetPersonalOrganizationName(string? languageCode)
+    {
+        return languageCode == "ru" ? "Личное" : "Personal"; // TODO - move to lang files
     }
 }

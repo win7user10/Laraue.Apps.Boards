@@ -61,6 +61,7 @@ public class OrganizationInitializer(
     {
         var organization = OrganizationDefaults.GetNewOrganizationEntity(
             ownerId,
+            "slug",
             _organizationName,
             _organizationColor,
             _timestamp,

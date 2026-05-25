@@ -11,7 +11,7 @@ namespace Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 public class OrganizationsController(IOrganizationsService organizationsService) : ControllerBase
 {
     [HttpPost]
-    public Task<long> Create(
+    public Task<CreateOrganizationResponse> Create(
         [FromBody] CreateOrganizationRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -214,5 +214,16 @@ public class OrganizationsController(IOrganizationsService organizationsService)
                 AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
+    }
+    
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPut("settings/selected-space/{spaceId}")]
+    public Task UpdateSpaceId(
+        [FromRoute] long spaceId,
+        CancellationToken cancellationToken)
+    {
+        return organizationsService.UpdateSelectedSpace(
+            HttpContext.User.GetOrganizationAuthData(),
+            spaceId, cancellationToken);
     }
 }

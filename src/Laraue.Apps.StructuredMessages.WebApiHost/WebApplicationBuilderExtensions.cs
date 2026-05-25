@@ -27,8 +27,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<IIssuesService, IssuesService>()
                 .AddScoped<IEpicsService, EpicsService>()
                 .AddScoped<IStatusesService, StatusesService>()
-                .AddScoped<IUserPreferencesService, UserPreferencesService>()
-                .AddScoped<IUserOrganizationPreferencesService, UserOrganizationPreferencesService>()
+                .AddScoped<IUserService, UserService>()
                 .AddScoped<ISpacesService, SpacesService>()
                 .AddScoped<IOrganizationsService, OrganizationsService>()
                 .AddScoped<IMovementService, MovementService>();

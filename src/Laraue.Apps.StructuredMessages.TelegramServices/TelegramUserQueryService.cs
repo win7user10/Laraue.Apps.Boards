@@ -29,7 +29,8 @@ public class TelegramUserQueryService(DatabaseContext context, IDateTimeProvider
 
         var organization = OrganizationDefaults.GetNewOrganizationEntity(
             user.Id,
-            user.TelegramLanguageCode == "ru" ? "Без организации" : "No organization", // TODO - move to lang files
+            OrganizationDefaults.GetPersonalOrganizationSlug(user.TelegramUserName),
+            OrganizationDefaults.GetPersonalOrganizationName(user.TelegramLanguageCode),
             Palette.RandomColor(),
             timestamp,
             isPersonal: true);

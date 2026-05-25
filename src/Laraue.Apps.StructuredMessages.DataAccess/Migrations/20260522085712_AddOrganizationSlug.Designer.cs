@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260522085712_AddOrganizationSlug")]
+    partial class AddOrganizationSlug
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -255,12 +258,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("slug");
 
-                    b.Property<string>("SlugPostfix")
-                        .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
-                        .HasColumnName("slug_postfix");
-
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
@@ -276,14 +273,14 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_organizations_join_code");
 
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_organizations_slug");
+
                     b.HasIndex("OwnerId", "Type")
                         .IsUnique()
                         .HasDatabaseName("ix_organizations_owner_id_type")
                         .HasFilter("type = 1");
-
-                    b.HasIndex("SlugPostfix", "Slug")
-                        .IsUnique()
-                        .HasDatabaseName("ix_organizations_slug_postfix_slug");
 
                     b.ToTable("organizations", (string)null);
                 });

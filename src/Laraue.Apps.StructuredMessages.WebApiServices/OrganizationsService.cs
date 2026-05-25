@@ -21,7 +21,7 @@ public interface IOrganizationsService
         GetOrganizationRequest request,
         CancellationToken cancellationToken);
     
-    Task<long> Create(
+    Task<CreateOrganizationResponse> Create(
         CreateOrganizationRequest request,
         CancellationToken cancellationToken);
     
@@ -72,13 +72,19 @@ public interface IOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
+    
+    Task UpdateSelectedSpace(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken = default);
 }
 
 public class OrganizationsService(
     ICoreOrganizationsService coreOrganizationsService,
     DatabaseContext context,
     IAuthService authService,
-    IOrganizationAccessService organizationAccessService)
+    IOrganizationAccessService organizationAccessService,
+    ISpacesAccessService spacesAccessService)
     : IOrganizationsService
 {
     public async Task<OrganizationListDto[]> GetOrganizations(
@@ -100,15 +106,17 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     IsPersonal = x.Organization.Type == OrganizationType.Personal,
                     CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                    Slug = x.Organization.Slug,
+                    SlugPostfix = x.Organization.SlugPostfix,
                 })
                 .ToListAsyncEF(cancellationToken));
 
         return allOrganizations.ToArray();
     }
 
-    public Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
+    public async Task<OrganizationDto> GetOrganization(GetOrganizationRequest request, CancellationToken cancellationToken)
     {
-        return organizationAccessService.GetAvailable(
+        var organization = await organizationAccessService.GetAvailable(
             request.AuthData.UserId,
             organizations => organizations
                 .Where(o => o.OrganizationId == request.AuthData.OrganizationId)
@@ -120,14 +128,24 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
                     CanMassMove = x.AdminAccessLevel.HasFlag(AdminAccessLevel.MassMove),
+                    Slug = x.Organization.Slug,
+                    SlugPostfix = x.Organization.SlugPostfix,
                 })
                 .FirstOrThrowNotFoundEFAsync($"Organization: {request.AuthData.OrganizationId} is not found", cancellationToken));
+
+        organization.Preferences = await coreOrganizationsService.GetPreferences(
+            request.AuthData.OrganizationId,
+            request.AuthData.UserId,
+            cancellationToken);
+
+        return organization;
     }
 
-    public Task<long> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
+    public Task<CreateOrganizationResponse> Create(CreateOrganizationRequest request, CancellationToken cancellationToken)
     {
         return coreOrganizationsService.Create(
             request.UserId,
+            request.Slug,
             request.Name,
             request.Color,
             cancellationToken);
@@ -393,6 +411,25 @@ public class OrganizationsService(
             request.AuthData.OrganizationId,
             cancellationToken);
     }
+
+    public async Task UpdateSelectedSpace(
+        OrganizationAuthData authData,
+        long spaceId,
+        CancellationToken cancellationToken = default)
+    {
+        await spacesAccessService.HasAccessOrThrow(
+            authData,
+            spaceId,
+            EntityAccessLevel.Read,
+            cancellationToken);
+        
+        await coreOrganizationsService
+            .UpdatePreferences(
+                authData.OrganizationId,
+                authData.UserId,
+                update => update.SetProperty(p => p.SelectedSpaceId, spaceId),
+                cancellationToken);
+    }
 }
 
 public record CreateOrganizationRequest
@@ -400,7 +437,13 @@ public record CreateOrganizationRequest
     public Guid UserId { get; set; }
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
+    
+    [MaxLength(64)]
+    [MinLength(3)]
+    [RegularExpression("[A-z]*")]
+    public required string Slug { get; set; }
     
     [MaxLength(7)]
     [MinLength(7)]
@@ -413,6 +456,7 @@ public record EditOrganizationRequest
     public Guid UserId { get; set; }
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
     
     [MaxLength(7)]
@@ -445,6 +489,8 @@ public record OrganizationListDto
     public required bool CanDelete { get; set; }
     public required bool IsPersonal { get; set; }
     public required bool CanCreateSpaces { get; set; }
+    public required string Slug { get; set; }
+    public required string SlugPostfix { get; set; }
 }
 
 public record OrganizationDto
@@ -455,6 +501,9 @@ public record OrganizationDto
     public required bool CanCreateSpaces { get; set; }
     public required bool CanMassMove { get; set; }
     public required bool CanManage { get; set; }
+    public required string Slug { get; set; }
+    public required string SlugPostfix { get; set; }
+    public UserOrganizationPreferencesResponse Preferences { get; set; } = new();
 }
 
 public record JoinOrganizationRequest
