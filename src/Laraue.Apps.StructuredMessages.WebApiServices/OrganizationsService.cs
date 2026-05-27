@@ -166,7 +166,8 @@ public class OrganizationsService(
             request.Id,
             setters => setters
                 .SetProperty(x => x.Color, request.Color)
-                .SetProperty(x => x.Name, request.Name),
+                .SetProperty(x => x.Name, request.Name)
+                .SetProperty(x => x.Slug, request.Slug),
             cancellationToken);
     }
 
@@ -458,6 +459,11 @@ public record EditOrganizationRequest
     [MaxLength(128)]
     [MinLength(3)]
     public required string Name { get; set; }
+    
+    [MaxLength(64)]
+    [MinLength(3)]
+    [RegularExpression("[A-z]*")]
+    public required string Slug { get; set; }
     
     [MaxLength(7)]
     [MinLength(7)]

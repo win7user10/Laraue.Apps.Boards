@@ -159,7 +159,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 new EditOrganizationRequest
                 {
                     Name = "Org 2",
-                    Color = "#000000"
+                    Color = "#000000",
+                    Slug = "slug"
                 }));
 
         var organizations = await testScope.Database.Organizations.ToListAsyncEF();
@@ -168,6 +169,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.Equal("Org 2", organization.Name);
         Assert.Equal("#000000", organization.Color);
         Assert.Equal(date1, organization.CreatedAt);
+        Assert.Equal("slug", organization.Slug);
         Assert.True(organization.UpdatedAt > date1);
     }
     
@@ -189,7 +191,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 new EditOrganizationRequest
                 {
                     Name = "Org 2",
-                    Color = "#000000"
+                    Color = "#000000",
+                    Slug =  "slug"
                 }));
     }
     
@@ -211,7 +214,8 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 new EditOrganizationRequest
                 {
                     Name = "Org 2",
-                    Color = "#000000"
+                    Color = "#000000",
+                    Slug =  "slug"
                 })));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);

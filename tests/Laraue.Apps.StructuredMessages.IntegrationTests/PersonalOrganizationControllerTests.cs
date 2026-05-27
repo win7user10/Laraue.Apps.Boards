@@ -32,7 +32,8 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
                 new EditOrganizationRequest
                 {
                     Name = "Org 2",
-                    Color = "#000000"
+                    Color = "#000000",
+                    Slug =  "slug"
                 }));
 
         var organizations = await testScope.Database.Organizations.ToListAsyncEF();
@@ -40,6 +41,7 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
         organization = Assert.Single(organizations);
         Assert.Equal("Org 2", organization.Name);
         Assert.Equal("#000000", organization.Color);
+        Assert.Equal("slug", organization.Slug);
         Assert.Equal(timestamp, organization.CreatedAt, new TimeSpan(10));
         Assert.True(organization.UpdatedAt > timestamp);
     }
@@ -60,7 +62,8 @@ public class PersonalOrganizationControllerTests(WebApiTestHost host) : IClassFi
                 new EditOrganizationRequest
                 {
                     Name = "Org 2",
-                    Color = "#000000"
+                    Color = "#000000",
+                    Slug =  "slug"
                 })));
         
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
