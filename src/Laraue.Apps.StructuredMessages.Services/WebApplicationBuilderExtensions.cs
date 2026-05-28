@@ -42,6 +42,7 @@ public static class WebApplicationBuilderExtensions
                 .AddScoped<IStatusAccessService, StatusAccessService>()
                 .AddScoped<ICoreUserService, CoreUserService>()
                 .AddScoped<ICoreSpacesService, CoreSpacesService>()
+                .AddScoped<ISpaceCounterService, SpaceCounterService>()
                 .AddScoped<ISpacesAccessService, SpacesAccessService>()
                 .AddScoped<ICoreOrganizationsService, CoreOrganizationsService>()
                 .AddScoped<IOrganizationAccessService, OrganizationAccessService>()

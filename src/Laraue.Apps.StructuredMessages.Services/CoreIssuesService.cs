@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -22,13 +23,23 @@ public interface ICoreIssuesService
         CancellationToken cancellationToken);
 }
 
-public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
+public class CoreIssuesService(
+    DatabaseContext context,
+    IDateTimeProvider dateTimeProvider,
+    ISpaceCounterService spaceCounterService)
     : ICoreIssuesService
 {
     public async Task<long> Create(
         CreateIssueRequest request,
         CancellationToken cancellationToken)
     {
+        var spaceId = await context.Statuses
+            .Where(x => x.Id == request.StatusId)
+            .Select(x => x.Epic!.SpaceId)
+            .FirstOrThrowNotFoundEFAsync("Space was not found", cancellationToken);
+
+        var issueNumber = await spaceCounterService.GetNextNumber(spaceId, cancellationToken);
+        
         var entity = new Issue
         {
             Content = request.Text,
@@ -37,6 +48,7 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
             UpdatedAt = request.CreatedAt,
             TelegramMessageId = request.TelegramMessageId,
             StatusId = request.StatusId,
+            Number = issueNumber,
         };
         
         context.Add(entity);

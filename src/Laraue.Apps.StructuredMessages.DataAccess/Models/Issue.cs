@@ -36,4 +36,9 @@ public class Issue
     
     public TelegramMessage? TelegramMessage { get; set; }
     public long? TelegramMessageId { get; set; }
+
+    /// <summary>
+    /// Issue serial number inside the space.
+    /// </summary>
+    public int Number { get; set; }
 }

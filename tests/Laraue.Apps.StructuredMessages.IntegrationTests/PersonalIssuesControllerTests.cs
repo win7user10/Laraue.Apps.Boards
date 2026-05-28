@@ -1,7 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
-using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.IntegrationTests;

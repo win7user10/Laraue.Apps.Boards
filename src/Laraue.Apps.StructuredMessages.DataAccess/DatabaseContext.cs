@@ -20,6 +20,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<Epic> Epics { get; init; }
     public DbSet<DirectEpicPermission> DirectEpicPermissions { get; init; }
     public DbSet<Space> Spaces { get; init; }
+    public DbSet<SpaceCounter> SpaceCounters { get; init; }
     public DbSet<DirectSpacePermission> DirectSpacePermissions { get; init; }
     public DbSet<Organization> Organizations { get; init; }
     public DbSet<OrganizationUser> OrganizationUsers { get; init; }
@@ -45,6 +46,14 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.Content)
                 .HasMethod("gin")
                 .HasOperators("gin_trgm_ops");
+
+            entity
+                .HasIndex(x => x.Number);
+        });
+        
+        modelBuilder.Entity<SpaceCounter>(entity =>
+        {
+            entity.HasKey(x => x.SpaceId);
         });
         
         modelBuilder.Entity<TelegramFile>(entity =>
