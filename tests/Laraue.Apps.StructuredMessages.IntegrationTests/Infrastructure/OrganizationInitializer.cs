@@ -132,7 +132,7 @@ public class OrganizationInitializer(
                             IssueNumber = new IssueNumber
                             {
                                 Space = spaceEntity,
-                                Number = lastIssueNumber++,
+                                Number = ++lastIssueNumber,
                             }
                         });
                     }

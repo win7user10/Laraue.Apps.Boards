@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,15 +75,42 @@ public class CoreMovementService(
                 cancellationToken);
     }
 
-    public Task MoveSpaceEpics(long spaceId, long newSpaceId, CancellationToken cancellationToken)
+    public async Task MoveSpaceEpics(long spaceId, long newSpaceId, CancellationToken cancellationToken)
     {
-        // TODO - renumber issues
-        return context.Epics
+        context.Database.EnsureTransactionStarted();
+        
+        var updatedCount = await context.Epics
             .Where(x => x.SpaceId == spaceId)
             .Where(x => x.IsDefault == false)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(epic => epic.SpaceId, newSpaceId),
                 cancellationToken);
+        
+        if (updatedCount == 0)
+            return;
+
+        var issuesNumbersToUpdateQuery = context.IssueNumbers
+            .Where(i => i.SpaceId == spaceId);
+
+        var issuesToUpdateQueryCount = await issuesNumbersToUpdateQuery
+            .CountAsyncEF(cancellationToken);
+        
+        var nextNumber = await spaceCounterService.GetNextNumber(
+            spaceId, issuesToUpdateQueryCount, cancellationToken);
+
+        var issueNumbers = issuesNumbersToUpdateQuery
+            .Select(number => new 
+            {
+                number.IssueId,
+                RowNum = Sql.Ext.RowNumber().Over().OrderBy(number.IssueId).ToValue()
+            })
+            .AsCte();
+
+        await context.IssueNumbers
+            .Join(issueNumbers, number => number.IssueId, n => n.IssueId, (number, n) => new { Number = number, n })
+            .Set(x => x.Number.Number, x => nextNumber + x.n.RowNum - 1)
+            .Set(x => x.Number.SpaceId, newSpaceId)
+            .UpdateAsync(cancellationToken);
     }
 
     public async Task MoveEpic(long epicId, long newSpaceId, CancellationToken cancellationToken)
