@@ -32,7 +32,9 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
 
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
         Assert.Equal("New Issue", issue.Content);
-        Assert.Equal(1, issue.Number);
+        
+        var issueNumber = await testScope.Database.IssueNumbers.FirstAsyncEF(e => e.IssueId == issueId);
+        Assert.Equal(1, issueNumber.Number);
     }
     
     [Fact]

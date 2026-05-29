@@ -1,6 +1,7 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.Services;
@@ -40,17 +41,31 @@ public interface ICoreMovementService
         CancellationToken ct);
 }
 
-public class CoreMovementService(DatabaseContext context, ICoreIssuesService issuesService) : ICoreMovementService
+public class CoreMovementService(
+    DatabaseContext context,
+    ICoreIssuesService issuesService,
+    ISpaceCounterService spaceCounterService)
+    : ICoreMovementService
 {
     public async Task MoveSpace(long spaceId, long newOrganizationId, CancellationToken cancellationToken)
     {
         var sourceData = await context.Spaces
             .Where(x => x.Id == spaceId)
-            .Select(x => new { x.IsDefault })
+            .Select(x => new { x.IsDefault, x.Key })
             .FirstOrThrowNotFoundEFAsync($"Space: {spaceId} is not found", cancellationToken);
         
         if (sourceData.IsDefault)
             throw new ForbiddenException("Default space cannot be moved.");
+        
+        var suchSpaceKeyExists = await context.Spaces
+            .Where(x => x.OrganizationId == newOrganizationId)
+            .Where(x => x.Key == sourceData.Key)
+            .AnyAsyncEF(cancellationToken);
+        
+        if (suchSpaceKeyExists)
+            throw new BadRequestException(
+                nameof(newOrganizationId),
+                $"Space key {sourceData.Key} already exists in target organization.");
 
         await context.Spaces
             .Where(x => x.Id == spaceId)
@@ -61,6 +76,7 @@ public class CoreMovementService(DatabaseContext context, ICoreIssuesService iss
 
     public Task MoveSpaceEpics(long spaceId, long newSpaceId, CancellationToken cancellationToken)
     {
+        // TODO - renumber issues
         return context.Epics
             .Where(x => x.SpaceId == spaceId)
             .Where(x => x.IsDefault == false)
@@ -71,6 +87,8 @@ public class CoreMovementService(DatabaseContext context, ICoreIssuesService iss
 
     public async Task MoveEpic(long epicId, long newSpaceId, CancellationToken cancellationToken)
     {
+        // TODO - renumber issues
+        
         var sourceData = await context.Epics
             .Where(x => x.Id == epicId)
             .Select(x => new { x.IsDefault })
@@ -91,6 +109,8 @@ public class CoreMovementService(DatabaseContext context, ICoreIssuesService iss
         long statusId,
         CancellationToken ct)
     {
+        // TODO - renumber issues
+        
         await issuesService.Update(
             issueId,
             update => update.SetProperty(x => x.StatusId, statusId),

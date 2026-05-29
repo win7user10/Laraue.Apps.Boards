@@ -17,6 +17,7 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<UserPreferences> UserPreferences { get; init; }
     public DbSet<UserOrganizationPreferences> UserOrganizationPreferences { get; init; }
     public DbSet<Issue> Issues { get; init; }
+    public DbSet<IssueNumber> IssueNumbers { get; init; }
     public DbSet<Epic> Epics { get; init; }
     public DbSet<DirectEpicPermission> DirectEpicPermissions { get; init; }
     public DbSet<Space> Spaces { get; init; }
@@ -46,9 +47,15 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.Content)
                 .HasMethod("gin")
                 .HasOperators("gin_trgm_ops");
-
+        });
+        
+        modelBuilder.Entity<IssueNumber>(entity =>
+        {
+            entity.HasKey(x => x.IssueId);
+            
             entity
-                .HasIndex(x => x.Number);
+                .HasIndex(x => new { x.SpaceId, x.Number })
+                .IsUnique();
         });
         
         modelBuilder.Entity<Space>(entity =>

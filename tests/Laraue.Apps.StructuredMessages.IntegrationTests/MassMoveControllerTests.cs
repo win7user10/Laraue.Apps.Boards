@@ -193,8 +193,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var destinationOrganization = await testScope.InitializeOrganization(
             userId,
             o => o
-                .AddSpace(userId)
-                .AddSpace(userId, s => s.WithName("Allowed"))
+                .AddSpace(userId, "SP1")
+                .AddSpace(userId, "SP2", s => s.WithName("Allowed"))
                 .AddUser(participatorId, u => u // User has create epics access only to last space
                     .SetSpaceEpicsAccessLevel(2, ChildrenAccessLevel.Create)));
         

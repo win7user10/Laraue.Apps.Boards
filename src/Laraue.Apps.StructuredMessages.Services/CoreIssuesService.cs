@@ -33,14 +33,14 @@ public class CoreIssuesService(
         CreateIssueRequest request,
         CancellationToken cancellationToken)
     {
+        context.Database.EnsureTransactionStarted();
+        
         var spaceId = await context.Statuses
             .Where(x => x.Id == request.StatusId)
             .Select(x => x.Epic!.SpaceId)
             .FirstOrThrowNotFoundEFAsync("Space was not found", cancellationToken);
-
-        var issueNumber = await spaceCounterService.GetNextNumber(spaceId, cancellationToken);
         
-        var entity = new Issue
+        var issue = new Issue
         {
             Content = request.Text,
             UserId = request.UserId,
@@ -48,15 +48,22 @@ public class CoreIssuesService(
             UpdatedAt = request.CreatedAt,
             TelegramMessageId = request.TelegramMessageId,
             StatusId = request.StatusId,
-            Number = issueNumber,
         };
         
-        context.Add(entity);
+        var issueNumber = new IssueNumber
+        {
+            Number = await spaceCounterService.GetNextNumber(spaceId, cancellationToken),
+            Issue = issue,
+            SpaceId = spaceId,
+        };
+        
+        context.Add(issue);
+        context.Add(issueNumber);
+        
         await context.SaveChangesAsync(cancellationToken);
+        await TouchMessageBoard(issue.Id, request.CreatedAt, cancellationToken);
         
-        await TouchMessageBoard(entity.Id, request.CreatedAt, cancellationToken);
-        
-        return entity.Id;
+        return issue.Id;
     }
 
     public async Task Update(

@@ -115,6 +115,8 @@ public class OrganizationInitializer(
                     epicEntity.Statuses.Add(statusEntity);
                 }
 
+
+                var lastIssueNumber = 0;
                 foreach (var issuesByStatusIndex in epic.Issues)
                 {
                     var statusForIssue = epicEntity.Statuses[issuesByStatusIndex.Key];
@@ -127,6 +129,11 @@ public class OrganizationInitializer(
                             UserId = issue.CreatorId,
                             CreatedAt = issue.Timestamp,
                             UpdatedAt = issue.Timestamp,
+                            IssueNumber = new IssueNumber
+                            {
+                                Space = spaceEntity,
+                                Number = lastIssueNumber++,
+                            }
                         });
                     }
                 }

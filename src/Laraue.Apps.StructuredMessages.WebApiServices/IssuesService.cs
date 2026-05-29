@@ -283,7 +283,9 @@ public class IssuesService(
                 $"Status: {request.StatusId} is not found, or {ChildrenAccessLevel.Create} permission is missing for Epic contains this status");
         }
 
-        return await issuesService.Create(
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        
+        var id = await issuesService.Create(
             new Services.CreateIssueRequest
             {
                 CreatedAt = dateTimeProvider.UtcNow,
@@ -292,6 +294,10 @@ public class IssuesService(
                 StatusId = request.StatusId,
             },
             ct);
+        
+        await transaction.CommitAsync(ct);
+        
+        return id;
     }
 
     public async Task Update(UpdateIssueRequest request, CancellationToken ct)
@@ -510,7 +516,7 @@ public class IssuesService(
             TelegramId = x.User.TelegramId,
             TelegramUsername = x.User.TelegramUserName,
             UserColor = x.User.Color,
-            Number = x.Number,
+            Number = x.IssueNumber!.Number,
             SpaceKey = x.Status.Epic!.Space!.Key,
         });
     }

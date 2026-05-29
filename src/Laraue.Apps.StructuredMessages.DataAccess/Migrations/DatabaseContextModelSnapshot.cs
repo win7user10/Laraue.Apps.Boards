@@ -177,10 +177,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int>("Number")
-                        .HasColumnType("integer")
-                        .HasColumnName("number");
-
                     b.Property<long>("StatusId")
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
@@ -206,9 +202,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
 
-                    b.HasIndex("Number")
-                        .HasDatabaseName("ix_issues_number");
-
                     b.HasIndex("StatusId")
                         .HasDatabaseName("ix_issues_status_id");
 
@@ -220,6 +213,30 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasDatabaseName("ix_issues_user_id");
 
                     b.ToTable("issues", (string)null);
+                });
+
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", b =>
+                {
+                    b.Property<long>("IssueId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issue_id");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<long>("SpaceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("space_id");
+
+                    b.HasKey("IssueId")
+                        .HasName("pk_issue_numbers");
+
+                    b.HasIndex("SpaceId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_issue_numbers_space_id_number");
+
+                    b.ToTable("issue_numbers", (string)null);
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>
@@ -895,6 +912,27 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", b =>
+                {
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", "Issue")
+                        .WithOne("IssueNumber")
+                        .HasForeignKey("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", "IssueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_issue_numbers_issues_issue_id");
+
+                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_issue_numbers_spaces_space_id");
+
+                    b.Navigation("Issue");
+
+                    b.Navigation("Space");
+                });
+
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>
                 {
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "Owner")
@@ -1025,6 +1063,11 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("Statuses");
 
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", b =>
+                {
+                    b.Navigation("IssueNumber");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>

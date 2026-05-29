@@ -33,7 +33,6 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
         
         Assert.Equal("New Issue", issue.Content);
-        Assert.Equal(1, issue.Number);
         Assert.Equal(defaultStatus.Id, issue.StatusId);
         Assert.NotEqual(default, issue.CreatedAt);
         Assert.NotEqual(default, issue.UpdatedAt);
@@ -61,8 +60,8 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
                     StatusId = defaultStatus.Id
                 }));
 
-        var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
-        Assert.Equal(1, issue.Number);
+        var issueNumber = await testScope.Database.IssueNumbers.FirstAsyncEF(e => e.IssueId == issueId);
+        Assert.Equal(1, issueNumber.Number);
         
         // Second issue has number 2
         issueId = await _issuesController
@@ -74,8 +73,8 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
                     StatusId = defaultStatus.Id
                 }));
 
-        issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
-        Assert.Equal(2, issue.Number);
+        issueNumber = await testScope.Database.IssueNumbers.FirstAsyncEF(e => e.IssueId == issueId);
+        Assert.Equal(2, issueNumber.Number);
     }
     
     [Fact]
@@ -371,10 +370,10 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var organization = await testScope.InitializePersonalOrganization(
             userId,
             o => o
-                .AddSpace(userId, s => s
+                .AddSpace(userId, "SP1", s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, issue => issue.WithContent("Other space app"))))
-                .AddSpace(userId, s => s
+                .AddSpace(userId, "SP2", s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
                         .AddIssue(userId, 0, issue => issue.WithContent("Deliver app"))
