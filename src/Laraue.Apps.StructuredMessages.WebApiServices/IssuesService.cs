@@ -160,7 +160,7 @@ public class IssuesService(
                     },
                     cancellationToken);
 
-            var mappedStatusResult = new InitialBatchResult<IssueListDto>()
+            var mappedStatusResult = new InitialBatchResult<IssueListDto>
             {
                 Data = statusResult.Data.Select(Map).ToArray(),
                 HasNext = statusResult.HasNextPage,
@@ -510,6 +510,8 @@ public class IssuesService(
             TelegramId = x.User.TelegramId,
             TelegramUsername = x.User.TelegramUserName,
             UserColor = x.User.Color,
+            Number = x.Number,
+            SpaceKey = x.Status.Epic!.Space!.Key,
         });
     }
     
@@ -530,6 +532,7 @@ public class IssuesService(
             SenderInitial = senderData.Initial,
             Time = source.Time,
             SenderColor = source.UserColor,
+            Key = $"{source.SpaceKey}-{source.Number}",
         };
     }
 }
@@ -581,6 +584,8 @@ public class IssueListDtoData
     public required string UserColor { get; set; }
     public required long EpicId { get; set; }
     public required long StatusId { get; set; }
+    public required int Number { get; set; }
+    public required string SpaceKey { get; set; }
 }
 
 public interface ICanContainMedia
@@ -594,6 +599,7 @@ public class IssueListDto : ICanContainMedia
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
     public required string? Sender { get; set; }
+    public required string Key { get; set; }
     public string? SenderInitial { get; set; }
     public required string SenderColor { get; set; }
     public required string? Content { get; set; }

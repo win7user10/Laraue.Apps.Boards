@@ -1,6 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
-using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
@@ -14,6 +13,7 @@ public interface ICoreSpacesService
     Task<long> Create(
         long organizationId,
         Guid creatorId,
+        string key,
         string name,
         string color,
         CancellationToken cancellationToken);
@@ -36,6 +36,7 @@ public class CoreSpacesService(
     public async Task<long> Create(
         long organizationId,
         Guid creatorId,
+        string key,
         string name,
         string color,
         CancellationToken cancellationToken)
@@ -49,6 +50,7 @@ public class CoreSpacesService(
             Color = color,
             CreatedAt = dateTime,
             UpdatedAt = dateTime,
+            Key = key.ToUpper(),
             OrganizationId = organizationId,
             Epics = new List<Epic>
             {

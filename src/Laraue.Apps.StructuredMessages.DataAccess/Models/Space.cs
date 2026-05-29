@@ -15,6 +15,9 @@ public class Space
     [MaxLength(7)]
     public required string Color { get; set; }
     
+    [MaxLength(3)]
+    public required string Key { get; set; }
+    
     public Guid CreatorId { get; set; }
     public User? Creator { get; set; }
     

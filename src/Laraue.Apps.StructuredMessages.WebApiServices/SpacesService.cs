@@ -94,6 +94,7 @@ public class SpacesService(
         return await coreSpacesService.Create(
             request.AuthData.OrganizationId,
             request.AuthData.UserId,
+            request.Key,
             request.Name,
             request.Color,
             cancellationToken);
@@ -111,7 +112,8 @@ public class SpacesService(
             request.Id,
             setters => setters
                 .SetProperty(x => x.Color, request.Color)
-                .SetProperty(x => x.Name, request.Name),
+                .SetProperty(x => x.Name, request.Name)
+                .SetProperty(x => x.Key, request.Key.ToUpper()),
             cancellationToken);
     }
 
@@ -137,6 +139,10 @@ public record CreateSpaceRequest
     [MaxLength(7)]
     [MinLength(7)]
     public required string Color { get; set; }
+    
+    [MaxLength(3)]
+    [MinLength(3)]
+    public required string Key { get; set; }
 }
 
 public record UpdateSpaceRequest
@@ -151,6 +157,10 @@ public record UpdateSpaceRequest
     [MaxLength(7)]
     [MinLength(7)]
     public required string Color { get; set; }
+    
+    [MaxLength(3)]
+    [MinLength(3)]
+    public required string Key { get; set; }
 }
 
 public record DeleteSpaceRequest

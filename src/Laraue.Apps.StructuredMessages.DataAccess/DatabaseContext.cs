@@ -51,6 +51,13 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .HasIndex(x => x.Number);
         });
         
+        modelBuilder.Entity<Space>(entity =>
+        {
+            entity
+                .HasIndex(x => new { x.OrganizationId, x.Key })
+                .IsUnique();
+        });
+        
         modelBuilder.Entity<SpaceCounter>(entity =>
         {
             entity.HasKey(x => x.SpaceId);

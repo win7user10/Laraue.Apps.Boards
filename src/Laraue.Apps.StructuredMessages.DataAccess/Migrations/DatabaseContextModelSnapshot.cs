@@ -367,6 +367,12 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_default");
 
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("key");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -387,8 +393,9 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasIndex("CreatorId")
                         .HasDatabaseName("ix_spaces_creator_id");
 
-                    b.HasIndex("OrganizationId")
-                        .HasDatabaseName("ix_spaces_organization_id");
+                    b.HasIndex("OrganizationId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_spaces_organization_id_key");
 
                     b.ToTable("spaces", (string)null);
                 });

@@ -26,7 +26,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
                 new CreateSpaceRequest
                 {
                     Name = "Space 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Key = "SPA"
                 }));
 
         var spaces = await testScope.Database.Spaces.Include(x => x.Epics).ToListAsyncEF();
@@ -59,7 +60,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
                 new CreateSpaceRequest
                 {
                     Name = "Space 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Key = "SPA",
                 }));
 
         var spaces = await testScope.Database.Spaces.Include(s => s.Users).ToListAsyncEF();
@@ -83,7 +85,8 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
                 new CreateSpaceRequest
                 {
                     Name = "Space 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Key = "SPA"
                 })));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
     }

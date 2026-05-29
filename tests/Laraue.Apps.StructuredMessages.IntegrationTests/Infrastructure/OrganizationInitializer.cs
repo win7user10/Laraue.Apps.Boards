@@ -20,7 +20,7 @@ public class OrganizationInitializer(
 
     private readonly List<SpaceBuilder> _spaces =
     [
-        new SpaceBuilder(ownerId, DateTime.UtcNow)
+        new SpaceBuilder(ownerId, "DEF", DateTime.UtcNow)
             .WithName("Default Space")
             .SetAsDefault()
             .AddEpic(ownerId, e => e
@@ -80,6 +80,7 @@ public class OrganizationInitializer(
                 UpdatedAt = space.Timestamp,
                 CreatorId = space.CreatorId,
                 IsDefault = space.IsDefault,
+                Key = space.SpaceKey,
                 Epics = index == 0 ? new List<Epic>() : new List<Epic>
                 {
                     OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
@@ -191,12 +192,22 @@ public class OrganizationInitializer(
 
     public OrganizationInitializer AddSpace(Guid creatorId)
     {
-        return AddSpace(creatorId, _ => {});
+        return AddSpace(creatorId, "ADD", _ => {});
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId, string key)
+    {
+        return AddSpace(creatorId, key, _ => {});
     }
 
     public OrganizationInitializer AddSpace(Guid creatorId, Action<SpaceBuilder> spaceBuilder)
     {
-        var builder = new SpaceBuilder(creatorId, _timestamp);
+        return AddSpace(creatorId, "ADD", spaceBuilder);
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId, string key, Action<SpaceBuilder> spaceBuilder)
+    {
+        var builder = new SpaceBuilder(creatorId, key, _timestamp);
         spaceBuilder(builder);
         
         _spaces.Add(builder);
@@ -335,8 +346,9 @@ public class OrganizationInitializer(
         }
     }
 
-    public class SpaceBuilder(Guid creatorId, DateTime timestamp)
+    public class SpaceBuilder(Guid creatorId, string key, DateTime timestamp)
     {
+        public string SpaceKey { get; private set; } = key;
         public string SpaceName { get; private set; } = "AdditionalSpace";
         public string SpaceColor { get; private set; }  = "#ffffff";
         public DateTime Timestamp { get; private set; }  = timestamp;

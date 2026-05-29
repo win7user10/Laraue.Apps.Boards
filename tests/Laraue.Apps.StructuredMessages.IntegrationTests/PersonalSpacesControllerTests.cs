@@ -24,7 +24,8 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
                 new CreateSpaceRequest
                 {
                     Name = "Space 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Key = "spa"
                 }));
 
         var spaces = await testScope.Database.Spaces.ToListAsyncEF();
@@ -32,6 +33,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
+        Assert.Equal("SPA", space.Key);
         Assert.Equal(userId, space.CreatorId);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);
@@ -56,7 +58,8 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
                 new UpdateSpaceRequest
                 {
                     Name = "Space 1",
-                    Color = "#ffffff"
+                    Color = "#ffffff",
+                    Key = "spb"
                 }));
 
         var spaces = await testScope.Database.Spaces.ToListAsyncEF();
@@ -64,6 +67,7 @@ public class PersonalSpacesControllerTests(WebApiTestHost host) : IClassFixture<
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space 1", space.Name);
         Assert.Equal("#ffffff", space.Color);
+        Assert.Equal("SPB", space.Key);
         Assert.Equal(userId, space.CreatorId);
         Assert.True(space.CreatedAt != default);
         Assert.True(space.UpdatedAt != default);

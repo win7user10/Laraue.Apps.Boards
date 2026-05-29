@@ -33,10 +33,49 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
         
         Assert.Equal("New Issue", issue.Content);
+        Assert.Equal(1, issue.Number);
         Assert.Equal(defaultStatus.Id, issue.StatusId);
         Assert.NotEqual(default, issue.CreatedAt);
         Assert.NotEqual(default, issue.UpdatedAt);
         Assert.Equal(userId, issue.UserId);
+    }
+    
+    [Fact]
+    public async Task Issue_ShouldHasCorrectCounter_Always()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(userId);
+
+        var space = organization.Spaces![0];
+        var backlog = space.Epics![0];
+        var defaultStatus = backlog.Statuses![0];
+        
+        // First issue has number 1
+        var issueId = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Create(
+                new CreateIssueRequest
+                {
+                    Content = "New Issue",
+                    StatusId = defaultStatus.Id
+                }));
+
+        var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
+        Assert.Equal(1, issue.Number);
+        
+        // Second issue has number 2
+        issueId = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Create(
+                new CreateIssueRequest
+                {
+                    Content = "New Issue",
+                    StatusId = defaultStatus.Id
+                }));
+
+        issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
+        Assert.Equal(2, issue.Number);
     }
     
     [Fact]
@@ -299,10 +338,10 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var organization = await testScope.InitializePersonalOrganization(
             userId,
             o => o
-                .AddSpace(userId, s => s
+                .AddSpace(userId, "SP1", s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, issue => issue.WithContent("Other space app"))))
-                .AddSpace(userId, s => s
+                .AddSpace(userId, "SP2", s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, issue => issue.WithContent("Build app"))
                         .AddIssue(userId, 0, issue => issue.WithContent("Deliver app")))));
