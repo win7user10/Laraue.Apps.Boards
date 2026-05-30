@@ -51,6 +51,7 @@ public class SpacesService(
                     Color = x.Space.Color,
                     CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
                     CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
+                    Key = x.Space.Key,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -184,7 +185,8 @@ public record SpaceListDto
 {
     public long Id { get; set; }
     public required string Name { get; set; }
-    public required string? Color { get; set; }
+    public required string Color { get; set; }
+    public required string Key { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
 }
