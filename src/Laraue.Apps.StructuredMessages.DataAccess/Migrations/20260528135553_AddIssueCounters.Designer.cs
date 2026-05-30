@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260528135553_AddIssueCounters")]
+    partial class AddIssueCounters
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -177,6 +180,10 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
                     b.Property<long>("StatusId")
                         .HasColumnType("bigint")
                         .HasColumnName("status_id");
@@ -213,30 +220,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasDatabaseName("ix_issues_user_id");
 
                     b.ToTable("issues", (string)null);
-                });
-
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", b =>
-                {
-                    b.Property<long>("IssueId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("issue_id");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("integer")
-                        .HasColumnName("number");
-
-                    b.Property<long>("SpaceId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("space_id");
-
-                    b.HasKey("IssueId")
-                        .HasName("pk_issue_numbers");
-
-                    b.HasIndex("SpaceId", "Number")
-                        .IsUnique()
-                        .HasDatabaseName("ix_issue_numbers_space_id_number");
-
-                    b.ToTable("issue_numbers", (string)null);
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>
@@ -384,12 +367,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_default");
 
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("key");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -410,9 +387,8 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.HasIndex("CreatorId")
                         .HasDatabaseName("ix_spaces_creator_id");
 
-                    b.HasIndex("OrganizationId", "Key")
-                        .IsUnique()
-                        .HasDatabaseName("ix_spaces_organization_id_key");
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_spaces_organization_id");
 
                     b.ToTable("spaces", (string)null);
                 });
@@ -912,27 +888,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", b =>
-                {
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", "Issue")
-                        .WithOne("IssueNumber")
-                        .HasForeignKey("Laraue.Apps.StructuredMessages.DataAccess.Models.IssueNumber", "IssueId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_numbers_issues_issue_id");
-
-                    b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.Space", "Space")
-                        .WithMany()
-                        .HasForeignKey("SpaceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_numbers_spaces_space_id");
-
-                    b.Navigation("Issue");
-
-                    b.Navigation("Space");
-                });
-
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>
                 {
                     b.HasOne("Laraue.Apps.StructuredMessages.DataAccess.Models.User", "Owner")
@@ -1063,11 +1018,6 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                     b.Navigation("Statuses");
 
                     b.Navigation("Users");
-                });
-
-            modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Issue", b =>
-                {
-                    b.Navigation("IssueNumber");
                 });
 
             modelBuilder.Entity("Laraue.Apps.StructuredMessages.DataAccess.Models.Organization", b =>

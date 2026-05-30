@@ -18,7 +18,8 @@ public interface ITelegramSaveMessageService
 public class TelegramSaveMessageService(
     DatabaseContext context,
     IFileStorage fileStorage,
-    ITelegramBotClient botClient)
+    ITelegramBotClient botClient,
+    ICoreIssuesService coreIssuesService)
     : ITelegramSaveMessageService
 {
     public Task<GetOrCreateMessageResult> Save(
@@ -257,18 +258,20 @@ public class TelegramSaveMessageService(
         if (!cardForMessageIsCreated)
         {
             var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
-            var card = new Issue
-            {
-                Content = request.Text,
-                UserId = request.UserId,
-                StatusId = statusId,
-                CreatedAt = request.SentAt,
-                TelegramMessageId = savedMessage.Id,
-                TelegramMessage = savedMessage,
-            };
-                
-            context.Add(card);
-            await context.SaveChangesAsync(cancellationToken);
+
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            
+            await coreIssuesService.Create(
+                new CreateIssueRequest
+                {
+                    CreatedAt = request.SentAt,
+                    Text = request.Text,
+                    StatusId = statusId,
+                    TelegramMessageId = savedMessage.Id,
+                    UserId = request.UserId,
+                }, cancellationToken);
+            
+            await transaction.CommitAsync(cancellationToken);
             
             return new GetOrCreateMessageResult
             {
@@ -323,29 +326,40 @@ public class TelegramSaveMessageService(
         if (savedMessage?.IssueId is null)
         {
             var statusId = await GetStatusIdToSaveMessage(request.UserId, cancellationToken);
-            
-            var card = new Issue
-            {
-                Content = request.Text,
-                UserId = request.UserId,
-                CreatedAt = request.SentAt,
-                TelegramMessageId = savedMessage?.Id,
-                StatusId = statusId,
-                TelegramMessage = savedMessage is null
-                    ? new TelegramMessage
-                    {
-                        ExternalMessageId = request.ExternalMessageId,
-                        ExternalChatId = request.ExternalUserId,
-                    }
-                    : null
-            };
 
-            context.Add(card);
-            await context.SaveChangesAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+            TelegramMessage? telegramMessage = null;
+            if (savedMessage is null)
+            {
+                telegramMessage = new TelegramMessage
+                {
+                    ExternalMessageId = request.ExternalMessageId,
+                    ExternalChatId = request.ExternalUserId,
+                };
+                
+                context.Add(telegramMessage);
+                
+                await context.SaveChangesAsync(cancellationToken);
+            }
+
+            var messageId = savedMessage?.Id ?? telegramMessage?.Id ?? throw new InvalidOperationException();
+            await coreIssuesService.Create(
+                new CreateIssueRequest
+                {
+                    CreatedAt = request.SentAt,
+                    Text = request.Text,
+                    TelegramMessageId = messageId,
+                    StatusId = statusId,
+                    UserId = request.UserId,
+                }, cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+
             return new GetOrCreateMessageResult
             {
                 Result = Result.MainMessageCreated,
-                TelegramMessageId = savedMessage?.Id ?? card.TelegramMessage?.Id ?? 0
+                TelegramMessageId = messageId
             };
         }
         

@@ -36,4 +36,7 @@ public class Issue
     
     public TelegramMessage? TelegramMessage { get; set; }
     public long? TelegramMessageId { get; set; }
+    
+    
+    public IssueNumber? IssueNumber { get; set; }
 }

@@ -44,6 +44,7 @@ public class OrganizationDefaults
                     Color = Palette.RandomColor(),
                     CreatedAt = timestamp,
                     UpdatedAt = timestamp,
+                    Key = "DEF",
                     IsDefault = true,
                     CreatorId = userId,
                     Epics = new List<Epic> { GetNewBacklogEpicEntity(userId, timestamp) },

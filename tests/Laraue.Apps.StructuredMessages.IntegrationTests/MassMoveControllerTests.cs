@@ -60,8 +60,15 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
             userId,
             o => o
                 .AddSpace(userId, s => s
-                    .AddEpic(userId)));
-        var organization = await testScope.InitializeOrganization(userId);
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, builder => builder
+                            .WithContent("Moving issue")))));
+        
+        var organization = await testScope.InitializeOrganization(
+            userId,
+            o => o
+                .AddIssueToDefaultStatus(userId, builder => builder
+                    .WithContent("Old issue")));
 
         var sourceSpace = personalOrganization.GetSpace(1);
         var backlogEpic = personalOrganization.GetEpic(1, 0); // Backlog should not be moved
@@ -69,12 +76,50 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         
         var spaceToReceive = organization.GetSpace(0);
         
+        var issueNumbers = await testScope.Database.IssueNumbers
+            .OrderBy(i => i.IssueId)
+            .Select(x => new { x.Number, x.Issue!.Content, x.SpaceId })
+            .ToListAsyncEF();
+
+        // Assert issue numbers before moving
+        var firstIssue = issueNumbers[0];
+        Assert.Equal(sourceSpace.Id, firstIssue.SpaceId);
+        Assert.Equal(1, firstIssue.Number);
+        Assert.Equal("Moving issue", firstIssue.Content);
+        
+        var secondIssue = issueNumbers[1];
+        Assert.Equal(spaceToReceive.Id, secondIssue.SpaceId);
+        Assert.Equal(1, secondIssue.Number);
+        Assert.Equal("Old issue", secondIssue.Content);
+        
         await _controller
             .WithOrganizationAuthorization(personalOrganization.Id, userId)
             .Execute(x => x.MoveSpaceEpics(sourceSpace.Id, spaceToReceive.Id));
         
         var movedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == epicToMove.Id);
         Assert.Equal(spaceToReceive.Id, movedEpic.SpaceId);
+        
+        // Assert issue numbers after moving
+        issueNumbers = await testScope.Database.IssueNumbers
+            .OrderBy(i => i.IssueId)
+            .Select(x => new { x.Number, x.Issue!.Content, x.SpaceId })
+            .ToListAsyncEF();
+
+        firstIssue = issueNumbers[0];
+        Assert.Equal(spaceToReceive.Id, firstIssue.SpaceId);
+        Assert.Equal(2, firstIssue.Number);
+        Assert.Equal("Moving issue", firstIssue.Content);
+        
+        secondIssue = issueNumbers[1];
+        Assert.Equal(spaceToReceive.Id, secondIssue.SpaceId);
+        Assert.Equal(1, secondIssue.Number);
+        Assert.Equal("Old issue", secondIssue.Content);
+
+        var counters = await testScope.Database.SpaceCounters
+            .ToDictionaryAsyncEF(x => x.SpaceId, x => x.LastNumber);
+        
+        Assert.Equal(1, counters[sourceSpace.Id]);
+        Assert.Equal(2, counters[spaceToReceive.Id]);
         
         var notMovedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == backlogEpic.Id);
         Assert.Equal(sourceSpace.Id, notMovedEpic.SpaceId);
@@ -193,8 +238,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var destinationOrganization = await testScope.InitializeOrganization(
             userId,
             o => o
-                .AddSpace(userId)
-                .AddSpace(userId, s => s.WithName("Allowed"))
+                .AddSpace(userId, "SP1")
+                .AddSpace(userId, "SP2", s => s.WithName("Allowed"))
                 .AddUser(participatorId, u => u // User has create epics access only to last space
                     .SetSpaceEpicsAccessLevel(2, ChildrenAccessLevel.Create)));
         

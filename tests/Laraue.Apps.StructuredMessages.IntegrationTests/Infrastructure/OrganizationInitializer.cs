@@ -20,7 +20,7 @@ public class OrganizationInitializer(
 
     private readonly List<SpaceBuilder> _spaces =
     [
-        new SpaceBuilder(ownerId, DateTime.UtcNow)
+        new SpaceBuilder(ownerId, "DEF", DateTime.UtcNow)
             .WithName("Default Space")
             .SetAsDefault()
             .AddEpic(ownerId, e => e
@@ -69,6 +69,7 @@ public class OrganizationInitializer(
 
         organization.Spaces = new List<Space>(); // Add all children manually
 
+        var spaceCounters = new List<(Space, int)>();
         for (var index = 0; index < _spaces.Count; index++)
         {
             var space = _spaces[index];
@@ -80,12 +81,14 @@ public class OrganizationInitializer(
                 UpdatedAt = space.Timestamp,
                 CreatorId = space.CreatorId,
                 IsDefault = space.IsDefault,
+                Key = space.SpaceKey,
                 Epics = index == 0 ? new List<Epic>() : new List<Epic>
                 {
                     OrganizationDefaults.GetNewBacklogEpicEntity(space.CreatorId, space.Timestamp)
                 }
             };
 
+            var lastIssueNumber = 0;
             foreach (var epic in space.Epics)
             {
                 var epicEntity = new Epic
@@ -114,6 +117,7 @@ public class OrganizationInitializer(
                     epicEntity.Statuses.Add(statusEntity);
                 }
 
+
                 foreach (var issuesByStatusIndex in epic.Issues)
                 {
                     var statusForIssue = epicEntity.Statuses[issuesByStatusIndex.Key];
@@ -126,6 +130,11 @@ public class OrganizationInitializer(
                             UserId = issue.CreatorId,
                             CreatedAt = issue.Timestamp,
                             UpdatedAt = issue.Timestamp,
+                            IssueNumber = new IssueNumber
+                            {
+                                Space = spaceEntity,
+                                Number = ++lastIssueNumber,
+                            }
                         });
                     }
                 }
@@ -134,9 +143,21 @@ public class OrganizationInitializer(
             }
 
             organization.Spaces!.Add(spaceEntity);
+            spaceCounters.Add((spaceEntity, lastIssueNumber));
         }
 
         context.Add(organization);
+        await context.SaveChangesAsync();
+
+        foreach (var spaceCounter in spaceCounters)
+        {
+            context.Add(new SpaceCounter
+            {
+                SpaceId = spaceCounter.Item1.Id,
+                LastNumber = spaceCounter.Item2
+            });
+        }
+        
         await context.SaveChangesAsync();
 
         foreach (var user in _organizationUsers)
@@ -191,12 +212,22 @@ public class OrganizationInitializer(
 
     public OrganizationInitializer AddSpace(Guid creatorId)
     {
-        return AddSpace(creatorId, _ => {});
+        return AddSpace(creatorId, "ADD", _ => {});
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId, string key)
+    {
+        return AddSpace(creatorId, key, _ => {});
     }
 
     public OrganizationInitializer AddSpace(Guid creatorId, Action<SpaceBuilder> spaceBuilder)
     {
-        var builder = new SpaceBuilder(creatorId, _timestamp);
+        return AddSpace(creatorId, "ADD", spaceBuilder);
+    }
+
+    public OrganizationInitializer AddSpace(Guid creatorId, string key, Action<SpaceBuilder> spaceBuilder)
+    {
+        var builder = new SpaceBuilder(creatorId, key, _timestamp);
         spaceBuilder(builder);
         
         _spaces.Add(builder);
@@ -335,8 +366,9 @@ public class OrganizationInitializer(
         }
     }
 
-    public class SpaceBuilder(Guid creatorId, DateTime timestamp)
+    public class SpaceBuilder(Guid creatorId, string key, DateTime timestamp)
     {
+        public string SpaceKey { get; private set; } = key;
         public string SpaceName { get; private set; } = "AdditionalSpace";
         public string SpaceColor { get; private set; }  = "#ffffff";
         public DateTime Timestamp { get; private set; }  = timestamp;

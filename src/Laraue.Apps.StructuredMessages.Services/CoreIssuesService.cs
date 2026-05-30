@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Models;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -22,14 +23,24 @@ public interface ICoreIssuesService
         CancellationToken cancellationToken);
 }
 
-public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTimeProvider)
+public class CoreIssuesService(
+    DatabaseContext context,
+    IDateTimeProvider dateTimeProvider,
+    ISpaceCounterService spaceCounterService)
     : ICoreIssuesService
 {
     public async Task<long> Create(
         CreateIssueRequest request,
         CancellationToken cancellationToken)
     {
-        var entity = new Issue
+        context.Database.EnsureTransactionStarted();
+        
+        var spaceId = await context.Statuses
+            .Where(x => x.Id == request.StatusId)
+            .Select(x => x.Epic!.SpaceId)
+            .FirstOrThrowNotFoundEFAsync("Space was not found", cancellationToken);
+        
+        var issue = new Issue
         {
             Content = request.Text,
             UserId = request.UserId,
@@ -39,12 +50,20 @@ public class CoreIssuesService(DatabaseContext context, IDateTimeProvider dateTi
             StatusId = request.StatusId,
         };
         
-        context.Add(entity);
+        var issueNumber = new IssueNumber
+        {
+            Number = await spaceCounterService.GetNextNumber(spaceId, cancellationToken),
+            Issue = issue,
+            SpaceId = spaceId,
+        };
+        
+        context.Add(issue);
+        context.Add(issueNumber);
+        
         await context.SaveChangesAsync(cancellationToken);
+        await TouchMessageBoard(issue.Id, request.CreatedAt, cancellationToken);
         
-        await TouchMessageBoard(entity.Id, request.CreatedAt, cancellationToken);
-        
-        return entity.Id;
+        return issue.Id;
     }
 
     public async Task Update(

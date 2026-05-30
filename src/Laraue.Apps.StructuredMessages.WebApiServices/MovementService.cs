@@ -65,7 +65,9 @@ public class MovementService(
 
         await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
 
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await movementService.MoveSpaceEpics(request.SpaceId, request.NewSpaceId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task MoveEpic(MoveEpicRequest request, CancellationToken cancellationToken)
@@ -82,7 +84,9 @@ public class MovementService(
         
         await CanCreateEpicsOrThrow(request.AuthData.UserId, request.NewSpaceId, cancellationToken);
         
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await movementService.MoveEpic(request.Id, request.NewSpaceId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<DestinationSpace[]> GetDestinationSpaces(
@@ -120,10 +124,12 @@ public class MovementService(
             request.StatusId,
             ct);
         
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         await movementService.MoveIssue(
             request.IssueId,
             request.StatusId,
             ct);
+        await transaction.CommitAsync(ct);
     }
 
     private async Task CanCreateEpicsOrThrow(
