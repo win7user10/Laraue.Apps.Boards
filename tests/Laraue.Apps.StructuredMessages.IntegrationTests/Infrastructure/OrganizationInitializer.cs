@@ -69,6 +69,7 @@ public class OrganizationInitializer(
 
         organization.Spaces = new List<Space>(); // Add all children manually
 
+        var spaceCounters = new List<(Space, int)>();
         for (var index = 0; index < _spaces.Count; index++)
         {
             var space = _spaces[index];
@@ -87,6 +88,7 @@ public class OrganizationInitializer(
                 }
             };
 
+            var lastIssueNumber = 0;
             foreach (var epic in space.Epics)
             {
                 var epicEntity = new Epic
@@ -116,7 +118,6 @@ public class OrganizationInitializer(
                 }
 
 
-                var lastIssueNumber = 0;
                 foreach (var issuesByStatusIndex in epic.Issues)
                 {
                     var statusForIssue = epicEntity.Statuses[issuesByStatusIndex.Key];
@@ -142,9 +143,21 @@ public class OrganizationInitializer(
             }
 
             organization.Spaces!.Add(spaceEntity);
+            spaceCounters.Add((spaceEntity, lastIssueNumber));
         }
 
         context.Add(organization);
+        await context.SaveChangesAsync();
+
+        foreach (var spaceCounter in spaceCounters)
+        {
+            context.Add(new SpaceCounter
+            {
+                SpaceId = spaceCounter.Item1.Id,
+                LastNumber = spaceCounter.Item2
+            });
+        }
+        
         await context.SaveChangesAsync();
 
         foreach (var user in _organizationUsers)

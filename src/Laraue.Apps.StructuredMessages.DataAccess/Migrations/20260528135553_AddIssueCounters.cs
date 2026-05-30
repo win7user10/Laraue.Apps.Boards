@@ -40,7 +40,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             // Insert issue numbers
             migrationBuilder.Sql(@"
 WITH issue_counters as (
-    select i.id, e.space_id, row_number() over (partition by e.space_id) as number from issues i
+    select i.id, e.space_id, row_number() over (partition by e.space_id order by i.id) as number from issues i
     inner join statuses s on i.status_id = s.id
     inner join epics e on s.epic_id = e.id
     order by i.id
@@ -71,6 +71,7 @@ WITH issue_counters as (
         inner join statuses st on i.status_id = st.id
         inner join epics e on st.epic_id = e.id and e.space_id = s.id
         inner join issue_numbers ic on ic.issue_id = i.id
+        order by ic.number desc
         limit 1) as number
     from spaces s
 )

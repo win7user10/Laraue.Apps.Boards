@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.StructuredMessages.DataAccess;
+using Laraue.Apps.StructuredMessages.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB;
@@ -89,34 +90,16 @@ public class CoreMovementService(
         if (updatedCount == 0)
             return;
 
-        var issuesNumbersToUpdateQuery = context.IssueNumbers
+        var affectedIssueNumbers = context.IssueNumbers
             .Where(i => i.SpaceId == spaceId);
 
-        var issuesToUpdateQueryCount = await issuesNumbersToUpdateQuery
-            .CountAsyncEF(cancellationToken);
-        
-        var nextNumber = await spaceCounterService.GetNextNumber(
-            spaceId, issuesToUpdateQueryCount, cancellationToken);
-
-        var issueNumbers = issuesNumbersToUpdateQuery
-            .Select(number => new 
-            {
-                number.IssueId,
-                RowNum = Sql.Ext.RowNumber().Over().OrderBy(number.IssueId).ToValue()
-            })
-            .AsCte();
-
-        await context.IssueNumbers
-            .Join(issueNumbers, number => number.IssueId, n => n.IssueId, (number, n) => new { Number = number, n })
-            .Set(x => x.Number.Number, x => nextNumber + x.n.RowNum - 1)
-            .Set(x => x.Number.SpaceId, newSpaceId)
-            .UpdateAsync(cancellationToken);
+        await UpdateIssueNumbers(affectedIssueNumbers, newSpaceId, cancellationToken);
     }
 
     public async Task MoveEpic(long epicId, long newSpaceId, CancellationToken cancellationToken)
     {
-        // TODO - renumber issues
-        
+        context.Database.EnsureTransactionStarted();
+
         var sourceData = await context.Epics
             .Where(x => x.Id == epicId)
             .Select(x => new { x.IsDefault })
@@ -125,11 +108,19 @@ public class CoreMovementService(
         if (sourceData.IsDefault)
             throw new ForbiddenException("Default epic cannot be moved.");
         
-        await context.Epics
+        var updatedCount = await context.Epics
             .Where(x => x.Id == epicId)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(epic => epic.SpaceId, newSpaceId),
                 cancellationToken);
+        
+        if (updatedCount == 0)
+            return;
+        
+        var affectedIssueNumbers = context.IssueNumbers
+            .Where(i => i.Issue!.Status!.EpicId == epicId);
+
+        await UpdateIssueNumbers(affectedIssueNumbers, newSpaceId, cancellationToken);
     }
     
     public async Task MoveIssue(
@@ -137,11 +128,55 @@ public class CoreMovementService(
         long statusId,
         CancellationToken ct)
     {
-        // TODO - renumber issues
+        context.Database.EnsureTransactionStarted();
+
+        var oldSpaceId = await context.Issues
+            .Where(i => i.Id == issueId)
+            .Select(i => i.Status!.Epic!.SpaceId)
+            .FirstOrThrowNotFoundEFAsync($"Issue: {issueId} is not found", ct);
+        
+        var newSpaceId = await context.Statuses
+            .Where(i => i.Id == statusId)
+            .Select(i => i.Epic!.SpaceId)
+            .FirstOrThrowNotFoundEFAsync($"Status: {statusId} is not found", ct);
         
         await issuesService.Update(
             issueId,
             update => update.SetProperty(x => x.StatusId, statusId),
             ct);
+
+        if (oldSpaceId == newSpaceId)
+            return;
+        
+        var affectedIssueNumbers = context.IssueNumbers
+            .Where(i => i.IssueId == issueId);
+
+        await UpdateIssueNumbers(affectedIssueNumbers, newSpaceId, ct);
+    }
+
+    private async Task UpdateIssueNumbers(
+        IQueryable<IssueNumber> issueNumbersQuery,
+        long newSpaceId,
+        CancellationToken cancellationToken)
+    {
+        var affectedIssueNumbers = issueNumbersQuery
+            .Select(number => new
+            {
+                number.IssueId,
+                Number = Sql.Ext.RowNumber().Over().OrderBy(number.IssueId).ToValue(),
+            })
+            .AsCte();
+
+        var issuesToUpdateQueryCount = await issueNumbersQuery
+            .CountAsyncEF(cancellationToken);
+        
+        var nextNumber = await spaceCounterService.GetNextNumber(
+            newSpaceId, issuesToUpdateQueryCount, cancellationToken);
+        
+        await context.IssueNumbers
+            .Join(affectedIssueNumbers, number => number.IssueId, n => n.IssueId, (number, n) => new { Number = number, n })
+            .Set(x => x.Number.Number, x => nextNumber + x.n.Number - 1)
+            .Set(x => x.Number.SpaceId, newSpaceId)
+            .UpdateAsync(cancellationToken);
     }
 }

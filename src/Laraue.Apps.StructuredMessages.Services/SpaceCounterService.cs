@@ -34,7 +34,7 @@ public class SpaceCounterService(DatabaseContext context) : ISpaceCounterService
     {
         var last = await GetLastNumber(spaceId, count, cancellationToken);
         
-        return last - count + 2;
+        return last - count + 1;
     }
     
     private async Task<int> GetLastNumber(long spaceId, int count, CancellationToken cancellationToken)

@@ -114,6 +114,12 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         Assert.Equal(spaceToReceive.Id, secondIssue.SpaceId);
         Assert.Equal(1, secondIssue.Number);
         Assert.Equal("Old issue", secondIssue.Content);
+
+        var counters = await testScope.Database.SpaceCounters
+            .ToDictionaryAsyncEF(x => x.SpaceId, x => x.LastNumber);
+        
+        Assert.Equal(1, counters[sourceSpace.Id]);
+        Assert.Equal(2, counters[spaceToReceive.Id]);
         
         var notMovedEpic = await testScope.Database.Epics.FirstAsyncEF(e => e.Id == backlogEpic.Id);
         Assert.Equal(sourceSpace.Id, notMovedEpic.SpaceId);
