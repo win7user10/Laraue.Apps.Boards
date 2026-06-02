@@ -10,7 +10,7 @@ public class Status
     public string Name { get; set; } = string.Empty;
     
     [MaxLength(7)]
-    public string? Color { get; set; }
+    public string Color { get; set; } = string.Empty;
     
     public long EpicId { get; set; }
     public Epic? Epic { get; set; }

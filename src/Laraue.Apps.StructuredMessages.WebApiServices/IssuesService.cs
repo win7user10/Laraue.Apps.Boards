@@ -41,7 +41,7 @@ public interface IIssuesService
         UpdateIssueRequest request,
         CancellationToken ct);
     
-    Task<ShortPaginatedResult<IssueListDto>> Search(
+    Task<ShortPaginatedResult<SearchIssueDto>> Search(
         SearchRequest request,
         CancellationToken ct);
     
@@ -91,7 +91,7 @@ public class IssuesService(
             .Select(Map)
             .ToArray();
         
-        await Enrich(projected, cancellationToken);
+        await EnrichMedia(projected, cancellationToken);
 
         return new BatchResult<IssueListDto>
         {
@@ -179,7 +179,7 @@ public class IssuesService(
             .SelectMany(x => x.Items.Data)
             .ToList();
         
-        await Enrich(allData, cancellationToken);
+        await EnrichMedia(allData, cancellationToken);
 
         return result.ToArray();
     }
@@ -315,11 +315,11 @@ public class IssuesService(
             ct);
     }
 
-    public async Task<ShortPaginatedResult<IssueListDto>> Search(
+    public async Task<ShortPaginatedResult<SearchIssueDto>> Search(
         SearchRequest request,
         CancellationToken ct)
     {
-        var result = await issuesAccessService.GetAvailable(
+        var temporaryResult = await issuesAccessService.GetAvailable(
             request.AuthData,
             issues =>
             {
@@ -337,11 +337,53 @@ public class IssuesService(
                     .ShortPaginateLinq2DbAsync(request, ct);
             }, ct);
         
-        var mapped = result.MapTo(Map);
-        await Enrich(mapped.Data, ct);
+        var mapped = temporaryResult.MapTo(Map);
+        await EnrichMedia(mapped.Data, ct);
         
-        return mapped;
+        var result = await MapToSearchDtos(mapped.Data, ct);
+        return new ShortPaginatedResult<SearchIssueDto>(
+            mapped.Page,
+            mapped.PerPage,
+            mapped.HasNextPage,
+            result);
     }
+
+    private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
+    {
+        var epics = await context.Epics
+            .Where(x => elements.Select(y => y.EpicId).Contains(x.Id))
+            .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color }, ct);
+        
+        var statuses = await context.Statuses
+            .Where(x => elements.Select(y => y.StatusId).Contains(x.Id))
+            .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color }, ct);
+
+        var result = new List<SearchIssueDto>();
+
+        foreach (var element in elements)
+        {
+            result.Add(new SearchIssueDto
+            {
+                EpicColor = epics[element.EpicId].Color,
+                EpicId = element.EpicId,
+                EpicName = epics[element.EpicId].Name,
+                StatusColor = statuses[element.StatusId].Color,
+                StatusName = statuses[element.StatusId].Name,
+                Id = element.Id,
+                StatusId = element.StatusId,
+                Content = element.Content,
+                Key = element.Key,
+                Sender = element.Sender,
+                SenderColor = element.SenderColor,
+                Time = element.Time,
+                Media = element.Media,
+                SenderInitial = element.SenderInitial,
+            });
+        }
+        
+        return result;
+    }
+    
 
     public async Task<IssueDetailDto> GetIssue(
         GetIssueRequest request,
@@ -390,7 +432,7 @@ public class IssuesService(
         };
     }
 
-    private async Task Enrich<T>(IList<T> elements, CancellationToken ct)
+    private async Task EnrichMedia<T>(IList<T> elements, CancellationToken ct)
         where T : class, ICanContainMedia
     {
         var cardIds = elements.Select(x => x.Id).ToList();
@@ -612,6 +654,14 @@ public class IssueListDto : ICanContainMedia
     public required long EpicId { get; set; }
     public required long StatusId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
+}
+
+public class SearchIssueDto : IssueListDto
+{
+    public required string EpicName { get; set; }
+    public required string EpicColor { get; set; }
+    public required string StatusName { get; set; }
+    public required string StatusColor { get; set; }
 }
 
 public class MediaInfo

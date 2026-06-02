@@ -14,10 +14,6 @@ public interface ISpacesService
         GetSpacesRequest request,
         CancellationToken cancellationToken);
     
-    Task<SpaceDto> GetSpace(
-        GetSpaceRequest request,
-        CancellationToken cancellationToken);
-    
     Task<long> Create(
         CreateSpaceRequest request,
         CancellationToken cancellationToken);
@@ -51,38 +47,13 @@ public class SpacesService(
                     Color = x.Space.Color,
                     CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
                     CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
+                    CanCreateEpics = (x.ChildrenAccessLevel & ChildrenAccessLevel.Create) == ChildrenAccessLevel.Create,
                     Key = x.Space.Key,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
         
         return spaces;
-    }
-
-    public async Task<SpaceDto> GetSpace(GetSpaceRequest request, CancellationToken cancellationToken)
-    {
-        await spacesAccessService.HasAccessOrThrow(
-            request.AuthData,
-            request.Id,
-            EntityAccessLevel.Read,
-            cancellationToken);
-        
-        var canCreateEpics = await spacesAccessService.CanCreateEpics(
-            request.AuthData,
-            request.Id,
-            cancellationToken);
-
-        var childrenAccessLevel = await spacesAccessService.GetChildrenAccessLevel(
-            request.AuthData,
-            request.Id,
-            cancellationToken);
-
-        return new SpaceDto
-        {
-            CanCreateEpics = canCreateEpics,
-            CanDelete = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Create),
-            CanUpdate = childrenAccessLevel.HasFlag(ChildrenAccessLevel.Update),
-        };
     }
 
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
@@ -170,12 +141,6 @@ public record DeleteSpaceRequest
     public long Id { get; set; }
 }
 
-public record GetSpaceRequest
-{
-    public required OrganizationAuthData AuthData { get; set; }
-    public required long Id { get; set; }
-}
-
 public record GetSpacesRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
@@ -189,6 +154,7 @@ public record SpaceListDto
     public required string Key { get; set; }
     public required bool CanUpdate { get; set; }
     public required bool CanDelete { get; set; }
+    public required bool CanCreateEpics { get; set; }
 }
 
 public record SpaceDto
