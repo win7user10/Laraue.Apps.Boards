@@ -323,8 +323,8 @@ public class IssuesService(
             request.AuthData,
             issues =>
             {
-                if (request.EpicId.HasValue)
-                    issues = issues.Where(x => x.Status!.EpicId == request.EpicId);
+                if (request.EpicIds.Length > 0)
+                    issues = issues.Where(x => ((IEnumerable<long>)request.EpicIds).Contains(x.Status!.EpicId));
         
                 if (request.SpaceId.HasValue)
                     issues = issues.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
@@ -356,19 +356,22 @@ public class IssuesService(
         
         var statuses = await context.Statuses
             .Where(x => elements.Select(y => y.StatusId).Contains(x.Id))
+            .Where(x => !x.Epic!.IsDefault)
             .ToDictionaryAsyncEF(x => x.Id, x => new { x.Name, x.Color }, ct);
 
         var result = new List<SearchIssueDto>();
 
         foreach (var element in elements)
         {
+            var status = statuses.GetValueOrDefault(element.StatusId);
+            
             result.Add(new SearchIssueDto
             {
                 EpicColor = epics[element.EpicId].Color,
                 EpicId = element.EpicId,
                 EpicName = epics[element.EpicId].Name,
-                StatusColor = statuses[element.StatusId].Color,
-                StatusName = statuses[element.StatusId].Name,
+                StatusColor = status?.Color,
+                StatusName = status?.Name,
                 Id = element.Id,
                 StatusId = element.StatusId,
                 Content = element.Content,
@@ -383,33 +386,34 @@ public class IssuesService(
         
         return result;
     }
-    
 
     public async Task<IssueDetailDto> GetIssue(
         GetIssueRequest request,
         CancellationToken cancellationToken)
     {
-        await issuesAccessService.HasAccessOrThrow(
+        var issueAccessLevel = await issuesAccessService.GetAccessLevel(
             request.AuthData,
             request.IssueId,
-            EntityAccessLevel.Read,
             cancellationToken);
+
+        if (!issueAccessLevel.HasFlag(EntityAccessLevel.Read))
+            throw new NotFoundException($"Issue: {request.IssueId} is not found or not accessible");
 
         var result = await context.Issues
             .Where(x => x.Id == request.IssueId)
-            .Select(x => new MessageDetailDtoData
+            .Select(x => new IssueDetailDtoData
             {
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
                 CategoryName = x.Status!.Epic!.Name,
-                StatusName = x.Status!.Name,
+                StatusName = x.Status!.Epic!.IsDefault ? null : x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
                 CategoryColor = x.Status.Epic.Color,
-                StatusColor = x.Status.Color,
+                StatusColor = x.Status!.Epic!.IsDefault ? null : x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
 
@@ -429,6 +433,7 @@ public class IssuesService(
             StatusName = result.StatusName,
             EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
+            CanEdit = issueAccessLevel.HasFlag(EntityAccessLevel.Update),
         };
     }
 
@@ -660,8 +665,8 @@ public class SearchIssueDto : IssueListDto
 {
     public required string EpicName { get; set; }
     public required string EpicColor { get; set; }
-    public required string StatusName { get; set; }
-    public required string StatusColor { get; set; }
+    public required string? StatusName { get; set; }
+    public required string? StatusColor { get; set; }
 }
 
 public class MediaInfo
@@ -700,7 +705,7 @@ public record UpdateIssueRequest
 public record SearchRequest : IPaginationData
 {
     public OrganizationAuthData AuthData { get; set; } = new();
-    public long? EpicId { get; set; }
+    public long[] EpicIds { get; set; } = [];
     public long? SpaceId { get; set; }
     public string? SearchString { get; set; }
     public int Page { get; init; }
@@ -718,9 +723,10 @@ public class IssueDetailDto
     public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required bool CanEdit { get; set; }
 }
 
-public class MessageDetailDtoData
+public class IssueDetailDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }

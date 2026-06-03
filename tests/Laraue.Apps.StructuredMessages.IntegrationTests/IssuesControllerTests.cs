@@ -426,7 +426,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
             .Execute(x => x.GetIssue(issue.Id)));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Read is missing", notFound.Message);
+        Assert.Equal($"Issue: {issue.Id} is not found or not accessible", notFound.Message);
     }
 
     [Fact]
@@ -516,7 +516,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
             .Execute(x => x.GetIssue(issue.Id)));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Read is missing", notFound.Message);
+        Assert.Equal($"Issue: {issue.Id} is not found or not accessible", notFound.Message);
     }
 
     [Fact]

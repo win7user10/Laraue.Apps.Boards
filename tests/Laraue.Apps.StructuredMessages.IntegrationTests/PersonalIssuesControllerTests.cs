@@ -315,7 +315,7 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
                     SearchString = "build",
                     Page = 0,
                     PerPage = 10,
-                    EpicId = epic.Id,
+                    EpicIds = new [] { epic.Id },
                 }));
         
         Assert.NotNull(searchResult);
