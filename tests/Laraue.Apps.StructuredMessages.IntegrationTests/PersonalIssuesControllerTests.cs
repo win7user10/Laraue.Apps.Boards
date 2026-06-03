@@ -355,7 +355,7 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
                     SearchString = "app",
                     Page = 0,
                     PerPage = 10,
-                    SpaceId = space.Id,
+                    SpaceIds = new [] { space.Id },
                 }));
         
         Assert.NotNull(searchResult);
