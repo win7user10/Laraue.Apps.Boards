@@ -2,8 +2,6 @@
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
-using Laraue.Core.DataAccess.Linq2DB.Extensions;
-using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -106,6 +104,7 @@ public record CreateSpaceRequest
     public OrganizationAuthData AuthData { get; set; } = new();
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
     
     [MaxLength(7)]
@@ -124,6 +123,7 @@ public record UpdateSpaceRequest
     public long Id { get; set; }
     
     [MaxLength(128)]
+    [MinLength(3)]
     public required string Name { get; set; }
     
     [MaxLength(7)]
