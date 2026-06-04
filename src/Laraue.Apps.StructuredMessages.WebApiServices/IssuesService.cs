@@ -41,7 +41,7 @@ public interface IIssuesService
         UpdateIssueRequest request,
         CancellationToken ct);
     
-    Task<ShortPaginatedResult<IssueListDto>> Search(
+    Task<ShortPaginatedResult<SearchIssueDto>> Search(
         SearchRequest request,
         CancellationToken ct);
     
@@ -91,7 +91,7 @@ public class IssuesService(
             .Select(Map)
             .ToArray();
         
-        await Enrich(projected, cancellationToken);
+        await EnrichMedia(projected, cancellationToken);
 
         return new BatchResult<IssueListDto>
         {
@@ -179,7 +179,7 @@ public class IssuesService(
             .SelectMany(x => x.Items.Data)
             .ToList();
         
-        await Enrich(allData, cancellationToken);
+        await EnrichMedia(allData, cancellationToken);
 
         return result.ToArray();
     }
@@ -315,19 +315,19 @@ public class IssuesService(
             ct);
     }
 
-    public async Task<ShortPaginatedResult<IssueListDto>> Search(
+    public async Task<ShortPaginatedResult<SearchIssueDto>> Search(
         SearchRequest request,
         CancellationToken ct)
     {
-        var result = await issuesAccessService.GetAvailable(
+        var temporaryResult = await issuesAccessService.GetAvailable(
             request.AuthData,
             issues =>
             {
-                if (request.EpicId.HasValue)
-                    issues = issues.Where(x => x.Status!.EpicId == request.EpicId);
+                if (request.EpicIds.Length > 0)
+                    issues = issues.Where(x => ((IEnumerable<long>)request.EpicIds).Contains(x.Status!.EpicId));
         
-                if (request.SpaceId.HasValue)
-                    issues = issues.Where(x => x.Status!.Epic!.SpaceId == request.SpaceId);
+                if (request.SpaceIds.Length > 0)
+                    issues = issues.Where(x => ((IEnumerable<long>)request.SpaceIds).Contains(x.Status!.Epic!.SpaceId));
         
                 if (!string.IsNullOrEmpty(request.SearchString))
                     issues = issues
@@ -337,37 +337,103 @@ public class IssuesService(
                     .ShortPaginateLinq2DbAsync(request, ct);
             }, ct);
         
-        var mapped = result.MapTo(Map);
-        await Enrich(mapped.Data, ct);
+        var mapped = temporaryResult.MapTo(Map);
+        await EnrichMedia(mapped.Data, ct);
         
-        return mapped;
+        var result = await MapToSearchDtos(mapped.Data, ct);
+        return new ShortPaginatedResult<SearchIssueDto>(
+            mapped.Page,
+            mapped.PerPage,
+            mapped.HasNextPage,
+            result);
+    }
+
+    private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
+    {
+        var spaces = await context.Spaces
+            .Where(x => elements.Select(y => y.SpaceId).Distinct().Contains(x.Id))
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+        
+        var epics = await context.Epics
+            .Where(x => elements.Select(y => y.EpicId).Distinct().Contains(x.Id))
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+        
+        var statuses = await context.Statuses
+            .Where(x => elements.Select(y => y.StatusId).Distinct().Contains(x.Id))
+            .Where(x => !x.Epic!.IsDefault)
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+
+        var result = new List<SearchIssueDto>();
+
+        foreach (var element in elements)
+        {
+            result.Add(new SearchIssueDto
+            {
+                EpicId = element.EpicId,
+                Epic = epics[element.EpicId],
+                StatusId = element.StatusId,
+                Status = statuses.GetValueOrDefault(element.StatusId),
+                SpaceId = element.SpaceId,
+                Space = spaces[element.SpaceId],
+                Id = element.Id,
+                Content = element.Content,
+                Key = element.Key,
+                Sender = element.Sender,
+                SenderColor = element.SenderColor,
+                Time = element.Time,
+                Media = element.Media,
+                SenderInitial = element.SenderInitial,
+            });
+        }
+        
+        return result;
     }
 
     public async Task<IssueDetailDto> GetIssue(
         GetIssueRequest request,
         CancellationToken cancellationToken)
     {
-        await issuesAccessService.HasAccessOrThrow(
+        var issueAccessLevel = await issuesAccessService.GetAccessLevel(
             request.AuthData,
             request.IssueId,
-            EntityAccessLevel.Read,
             cancellationToken);
+
+        if (!issueAccessLevel.HasFlag(EntityAccessLevel.Read))
+            throw new NotFoundException($"Issue: {request.IssueId} is not found or not accessible");
 
         var result = await context.Issues
             .Where(x => x.Id == request.IssueId)
-            .Select(x => new MessageDetailDtoData
+            .Select(x => new IssueDetailDtoData
             {
                 Id = x.Id,
                 Content = x.Content,
                 Time = x.CreatedAt,
                 CategoryName = x.Status!.Epic!.Name,
-                StatusName = x.Status!.Name,
+                StatusName = x.Status!.Epic!.IsDefault ? null : x.Status!.Name,
                 TelegramFirstName = x.User!.TelegramFirstName,
                 TelegramLastName = x.User!.TelegramLastName,
                 TelegramId = x.User.TelegramId,
                 TelegramUsername = x.User.TelegramUserName,
                 CategoryColor = x.Status.Epic.Color,
-                StatusColor = x.Status.Color,
+                StatusColor = x.Status!.Epic!.IsDefault ? null : x.Status.Color,
             })
             .FirstAsyncEF(cancellationToken);
 
@@ -387,10 +453,11 @@ public class IssuesService(
             StatusName = result.StatusName,
             EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
+            CanEdit = issueAccessLevel.HasFlag(EntityAccessLevel.Update),
         };
     }
 
-    private async Task Enrich<T>(IList<T> elements, CancellationToken ct)
+    private async Task EnrichMedia<T>(IList<T> elements, CancellationToken ct)
         where T : class, ICanContainMedia
     {
         var cardIds = elements.Select(x => x.Id).ToList();
@@ -518,6 +585,7 @@ public class IssuesService(
             UserColor = x.User.Color,
             Number = x.IssueNumber!.Number,
             SpaceKey = x.Status.Epic!.Space!.Key,
+            SpaceId = x.Status.Epic.SpaceId,
         });
     }
     
@@ -539,6 +607,7 @@ public class IssuesService(
             Time = source.Time,
             SenderColor = source.UserColor,
             Key = $"{source.SpaceKey}-{source.Number}",
+            SpaceId = source.SpaceId,
         };
     }
 }
@@ -592,6 +661,7 @@ public class IssueListDtoData
     public required long StatusId { get; set; }
     public required int Number { get; set; }
     public required string SpaceKey { get; set; }
+    public required long SpaceId { get; set; }
 }
 
 public interface ICanContainMedia
@@ -600,7 +670,7 @@ public interface ICanContainMedia
     public List<MediaInfo> Media { get; set; }
 }
 
-public class IssueListDto : ICanContainMedia
+public record IssueListDto : ICanContainMedia
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }
@@ -611,7 +681,21 @@ public class IssueListDto : ICanContainMedia
     public required string? Content { get; set; }
     public required long EpicId { get; set; }
     public required long StatusId { get; set; }
+    public required long SpaceId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
+}
+
+public record SearchIssueDto : IssueListDto
+{
+    public required NameAndColor Epic { get; set; }
+    public required NameAndColor? Status { get; set; }
+    public required NameAndColor Space { get; set; }
+}
+
+public record NameAndColor
+{
+    public required string Name { get; set; }
+    public required string Color { get; set; }
 }
 
 public class MediaInfo
@@ -650,8 +734,8 @@ public record UpdateIssueRequest
 public record SearchRequest : IPaginationData
 {
     public OrganizationAuthData AuthData { get; set; } = new();
-    public long? EpicId { get; set; }
-    public long? SpaceId { get; set; }
+    public long[] EpicIds { get; set; } = [];
+    public long[] SpaceIds { get; set; } = [];
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
@@ -668,9 +752,10 @@ public class IssueDetailDto
     public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required bool CanEdit { get; set; }
 }
 
-public class MessageDetailDtoData
+public class IssueDetailDtoData
 {
     public required long Id { get; set; }
     public required DateTime Time { get; set; }

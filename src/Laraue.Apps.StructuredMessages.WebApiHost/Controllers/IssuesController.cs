@@ -95,9 +95,9 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
             cancellationToken);
     }
     
-    [HttpGet("search")]
-    public Task<ShortPaginatedResult<IssueListDto>> Search(
-        [FromQuery] SearchRequest request,
+    [HttpPost("search")]
+    public Task<ShortPaginatedResult<SearchIssueDto>> Search(
+        [FromBody] SearchRequest request,
         CancellationToken cancellationToken = default)
     {
         return issuesService.Search(

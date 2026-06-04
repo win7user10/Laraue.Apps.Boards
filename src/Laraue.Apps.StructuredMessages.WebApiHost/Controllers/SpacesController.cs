@@ -74,16 +74,4 @@ public class SpacesController(ISpacesService spacesService, IEpicsService epicsS
                 AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
-    
-    [HttpGet("{id:long}")]
-    public Task<SpaceDto> GetSpace(
-        long id,
-        CancellationToken cancellationToken = default) => 
-        spacesService.GetSpace(
-            new GetSpaceRequest
-            {
-                Id = id,
-                AuthData = HttpContext.User.GetOrganizationAuthData()
-            },
-            cancellationToken);
 }
