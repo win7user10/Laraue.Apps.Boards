@@ -3,10 +3,10 @@ The repository contains backend for Task-management Jira-like system.
 
 ## App structure
 
-### Laraue.Apps.StructuredMessages.DataAccess
+### Laraue.Apps.Boards.DataAccess
 The layer that contains models and enums associated with these models
 
-### Laraue.Apps.StructuredMessages.Services
+### Laraue.Apps.Boards.Services
 The layer with services that use other services. Required to encapsulate hard logic mostly in CRD operations.  
 Example: issue creation may update `updated_at` property, add record to history changes etc.  
 So the service provides the method to create issue.
@@ -14,10 +14,10 @@ So the service provides the method to create issue.
 **Note:** core services should not manage transactions, but may require them calling `context.Database.EnsureTransaction`
 at the top of function.
 
-### Laraue.Apps.StructuredMessages.WebApiServices
+### Laraue.Apps.Boards.WebApiServices
 Services to call from WebApi
 
-### Laraue.Apps.StructuredMessages.TelegramServices
+### Laraue.Apps.Boards.TelegramServices
 Services to call from TelegramApi
 
 ## Local run
