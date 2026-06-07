@@ -1,0 +1,50 @@
+using Laraue.Apps.Boards.DataAccess;
+using Laraue.Apps.Boards.Services;
+using Laraue.Apps.Boards.WebApiHost;
+using Laraue.Core.DataAccess.Linq2DB.Extensions;
+using Laraue.Core.Exceptions;
+using Microsoft.EntityFrameworkCore;
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOptions<TelegramOptions>();
+builder.Services.Configure<TelegramOptions>(
+    builder.Configuration.GetSection("Telegram"));
+
+const string dbConnectionStringName = "Postgre";
+
+builder.Services.AddAuthorization();
+
+builder
+    .AddAuthentication()
+    .AddApplicationServices()
+    .AddDatabaseServices(dbConnectionStringName);
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.Services.UseLinq2Db();
+app.UseMiddleware<ExceptionHandleMiddleware>();
+
+using (var scope = app.Services.CreateScope())
+{
+    await using var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+    await db.Database.MigrateAsync();
+}
+
+var origins = builder
+    .Configuration
+    .GetSection("Cors:Hosts")
+    .Get<string[]>();
+
+if (origins is not null)
+{
+    app.UseCors(corsPolicyBuilder =>
+        corsPolicyBuilder.WithOrigins(origins)
+            .AllowCredentials()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+}
+
+app.Run();
