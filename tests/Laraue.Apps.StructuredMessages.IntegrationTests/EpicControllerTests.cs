@@ -57,7 +57,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, builder => builder
-                .SetEpicsAccessLevel(ChildrenAccessLevel.Create)));
+                .SetGlobalAccessLevel(x => x.CanCreateEpics = true)));
         
         var spaceId = organization.Spaces![0].Id;
         
@@ -75,32 +75,6 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
     }
     
     [Fact]
-    public async Task User_ShouldNotCreateEpicInOrganization_WhenHasCreateAccessOnSpacesLevel()
-    {
-        using var testScope = host.CreateTestScope();
-        var ownerId = await testScope.CreateUser();
-        var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializeOrganization(ownerId, org => org
-            .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
-        
-        var spaceId = organization.Spaces![0].Id;
-
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _epicsController
-            .WithOrganizationAuthorization(organization.Id, participatorId)
-            .Execute(x => x.Create(
-                new CreateEpicRequest
-                {
-                    Name = "Epic 1",
-                    Color = "#fffff1",
-                    SpaceId = spaceId,
-                })));
-
-        var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal($"Space: {spaceId} is not exists or items permission: Create is missing", notFound.Message);
-    }
-    
-    [Fact]
     public async Task User_ShouldCreateEpicInOrganization_WhenHasAccessOnSpaceLevel()
     {
         using var testScope = host.CreateTestScope();
@@ -108,7 +82,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, builder => builder
-                .SetSpaceEpicsAccessLevel(0, ChildrenAccessLevel.Create)));
+                .SetSpaceAccessLevel(0, x => x.CanCreateEpics = true)));
         
         var spaceId = organization.Spaces![0].Id;
         
@@ -135,7 +109,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
             setup => setup
                 .AddSpace(userId)
                 .AddUser(participatorId, u => u
-                    .SetIssuesAccessLevel(ChildrenAccessLevel.Read)));
+                    .SetGlobalAccessLevel(x => x.CanRead = true)));
 
         var epicId = organization.GetEpic(1, 0).Id;
         
@@ -147,7 +121,6 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         Assert.False(epic.CanDelete);
         Assert.False(epic.CanUpdate);
         Assert.False(epic.CanCreateIssues);
-        Assert.True(epic.CanViewIssues);
         Assert.False(epic.CanDeleteIssues);
         Assert.False(epic.CanUpdateIssues);
     }
@@ -160,7 +133,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, builder => builder
-                .SetEpicAccessLevel(0, 0, EntityAccessLevel.Update)));
+                .SetSpaceAccessLevel(0,  x => x.CanUpdateEpics = true)));
         
         var epicId = organization.GetEpic(0, 0).Id;
         
@@ -187,7 +160,7 @@ public class EpicControllerTests(WebApiTestHost host) : IClassFixture<WebApiTest
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(participatorId, space => space.AddEpic(participatorId))
             .AddUser(participatorId, builder => builder
-                .SetEpicAccessLevel(1, 1, EntityAccessLevel.Delete)));
+                .SetSpaceAccessLevel(1,  x => x.CanDeleteEpics = true)));
         
         var epicId = organization.GetEpic(1, 1).Id;
         

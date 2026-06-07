@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Laraue.Apps.StructuredMessages.DataAccess;
-using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -10,6 +9,10 @@ public interface ISpacesService
 {
     Task<SpaceListDto[]> GetSpaces(
         GetSpacesRequest request,
+        CancellationToken cancellationToken);
+    
+    Task<SpaceDetailsDto> GetSpace(
+        GetSpaceRequest request,
         CancellationToken cancellationToken);
     
     Task<long> Create(
@@ -27,7 +30,7 @@ public interface ISpacesService
 
 public class SpacesService(
     ICoreSpacesService coreSpacesService,
-    ISpacesAccessService spacesAccessService,
+    IAccessService accessService,
     IOrganizationAccessService organizationAccessService)
     : ISpacesService
 {
@@ -35,23 +38,37 @@ public class SpacesService(
         GetSpacesRequest request,
         CancellationToken cancellationToken)
     {
-        var spaces = await spacesAccessService.GetAvailableForRead(
+        var spaces = await accessService.GetAvailableSpaces(
             request.AuthData,
             items => items
                 .Select(x => new SpaceListDto
                 {
-                    Id = x.Space.Id,
-                    Name = x.Space.Name,
-                    Color = x.Space.Color,
-                    CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
-                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
-                    CanCreateEpics = (x.ChildrenAccessLevel & ChildrenAccessLevel.Create) == ChildrenAccessLevel.Create,
-                    Key = x.Space.Key,
+                    Id = x.Id,
+                    Name = x.Name,
+                    Color = x.Color,
+                    Key = x.Key,
+                    IsDefault = x.IsDefault,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
         
         return spaces;
+    }
+
+    public async Task<SpaceDetailsDto> GetSpace(GetSpaceRequest request, CancellationToken cancellationToken)
+    {
+        var spaceAccessLevel = await accessService
+            .GetAccessLevelsBySpaceId(request.AuthData, request.Id, cancellationToken);
+        
+        if (spaceAccessLevel is null)
+            throw new NotFoundException($"Space: {request.Id} is not found");
+        
+        return new SpaceDetailsDto
+        {
+            CanDelete = spaceAccessLevel.CanDeleteSpace,
+            CanUpdate = spaceAccessLevel.CanUpdateSpace,
+            CanCreateEpics = spaceAccessLevel.CanCreateEpic,
+        };
     }
 
     public async Task<long> Create(CreateSpaceRequest request, CancellationToken cancellationToken)
@@ -72,11 +89,16 @@ public class SpacesService(
 
     public async Task Update(UpdateSpaceRequest request, CancellationToken cancellationToken)
     {
-        await spacesAccessService.HasAccessOrThrow(
+        var accessLevel = await accessService.GetAccessLevelsBySpaceId(
             request.AuthData,
             request.Id,
-            EntityAccessLevel.Update,
             cancellationToken);
+
+        if (accessLevel is null)
+            throw new NotFoundException($"Space: {request.Id} is not found");
+        
+        if (!accessLevel.CanUpdateSpace)
+            throw new ForbiddenException($"Space: {request.Id} is not accessible");
 
         await coreSpacesService.Update(
             request.Id,
@@ -89,11 +111,16 @@ public class SpacesService(
 
     public async Task Delete(DeleteSpaceRequest request, CancellationToken cancellationToken)
     {
-        await spacesAccessService.HasAccessOrThrow(
+        var accessLevel = await accessService.GetAccessLevelsBySpaceId(
             request.AuthData,
             request.Id,
-            EntityAccessLevel.Delete,
             cancellationToken);
+
+        if (accessLevel is null)
+            throw new NotFoundException($"Space: {request.Id} is not found");
+        
+        if (!accessLevel.CanDeleteSpace)
+            throw new ForbiddenException($"Space: {request.Id} is not accessible");
         
         await coreSpacesService.Delete(request.Id, cancellationToken);
     }
@@ -152,12 +179,16 @@ public record SpaceListDto
     public required string Name { get; set; }
     public required string Color { get; set; }
     public required string Key { get; set; }
-    public required bool CanUpdate { get; set; }
-    public required bool CanDelete { get; set; }
-    public required bool CanCreateEpics { get; set; }
+    public required bool IsDefault { get; set; }
 }
 
-public record SpaceDto
+public record GetSpaceRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+    public long Id { get; set; }
+}
+
+public record SpaceDetailsDto
 {
     public required bool CanCreateEpics { get; set; }
     public required bool CanUpdate { get; set; }

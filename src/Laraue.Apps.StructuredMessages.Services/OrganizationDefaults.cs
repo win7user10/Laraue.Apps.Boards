@@ -15,9 +15,16 @@ public class OrganizationDefaults
     {
         var organizationUser = new OrganizationUser
         {
-            EpicsAccessLevel = ChildrenAccessLevel.All,
-            SpacesAccessLevel = ChildrenAccessLevel.All,
-            IssuesAccessLevel = ChildrenAccessLevel.All,
+            CanRead = true,
+            CanCreateSpaces = true,
+            CanUpdateSpaces = true,
+            CanDeleteSpaces = true,
+            CanCreateEpics = true,
+            CanDeleteEpics = true,
+            CanUpdateEpics = true,
+            CanCreateIssues = true,
+            CanUpdateIssues = true,
+            CanDeleteIssues = true,
             AdminAccessLevel = isPersonal
                 ? AdminAccessLevel.UpdateOrganization | AdminAccessLevel.MassMove
                 : AdminAccessLevel.All,

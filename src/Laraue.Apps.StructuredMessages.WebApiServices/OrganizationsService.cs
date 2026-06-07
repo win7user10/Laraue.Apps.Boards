@@ -72,19 +72,13 @@ public interface IOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
-    
-    Task UpdateSelectedSpace(
-        OrganizationAuthData authData,
-        long spaceId,
-        CancellationToken cancellationToken = default);
 }
 
 public class OrganizationsService(
     ICoreOrganizationsService coreOrganizationsService,
     DatabaseContext context,
     IAuthService authService,
-    IOrganizationAccessService organizationAccessService,
-    ISpacesAccessService spacesAccessService)
+    IOrganizationAccessService organizationAccessService)
     : IOrganizationsService
 {
     public async Task<OrganizationListDto[]> GetOrganizations(
@@ -105,7 +99,7 @@ public class OrganizationsService(
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     IsPersonal = x.Organization.Type == OrganizationType.Personal,
-                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                    CanCreateSpaces = x.CanCreateSpaces,
                     Slug = x.Organization.Slug,
                     SlugPostfix = x.Organization.SlugPostfix,
                 })
@@ -123,7 +117,7 @@ public class OrganizationsService(
                 .Select(x => new OrganizationDto
                 {
                     Id = x.Organization!.Id,
-                    CanCreateSpaces = x.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create),
+                    CanCreateSpaces = x.CanCreateSpaces,
                     Name = x.Organization.Name,
                     Color = x.Organization.Color,
                     CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
@@ -277,7 +271,7 @@ public class OrganizationsService(
                 cancellationToken))
                 .ToDictionary(
                     x => x.Id,
-                    x => new { Self = x, Epics = x.Epics.ToDictionary(e => e.Id) });
+                    x => new { Self = x });
 
             var errors = new List<string>();
             
@@ -288,16 +282,9 @@ public class OrganizationsService(
                     errors.Add($"Space: '{directSpacePermission.Key}'. Entity is not found");
                     continue;
                 }
-                if (space.Self.IsDefault && directSpacePermission.Value.Self.HasFlag(EntityAccessLevel.Delete))
+                
+                if (space.Self.IsDefault && directSpacePermission.Value.CanDelete)
                     errors.Add($"Space: '{directSpacePermission.Key}'. Attempt to add delete permission to Default space");
-
-                foreach (var directEpicPermission in directSpacePermission.Value.DirectEpics)
-                {
-                    if (!space.Epics.TryGetValue(directEpicPermission.Key, out var epic))
-                        errors.Add($"Space: '{directSpacePermission.Key}', Epic: '{directEpicPermission.Key}'. Entity is not found");
-                    else if (epic.IsDefault && directEpicPermission.Value.Self.HasFlag(EntityAccessLevel.Delete))
-                        errors.Add($"Space: '{directSpacePermission.Key}', Epic: '{directEpicPermission.Key}'. Attempt to add delete permission to Default epic");
-                }
             }
 
             if (errors.Count != 0)
@@ -411,25 +398,6 @@ public class OrganizationsService(
         return await coreOrganizationsService.GetPermittableEntities(
             request.AuthData.OrganizationId,
             cancellationToken);
-    }
-
-    public async Task UpdateSelectedSpace(
-        OrganizationAuthData authData,
-        long spaceId,
-        CancellationToken cancellationToken = default)
-    {
-        await spacesAccessService.HasAccessOrThrow(
-            authData,
-            spaceId,
-            EntityAccessLevel.Read,
-            cancellationToken);
-        
-        await coreOrganizationsService
-            .UpdatePreferences(
-                authData.OrganizationId,
-                authData.UserId,
-                update => update.SetProperty(p => p.SelectedSpaceId, spaceId),
-                cancellationToken);
     }
 }
 

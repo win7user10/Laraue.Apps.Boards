@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
+using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.Exceptions.Web;
 
 namespace Laraue.Apps.StructuredMessages.WebApiServices;
@@ -26,19 +27,24 @@ public interface IStatusesService
 
 public class StatusesService(
     ICoreStatusService statusService,
-    IEpicsAccessService epicsAccessService,
-    IStatusAccessService statusAccessService)
+    IAccessService accessService)
     : IStatusesService
 {
     public async Task<long> CreateStatus(
         CreateStatusRequest request,
         CancellationToken cancellationToken)
     {
-        await epicsAccessService.HasAccessOrThrow(
-            request.AuthData,
-            request.EpicId,
-            ChildrenAccessLevel.Update,
-            cancellationToken);
+        var epicsAccessLevel = await accessService
+            .GetAccessLevelsByEpicId(
+                request.AuthData,
+                request.EpicId,
+                cancellationToken);
+        
+        if (epicsAccessLevel is null)
+            throw new NotFoundException($"Epic: {request.EpicId} is not found");
+
+        if (!epicsAccessLevel.CanUpdateEpic)
+            throw new ForbiddenException($"Epic: {request.EpicId} is not accessible");
 
         return await statusService.Create(
             new CreateMessageCategoryStatusRequest
@@ -52,10 +58,13 @@ public class StatusesService(
 
     public async Task Delete(DeleteStatusRequest request, CancellationToken cancellationToken)
     {
-        await statusAccessService.CanModifyStatusOrThrow(
+        var canModify = await accessService.CanModifyStatus(
             request.AuthData,
             request.Id,
             cancellationToken);
+        
+        if (!canModify)
+            throw new NotFoundException($"Status: {request.Id} is not found");
 
         await statusService.Delete(
             new Services.DeleteStatusRequest
@@ -67,10 +76,13 @@ public class StatusesService(
 
     public async Task Edit(EditStatusRequest request, CancellationToken cancellationToken)
     {
-        await statusAccessService.CanModifyStatusOrThrow(
+        var canModify = await accessService.CanModifyStatus(
             request.AuthData,
             request.Id,
             cancellationToken);
+        
+        if (!canModify)
+            throw new NotFoundException($"Status: {request.Id} is not found");
 
         await statusService.Update(
             request.Id,
@@ -82,10 +94,11 @@ public class StatusesService(
 
     public async Task<MessageStatusDto[]> GetStatuses(GetStatusesRequest request, CancellationToken cancellationToken)
     {
-        await epicsAccessService.HasAccessOrThrow(
+        await accessService.GetAvailableEpics(
             request.AuthData,
-            request.EpicId,
-            ChildrenAccessLevel.Read,
+            x => x
+                .Where(e => e.Id == request.EpicId)
+                .FirstOrThrowNotFoundEFAsync("Epic is not found", cancellationToken),
             cancellationToken);
 
         return await statusService.GetStatuses(

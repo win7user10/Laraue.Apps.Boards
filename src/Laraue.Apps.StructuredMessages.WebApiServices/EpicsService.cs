@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Laraue.Apps.StructuredMessages.DataAccess;
 using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.Services;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
@@ -36,27 +35,25 @@ public interface IEpicsService
 }
 
 public class EpicsService(
-    DatabaseContext context,
     ICoreEpicsService coreEpicsService,
-    IEpicsAccessService epicsAccessService,
-    ISpacesAccessService spacesAccessService)
+    IAccessService accessService)
     : IEpicsService
 {
     public Task<EpicListDto[]> GetSpaceEpics(
         GetEpicsRequest request,
         CancellationToken cancellationToken)
     {
-        return epicsAccessService.GetAvailable(
+        return accessService.GetAvailableEpics(
             request.AuthData,
-            new Filter { SpaceId = request.SpaceId },
             epics => epics
+                .Where(x => x.SpaceId == request.SpaceId)
                 .Select(x => new EpicListDto
                 {
-                    Id = x.Epic.Id,
-                    Name = x.Epic.Name,
-                    Color = x.Epic.Color,
-                    TouchedAt = x.Epic.TouchedAt,
-                    IsDefault = x.Epic.IsDefault,
+                    Id = x.Id,
+                    Name = x.Name,
+                    Color = x.Color,
+                    TouchedAt = x.TouchedAt,
+                    IsDefault = x.IsDefault,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -66,15 +63,15 @@ public class EpicsService(
         GetEpicRequest request,
         CancellationToken cancellationToken)
     {
-        var epic = await epicsAccessService.GetAvailable(
+        var epicData = await accessService.GetAvailableEpics(
             request.AuthData,
-            new Filter { EpicId = request.Id },
             epics => epics
-                .Select(x => new EpicDto
+                .Where(x => x.Id == request.Id)
+                .Select(x => new
                 {
-                    Color = x.Epic.Color,
-                    Name = x.Epic.Name,
-                    Statuses = x.Epic.Statuses!
+                    x.Color,
+                    x.Name,
+                    Statuses = x.Statuses!
                         .Select(s => new StatusDto
                         {
                             Id = s.Id,
@@ -83,40 +80,45 @@ public class EpicsService(
                             SortOrder = s.SortOrder,
                         })
                         .ToArray(),
-                    CanDelete = (x.EntityAccessLevel & EntityAccessLevel.Delete) == EntityAccessLevel.Delete,
-                    CanUpdate = (x.EntityAccessLevel & EntityAccessLevel.Update) == EntityAccessLevel.Update,
-                    CanViewIssues = false, // Fill next fields later
-                    CanCreateIssues = false,
-                    CanDeleteIssues = false,
-                    CanUpdateIssues = false,
+                    x.IsDefault,
                 })
                 .FirstOrThrowNotFoundLinq2DbAsync($"Epic: {request.Id} is not found", cancellationToken),
             cancellationToken);
         
-        var accessLevel = await epicsAccessService.GetChildrenAccessLevel(
+        var accessLevels = await accessService.GetAccessLevelsByEpicId(
             request.AuthData,
             request.Id,
             cancellationToken);
 
-        epic.CanDeleteIssues = accessLevel.HasFlag(ChildrenAccessLevel.Delete);
-        epic.CanUpdateIssues = accessLevel.HasFlag(ChildrenAccessLevel.Update);
-        epic.CanViewIssues = accessLevel.HasFlag(ChildrenAccessLevel.Read);
-        epic.CanCreateIssues = accessLevel.HasFlag(ChildrenAccessLevel.Create);
+        if (accessLevels is null)
+            throw new NotFoundException($"Epic: {request.Id} is not found");
+
+        var result = new EpicDto
+        {
+            CanDeleteIssues = accessLevels.CanDeleteIssue,
+            CanUpdateIssues = accessLevels.CanUpdateIssue,
+            CanCreateIssues = accessLevels.CanCreateIssue,
+            Color = epicData.Color,
+            Name = epicData.Name,
+            Statuses = epicData.Statuses,
+            CanDelete = accessLevels.CanDeleteEpic,
+            CanUpdate = accessLevels.CanUpdateEpic,
+        };
         
-        return epic;
+        return result;
     }
 
     public async Task<long> Create(
         CreateEpicRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await spacesAccessService
+        if (!await accessService
             .CanCreateEpics(
                 request.AuthData,
                 request.SpaceId,
                 cancellationToken))
             throw new NotFoundException(
-                $"Space: {request.SpaceId} is not exists or items permission: {ChildrenAccessLevel.Create} is missing");
+                $"Space: {request.SpaceId} is not exists");
         
         return await coreEpicsService.Create(
             request.SpaceId,
@@ -131,12 +133,17 @@ public class EpicsService(
         ChangeStatusesOrderRequest request,
         CancellationToken cancellationToken)
     {
-        await epicsAccessService
-            .HasAccessOrThrow(
+        var epicsAccessLevel = await accessService
+            .GetAccessLevelsByEpicId(
                 request.AuthData,
                 request.EpicId,
-                EntityAccessLevel.Update,
                 cancellationToken);
+        
+        if (epicsAccessLevel is null)
+            throw new NotFoundException($"Epic: {request.EpicId} is not found");
+
+        if (!epicsAccessLevel.CanUpdateEpic)
+            throw new ForbiddenException($"Epic: {request.EpicId} is not accessible");
         
         await coreEpicsService.ChangeStatusesOrder(
             new Services.ChangeStatusesOrderRequest
@@ -149,12 +156,17 @@ public class EpicsService(
 
     public async Task Update(UpdateEpicRequest request, CancellationToken cancellationToken)
     {
-        await epicsAccessService
-            .HasAccessOrThrow(
+        var epicsAccessLevel = await accessService
+            .GetAccessLevelsByEpicId(
                 request.AuthData,
                 request.Id,
-                EntityAccessLevel.Update,
                 cancellationToken);
+        
+        if (epicsAccessLevel is null)
+            throw new NotFoundException($"Epic: {request.Id} is not found");
+
+        if (!epicsAccessLevel.CanUpdateEpic)
+            throw new ForbiddenException($"Epic: {request.Id} is not accessible");
 
         await coreEpicsService.Update(
             request.Id,
@@ -166,12 +178,17 @@ public class EpicsService(
 
     public async Task Delete(DeleteEpicRequest request, CancellationToken cancellationToken)
     {
-        await epicsAccessService
-            .HasAccessOrThrow(
+        var epicsAccessLevel = await accessService
+            .GetAccessLevelsByEpicId(
                 request.AuthData,
                 request.Id,
-                EntityAccessLevel.Update,
                 cancellationToken);
+        
+        if (epicsAccessLevel is null)
+            throw new NotFoundException($"Epic: {request.Id} is not found");
+
+        if (!epicsAccessLevel.CanDeleteEpic)
+            throw new ForbiddenException($"Epic: {request.Id} is not accessible");
         
         await coreEpicsService.Delete(
             new DeleteRequest { Id = request.Id },
@@ -199,12 +216,11 @@ public record EpicDto
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public StatusDto[] Statuses { get; set; } = [];
-    public required bool CanViewIssues { get; set; }
     public required bool CanCreateIssues { get; set; }
     public required bool CanDeleteIssues { get; set; }
     public required bool CanUpdateIssues { get; set; }
-    public required bool CanUpdate { get; set; }
-    public required bool CanDelete { get; set; }
+    public bool CanUpdate { get; set; }
+    public bool CanDelete { get; set; }
 }
 
 public class StatusDto

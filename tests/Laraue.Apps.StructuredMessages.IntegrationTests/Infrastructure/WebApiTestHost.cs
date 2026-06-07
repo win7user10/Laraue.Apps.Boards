@@ -53,7 +53,6 @@ public class WebApiTestHostScope : IDisposable
         
         // Cleanup before test run
         Database.DirectSpacePermissions.ExecuteDelete();
-        Database.DirectEpicPermissions.ExecuteDelete();
         Database.SpaceCounters.ExecuteDelete();
         Database.Users.ExecuteDelete();
     }

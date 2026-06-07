@@ -49,7 +49,10 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var organizationUser = Assert.Single(organizationUsers);
         Assert.Equal(userId, organizationUser.UserId);
         Assert.Equal(organization.Id, organizationUser.OrganizationId);
-        Assert.Equal(ChildrenAccessLevel.Read | ChildrenAccessLevel.Create | ChildrenAccessLevel.Update | ChildrenAccessLevel.Delete, organizationUser.SpacesAccessLevel);
+        Assert.True(organizationUser.CanCreateSpaces);
+        Assert.True(organizationUser.CanUpdateSpaces);
+        Assert.True(organizationUser.CanDeleteSpaces);
+        Assert.True(organizationUser.CanRead);
         Assert.Equal(AdminAccessLevel.All, organizationUser.AdminAccessLevel);
         
         var spaces = await testScope.Database.Spaces.ToListAsyncEF();
@@ -85,7 +88,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .WithName("Org 1")
             .WithColor("#ffffff")
             .AddUser(user2Id, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
+                .SetGlobalAccessLevel(x => x.CanCreateSpaces = true)
                 .SetAdminAccessLevel(AdminAccessLevel.DeleteOrganization)));
         
         await testScope.InitializePersonalOrganization(user2Id, org => org
@@ -377,18 +380,16 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             {
                 Direct = new Dictionary<long, DirectSpaceAccessLevel>
                 {
-                    [space.Id] = new ()
+                    [space.Id] = new()
                     {
-                        DirectEpics = new Dictionary<long, DirectEpicAccessLevel>
-                        {
-                            [epic.Id] = new()
-                            {
-                                Issues = ChildrenAccessLevel.All,
-                            },
-                        }
+                        CanDeleteIssues = true,
                     }
                 },
-                Admin = AdminAccessLevel.Manage
+                Admin = AdminAccessLevel.Manage,
+                Global = new GlobalAccessLevels
+                {
+                    CanCreateSpaces = true,
+                }
             }
         };
         
@@ -397,24 +398,27 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.SetUserPermissions(organizationUser.Id, request));
         
         organizationUser = await testScope.Database.OrganizationUsers.FirstAsyncEF(x => x.Id == organizationUser.Id);
-        Assert.Equal(ChildrenAccessLevel.None, organizationUser.IssuesAccessLevel);
-        Assert.Equal(ChildrenAccessLevel.None, organizationUser.EpicsAccessLevel);
-        Assert.Equal(ChildrenAccessLevel.None, organizationUser.SpacesAccessLevel);
+        Assert.True(organizationUser.CanCreateSpaces);
+        Assert.True(organizationUser.CanCreateEpics);
+        Assert.True(organizationUser.CanCreateIssues);
+        Assert.True(organizationUser.CanRead);
+        
+        Assert.False(organizationUser.CanDeleteSpaces);
+        Assert.False(organizationUser.CanDeleteEpics);
+        Assert.False(organizationUser.CanDeleteIssues);
+        
         Assert.Equal(AdminAccessLevel.Manage, organizationUser.AdminAccessLevel);
         
         var spaceOrganizationUser = await testScope.Database.DirectSpacePermissions.FirstAsyncEF(x => x.OrganizationUserId == organizationUser.Id);
         Assert.Equal(organizationUser.Id, spaceOrganizationUser.OrganizationUserId);
         Assert.Equal(space.Id, spaceOrganizationUser.SpaceId);
-        Assert.Equal(EntityAccessLevel.Read, spaceOrganizationUser.EntityAccessLevel);
-        Assert.Equal(ChildrenAccessLevel.None, spaceOrganizationUser.ChildrenEpicsAccessLevel);
-        Assert.Equal(ChildrenAccessLevel.None, spaceOrganizationUser.ChildrenIssuesAccessLevel);
         
-        var epicOrganizationUsers = await testScope.Database.DirectEpicPermissions.ToListAsyncEF();
-        var epicOrganizationUser = Assert.Single(epicOrganizationUsers);
-        Assert.Equal(organizationUser.Id, epicOrganizationUser.OrganizationUserId);
-        Assert.Equal(epic.Id, epicOrganizationUser.EpicId);
-        Assert.Equal(EntityAccessLevel.Read, epicOrganizationUser.EntityAccessLevel);
-        Assert.Equal(ChildrenAccessLevel.All, epicOrganizationUser.ChildrenIssuesAccessLevel);
+        Assert.True(spaceOrganizationUser.CanCreateEpics);
+        Assert.True(spaceOrganizationUser.CanCreateIssues);
+        Assert.False(spaceOrganizationUser.CanDelete);
+        Assert.False(spaceOrganizationUser.CanDeleteEpics);
+        Assert.True(spaceOrganizationUser.CanDeleteIssues);
+        Assert.True(spaceOrganizationUser.CanRead);
     }
     
     [Fact]
@@ -439,22 +443,11 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
                 {
                     [space.Id] = new ()
                     {
-                        DirectEpics = new Dictionary<long, DirectEpicAccessLevel>
-                        {
-                            [0] = new() // Unexists epic
-                            {
-                                Issues = ChildrenAccessLevel.All,
-                            },
-                            [epic.Id] = new ()
-                            {
-                                Self = EntityAccessLevel.All, // Attempt to set delete permission for default epic
-                            }
-                        },
-                        Self = EntityAccessLevel.All, // Attempt to set delete permission for default space
+                        CanDelete = true, // Attempt to set delete permission for default space
                     },
                     [0] = new () // Unexists space
                     {
-                        Epics = ChildrenAccessLevel.All
+                        CanCreateEpics = true,
                     }
                 },
                 Admin = AdminAccessLevel.Manage
@@ -468,8 +461,6 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
         var exceptedErrors = new[]
         {
             $"Space: '{space.Id}'. Attempt to add delete permission to Default space",
-            $"Space: '{space.Id}', Epic: '0'. Entity is not found",
-            $"Space: '{space.Id}', Epic: '{epic.Id}'. Attempt to add delete permission to Default epic",
             "Space: '0'. Entity is not found",
         };
         Assert.Equal(exceptedErrors, badRequest.Errors["direct"]);
@@ -541,9 +532,7 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Epics);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Issues);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Spaces);
+        Assert.False(permissions.Global.CanCreateEpics);
         Assert.Equal(AdminAccessLevel.None, permissions.Admin);
         Assert.Empty(permissions.Direct);
     }
@@ -597,33 +586,16 @@ public class OrganizationControllerTests(WebApiTestHost host) : IClassFixture<We
 
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(organizationUserId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
-                .SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel.Delete)));
+                .SetGlobalAccessLevel(x => x.CanCreateSpaces = true)));
 
         var organizationUser = organization.Users![1];
-        var space = organization.Spaces![0];
-        var epic = space.Epics![0];
 
         var permissions = await _organizationsController
             .WithOrganizationAuthorization(organization.Id, ownerId)
             .Execute(x => x.GetUserPermissions(organizationUser.Id));
 
         Assert.NotNull(permissions);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Epics);
-        Assert.Equal(ChildrenAccessLevel.None, permissions.Global.Issues);
-        Assert.Equal(ChildrenAccessLevel.Read | ChildrenAccessLevel.Create, permissions.Global.Spaces);
         Assert.Equal(AdminAccessLevel.None, permissions.Admin);
-        
-        var directSpaceAccess = Assert.Single(permissions.Direct);
-        Assert.Equal(space.Id, directSpaceAccess.Key);
-        Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Epics);
-        Assert.Equal(ChildrenAccessLevel.None, directSpaceAccess.Value.Issues);
-        Assert.Equal(EntityAccessLevel.Read, directSpaceAccess.Value.Self);
-        
-        var directEpicsAccess = Assert.Single(directSpaceAccess.Value.DirectEpics);
-        Assert.Equal(epic.Id, directEpicsAccess.Key);
-        Assert.Equal(ChildrenAccessLevel.None, directEpicsAccess.Value.Issues);
-        Assert.Equal(EntityAccessLevel.Read | EntityAccessLevel.Delete, directEpicsAccess.Value.Self);
     }
 
     [Fact]

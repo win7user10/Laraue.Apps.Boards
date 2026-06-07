@@ -11,10 +11,16 @@ public class OrganizationUser
     
     public Guid UserId { get; set; }
     public User? User { get; set; }
-    
-    public ChildrenAccessLevel SpacesAccessLevel { get; set; }
-    public ChildrenAccessLevel EpicsAccessLevel { get; set; }
-    public ChildrenAccessLevel IssuesAccessLevel { get; set; }
-    
     public AdminAccessLevel AdminAccessLevel { get; set; }
+    
+    public bool CanRead { get; set; }
+    public bool CanCreateSpaces { get; set; }
+    public bool CanUpdateSpaces { get; set; }
+    public bool CanDeleteSpaces { get; set; }
+    public bool CanCreateEpics { get; set; }
+    public bool CanUpdateEpics { get; set; }
+    public bool CanDeleteEpics { get; set; }
+    public bool CanCreateIssues { get; set; }
+    public bool CanUpdateIssues { get; set; }
+    public bool CanDeleteIssues { get; set; }
 }

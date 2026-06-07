@@ -53,9 +53,8 @@ public interface IIssuesService
 public class IssuesService(
     DatabaseContext context,
     ICoreIssuesService issuesService,
-    IDateTimeProvider dateTimeProvider,
-    IIssuesAccessService issuesAccessService,
-    IEpicsAccessService epicsAccessService)
+    IAccessService accessService,
+    IDateTimeProvider dateTimeProvider)
     : IIssuesService
 {
     public async Task<BatchResult<IssueListDto>> GetIssues(
@@ -65,12 +64,13 @@ public class IssuesService(
         var statusData = await context.Statuses
             .Where(x => x.Id == request.StatusId)
             .Select(x => new { x.EpicId })
-            .FirstOrThrowNotFoundEFAsync("Status is not found", cancellationToken);
+            .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", cancellationToken);
         
-        await epicsAccessService.HasAccessOrThrow(
+        await accessService.GetAvailableEpics(
             request.AuthData,
-            statusData.EpicId,
-            ChildrenAccessLevel.Read,
+            q => q
+                .Where(x => x.Id == statusData.EpicId)
+                .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", cancellationToken),
             cancellationToken);
 
         var query = context.Issues
@@ -126,10 +126,11 @@ public class IssuesService(
         GetBoardRequest request,
         CancellationToken cancellationToken)
     {
-        await epicsAccessService.HasAccessOrThrow(
+        await accessService.GetAvailableEpics(
             request.AuthData,
-            request.EpicId,
-            ChildrenAccessLevel.Read,
+            q => q
+                .Where(x => x.Id == request.EpicId)
+                .FirstOrThrowNotFoundEFAsync($"Epic: {request.EpicId} is not found", cancellationToken),
             cancellationToken);
         
         var statusIds = await context.Statuses
@@ -188,15 +189,15 @@ public class IssuesService(
         GetBoardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        var epics = await epicsAccessService.GetAvailable(
+        var epics = await accessService.GetAvailableEpics(
             request.AuthData,
-            new Filter { SpaceId = request.SpaceId },
             epics => epics
+                .Where(x => x.SpaceId == request.SpaceId)
                 .Select(x => new
                 {
-                    x.Epic.Id,
-                    x.Epic.Color,
-                    x.Epic.Name,
+                    x.Id,
+                    x.Color,
+                    x.Name,
                 })
                 .ToArrayAsyncEF(cancellationToken),
             cancellationToken);
@@ -253,11 +254,16 @@ public class IssuesService(
 
     public async Task Delete(DeleteIssueRequest request, CancellationToken ct)
     {
-        await issuesAccessService.HasAccessOrThrow(
+        var accessLevel = await accessService.GetAccessLevelsByIssueId(
             request.AuthData,
             request.IssueId,
-            EntityAccessLevel.Delete,
             ct);
+
+        if (accessLevel is null)
+            throw new NotFoundException($"Issue: {request.IssueId} is not found");
+
+        if (!accessLevel.CanDeleteIssue)
+            throw new ForbiddenException($"Issue: {request.IssueId} delete is forbidden");
 
         await issuesService.Delete(request.IssueId, ct);
     }
@@ -266,22 +272,19 @@ public class IssuesService(
     {
         var validationData = await context.Statuses
             .Where(s => s.Id == request.StatusId)
-            .Select(x => new { x.EpicId, x.Epic!.SpaceId })
+            .Select(x => new { x.EpicId })
             .FirstOrThrowNotFoundEFAsync($"Status: {request.StatusId} is not found", ct);
-
-        try
-        {
-            await epicsAccessService.HasAccessOrThrow(
-                request.AuthData,
-                validationData.EpicId,
-                ChildrenAccessLevel.Create,
-                ct);
-        }
-        catch (NotFoundException)
-        {
-            throw new NotFoundException(
-                $"Status: {request.StatusId} is not found, or {ChildrenAccessLevel.Create} permission is missing for Epic contains this status");
-        }
+        
+        var issuesAccessLevel = await accessService.GetAccessLevelsByEpicId(
+            request.AuthData,
+            validationData.EpicId,
+            ct);
+        
+        if (issuesAccessLevel is null)
+            throw new NotFoundException($"Status: {request.StatusId} is not found");
+        
+        if (!issuesAccessLevel.CanCreateIssue)
+            throw new NotFoundException($"Status: {request.StatusId} issue creation is forbidden");
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         
@@ -302,11 +305,16 @@ public class IssuesService(
 
     public async Task Update(UpdateIssueRequest request, CancellationToken ct)
     {
-        await issuesAccessService.HasAccessOrThrow(
+        var accessLevels = await accessService.GetAccessLevelsByIssueId(
             request.AuthData,
             request.Id,
-            EntityAccessLevel.Update,
             ct);
+
+        if (accessLevels is null)
+            throw new NotFoundException($"Issue: {request.Id} is not found");
+        
+        if (!accessLevels.CanUpdateIssue)
+            throw new ForbiddenException($"Issue: {request.Id} update is forbidden");
         
         await issuesService.Update(
             request.Id,
@@ -319,7 +327,7 @@ public class IssuesService(
         SearchRequest request,
         CancellationToken ct)
     {
-        var temporaryResult = await issuesAccessService.GetAvailable(
+        var temporaryResult = await accessService.GetAvailableIssues(
             request.AuthData,
             issues =>
             {
@@ -411,12 +419,12 @@ public class IssuesService(
         GetIssueRequest request,
         CancellationToken cancellationToken)
     {
-        var issueAccessLevel = await issuesAccessService.GetAccessLevel(
+        var issueAccessLevels = await accessService.GetAccessLevelsByIssueId(
             request.AuthData,
             request.IssueId,
             cancellationToken);
 
-        if (!issueAccessLevel.HasFlag(EntityAccessLevel.Read))
+        if (issueAccessLevels is null)
             throw new NotFoundException($"Issue: {request.IssueId} is not found or not accessible");
 
         var result = await context.Issues
@@ -453,7 +461,7 @@ public class IssuesService(
             StatusName = result.StatusName,
             EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
-            CanEdit = issueAccessLevel.HasFlag(EntityAccessLevel.Update),
+            CanEdit = issueAccessLevels.CanUpdateIssue,
         };
     }
 

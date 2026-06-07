@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using Laraue.Apps.StructuredMessages.DataAccess.Enums;
 using Laraue.Apps.StructuredMessages.IntegrationTests.Infrastructure;
 using Laraue.Apps.StructuredMessages.WebApiHost.Controllers;
 using Laraue.Apps.StructuredMessages.WebApiServices;
@@ -52,7 +51,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)));
+                .SetGlobalAccessLevel(x => x.CanCreateSpaces = true)));
         
         var spaceId = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
@@ -77,7 +76,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
+                .SetGlobalAccessLevel(x => x.CanRead = true)));
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
@@ -111,12 +110,6 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         Assert.Equal(2, spaces!.Length);
         var space = spaces.First(x => x.Id == spaceId);
         Assert.Equal("Space created by Participator", space.Name);
-        Assert.True(space.CanUpdate);
-        Assert.True(space.CanDelete);
-        
-        var defaultSpace = spaces.Except([space]).Single();
-        Assert.True(defaultSpace.CanUpdate);
-        Assert.False(defaultSpace.CanDelete);
     }
     
     [Fact]
@@ -128,15 +121,13 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
+                .SetGlobalAccessLevel(x => x.CanRead = true)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.False(s.CanUpdate));
-        Assert.All(spaces, s => Assert.False(s.CanDelete));
     }
     
     [Fact]
@@ -148,15 +139,13 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
+                .SetGlobalAccessLevel(x => x.CanRead = true)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.False(s.CanUpdate));
-        Assert.All(spaces, s => Assert.False(s.CanDelete));
     }
     
     [Fact]
@@ -168,38 +157,13 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddSpace(ownerId)
             .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Read)));
+                .SetGlobalAccessLevel(x => x.CanRead = true)));
         
         var spaces = await _spacesController
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.GetAll());
         
         Assert.Equal(2, spaces!.Length);
-        Assert.All(spaces, s => Assert.False(s.CanUpdate));
-        Assert.All(spaces, s => Assert.False(s.CanDelete));
-    }
-    
-    [Fact]
-    public async Task UserChildrenAccessLevel_ShouldBeMergedFromOrganizationAndSpaceLevel_Always()
-    {
-        using var testScope = host.CreateTestScope();
-        var ownerId = await testScope.CreateUser();
-        var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializeOrganization(ownerId, org => org
-            .AddSpace(ownerId)
-            .AddUser(participatorId, builder => builder
-                .SetSpacesAccessLevel(ChildrenAccessLevel.Create)
-                .SetSpaceAccessLevel(1, EntityAccessLevel.Update)));
-
-        var spaceId = organization.Spaces![1].Id;
-        
-        var spaces = await _spacesController
-            .WithOrganizationAuthorization(organization.Id, participatorId)
-            .Execute(x => x.GetAll());
-        
-        var space = spaces!.First(x => x.Id == spaceId);
-        Assert.True(space.CanUpdate);
-        Assert.False(space.CanDelete);
     }
     
     [Fact]
@@ -231,7 +195,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, b => b
-                .SetSpaceAccessLevel(1, EntityAccessLevel.Read))
+                .SetSpaceAccessLevel(1, x => x.CanRead = true))
             .AddSpace(ownerId, s => s
                 .AddEpic(ownerId)));
 
@@ -252,7 +216,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, b => b
-                .SetSpaceAccessLevel(0, EntityAccessLevel.Read))
+                .SetSpaceAccessLevel(0, x => x.CanRead = true))
             .AddSpace(ownerId, s => s
                 .AddEpic(ownerId)));
 
@@ -273,7 +237,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, b => b
-                .SetEpicsAccessLevel(ChildrenAccessLevel.Read))
+                .SetGlobalAccessLevel(x => x.CanRead = true))
             .AddSpace(ownerId, s => s
                 .AddEpic(ownerId)));
 
@@ -294,28 +258,7 @@ public class SpacesControllerTests(WebApiTestHost host) : IClassFixture<WebApiTe
         var participatorId = await testScope.CreateUser();
         var organization = await testScope.InitializeOrganization(ownerId, org => org
             .AddUser(participatorId, b => b
-                .SetSpaceEpicsAccessLevel(1, ChildrenAccessLevel.Read))
-            .AddSpace(ownerId, s => s
-                .AddEpic(ownerId)));
-
-        var spaceId = organization.Spaces![1].Id;
-        
-        var epics = await _spacesController
-            .WithOrganizationAuthorization(organization.Id, participatorId)
-            .Execute(x => x.GetSpaceEpics(spaceId));
-        
-        Assert.Equal(2, epics!.Length);
-    }
-    
-    [Fact]
-    public async Task User_ShouldViewEpics_WhenHasEpicLevelWritePermission()
-    {
-        using var testScope = host.CreateTestScope();
-        var ownerId = await testScope.CreateUser();
-        var participatorId = await testScope.CreateUser();
-        var organization = await testScope.InitializeOrganization(ownerId, org => org
-            .AddUser(participatorId, b => b
-                .SetEpicAccessLevel(1, 1, EntityAccessLevel.Delete))
+                .SetSpaceAccessLevel(1, x => x.CanRead = true))
             .AddSpace(ownerId, s => s
                 .AddEpic(ownerId)));
 

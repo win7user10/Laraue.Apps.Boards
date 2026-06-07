@@ -110,7 +110,6 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
                             .AddStatus(s => s.WithName("In Progress"))
                             .AddIssue(userId, 1, issue => issue.WithContent("Issue 1")))));
 
-        var exceptedNewStatusId = organization.Spaces![1].Epics![0].Statuses![0].Id;
         var epicId = organization.Spaces![1].Epics![1].Id;
         
         await _epicsController
@@ -120,8 +119,8 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
         var epic = await testScope.Database.Epics.FirstOrDefaultAsyncEF(e => e.Id == epicId);
         Assert.Null(epic);
      
-        var issue = await testScope.Database.Issues.SingleAsyncEF();
-        Assert.Equal(exceptedNewStatusId, issue.StatusId);
+        var issues = await testScope.Database.Issues.ToListAsyncEF();
+        Assert.Empty(issues);
     }
     
     [Fact]
@@ -138,7 +137,7 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
             .Execute(x => x.Delete(epicId)));
 
         var badRequest = ex.HasInnerException<ForbiddenException>();
-        Assert.Equal("Default Epic can not be deleted", badRequest.Message);
+        Assert.Equal($"Epic: {epicId} is not accessible", badRequest.Message);
     }
     
     [Fact]
@@ -180,7 +179,6 @@ public class PersonalEpicControllerTests(WebApiTestHost host) : IClassFixture<We
         Assert.True(epic.CanDelete);
         Assert.True(epic.CanUpdate);
         Assert.True(epic.CanCreateIssues);
-        Assert.True(epic.CanViewIssues);
         Assert.True(epic.CanDeleteIssues);
         Assert.True(epic.CanUpdateIssues);
     }

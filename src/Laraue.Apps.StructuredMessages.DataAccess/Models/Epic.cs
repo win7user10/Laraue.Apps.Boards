@@ -40,5 +40,4 @@ public class Epic
     public bool IsDefault { get; set; }
 
     public IList<Status>? Statuses { get; set; }
-    public IList<DirectEpicPermission>? Users { get; set; }
 }

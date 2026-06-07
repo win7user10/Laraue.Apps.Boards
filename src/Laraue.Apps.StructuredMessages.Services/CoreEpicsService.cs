@@ -133,16 +133,6 @@ public class CoreEpicsService(DatabaseContext context, IDateTimeProvider dateTim
         if (defaultEpic.EpicId == request.Id)
             throw new ForbiddenException("Default Epic can not be deleted");
         
-        await context.Issues
-            .Where(x => x.Status!.EpicId == request.Id)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(p => p.StatusId, defaultEpic.NewStatusId),
-                cancellationToken);
-        
-        await context.Statuses
-            .Where(x => x.EpicId == request.Id)
-            .DeleteAsync(cancellationToken);
-        
         await context.Epics
             .Where(c => c.Id == request.Id)
             .DeleteAsync(cancellationToken);
