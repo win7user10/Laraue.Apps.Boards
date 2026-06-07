@@ -20,7 +20,7 @@ Services to call from WebApi
 ### Laraue.Apps.StructuredMessages.TelegramServices
 Services to call from TelegramApi
 
-## Testing
+## Local run
 Check how to deal with the frontend in [Frontend Repository](https://github.com/win7user10/laraue-note-to-board)
 
 ### Create a new user for Test
@@ -40,3 +40,10 @@ Set it in frontend `.env` file:
 ```
 NUXT_PUBLIC_TEST_USER_TOKEN=Taken_Token
 ```
+
+## Permissions arch
+Application permissions are divided into two parts:
+1. Entity permissions. Allows to set up access to organization spaces, epics, issues
+    1. Organization level. Make set for all entities in one time.
+    2. Flexible setup for each space separately. Can be combined with organization level.
+2. Administrative permissions. They allow to set up access for administrative actions like renaming organization.

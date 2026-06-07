@@ -42,11 +42,11 @@ public class OrganizationAccessService(DatabaseContext context) : IOrganizationA
         {
             return organizationUsers
                 .Where(ou => ou.OrganizationId == organizationId)
-                .AnyAsyncEF(ou => ou.SpacesAccessLevel.HasFlag(ChildrenAccessLevel.Create), cancellationToken);
+                .AnyAsyncEF(ou => ou.CanCreateSpaces, cancellationToken);
         });
         
         if (!result)
-            throw new NotFoundException($"Organization: {organizationId} is unavailable or permission: {ChildrenAccessLevel.Create} for spaces is missing");
+            throw new NotFoundException($"Organization: {organizationId} space creation is forbidden");
     }
 
     public async Task HasAccessOrThrow(OrganizationAuthData authData, AdminAccessLevel accessLevel, CancellationToken cancellationToken)

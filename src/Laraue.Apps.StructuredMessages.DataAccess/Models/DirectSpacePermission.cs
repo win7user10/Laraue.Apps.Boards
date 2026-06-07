@@ -1,6 +1,4 @@
-﻿using Laraue.Apps.StructuredMessages.DataAccess.Enums;
-
-namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
+﻿namespace Laraue.Apps.StructuredMessages.DataAccess.Models;
 
 public class DirectSpacePermission
 {
@@ -15,7 +13,13 @@ public class DirectSpacePermission
     public long OrganizationUserId { get; set; }
     public OrganizationUser? OrganizationUser { get; set; }
     
-    public ChildrenAccessLevel ChildrenIssuesAccessLevel { get; set; }
-    public ChildrenAccessLevel ChildrenEpicsAccessLevel { get; set; }
-    public EntityAccessLevel EntityAccessLevel { get; set; }
+    public bool CanRead { get; set; }
+    public bool CanUpdate { get; set; }
+    public bool CanDelete { get; set; }
+    public bool CanCreateEpics { get; set; }
+    public bool CanUpdateEpics { get; set; }
+    public bool CanDeleteEpics { get; set; }
+    public bool CanCreateIssues { get; set; }
+    public bool CanUpdateIssues { get; set; }
+    public bool CanDeleteIssues { get; set; }
 }

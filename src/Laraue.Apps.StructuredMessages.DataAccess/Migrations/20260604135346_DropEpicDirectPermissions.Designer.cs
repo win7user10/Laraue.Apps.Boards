@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.StructuredMessages.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260604135346_DropEpicDirectPermissions")]
+    partial class DropEpicDirectPermissions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,41 +36,17 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<bool>("CanCreateEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_create_epics");
+                    b.Property<byte>("ChildrenEpicsAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("children_epics_access_level");
 
-                    b.Property<bool>("CanCreateIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_create_issues");
+                    b.Property<byte>("ChildrenIssuesAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("children_issues_access_level");
 
-                    b.Property<bool>("CanDelete")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete");
-
-                    b.Property<bool>("CanDeleteEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete_epics");
-
-                    b.Property<bool>("CanDeleteIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete_issues");
-
-                    b.Property<bool>("CanRead")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_read");
-
-                    b.Property<bool>("CanUpdate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update");
-
-                    b.Property<bool>("CanUpdateEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update_epics");
-
-                    b.Property<bool>("CanUpdateIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update_issues");
+                    b.Property<byte>("EntityAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("entity_access_level");
 
                     b.Property<long>("OrganizationUserId")
                         .HasColumnType("bigint")
@@ -312,49 +291,21 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("admin_access_level");
 
-                    b.Property<bool>("CanCreateEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_create_epics");
+                    b.Property<byte>("EpicsAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("epics_access_level");
 
-                    b.Property<bool>("CanCreateIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_create_issues");
-
-                    b.Property<bool>("CanCreateSpaces")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_create_spaces");
-
-                    b.Property<bool>("CanDeleteEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete_epics");
-
-                    b.Property<bool>("CanDeleteIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete_issues");
-
-                    b.Property<bool>("CanDeleteSpaces")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_delete_spaces");
-
-                    b.Property<bool>("CanRead")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_read");
-
-                    b.Property<bool>("CanUpdateEpics")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update_epics");
-
-                    b.Property<bool>("CanUpdateIssues")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update_issues");
-
-                    b.Property<bool>("CanUpdateSpaces")
-                        .HasColumnType("boolean")
-                        .HasColumnName("can_update_spaces");
+                    b.Property<byte>("IssuesAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("issues_access_level");
 
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
+
+                    b.Property<byte>("SpacesAccessLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("spaces_access_level");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")

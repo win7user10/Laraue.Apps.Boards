@@ -172,20 +172,7 @@ public class OrganizationInitializer(
                 Direct = builder.Permissions.DirectAccessLevels
                     .ToDictionary(
                         x => organization.Spaces![x.Key].Id,
-                        x =>
-                        {
-                            var spacePermission = organization.Spaces![x.Key];
-                            return new DirectSpaceAccessLevel
-                            {
-                                Epics = x.Value.Epics,
-                                Issues = x.Value.Issues,
-                                Self = x.Value.Self,
-                                DirectEpics = x.Value.DirectEpics
-                                    .ToDictionary(
-                                        y => spacePermission.Epics![y.Key].Id,
-                                        y => y.Value)
-                            };
-                        })
+                        x => x.Value)
             };
             
             var organizationUserId = await coreOrganizationsService.AddMember(organization.Id, user.Key, CancellationToken.None);
@@ -263,16 +250,8 @@ public class OrganizationInitializer(
     public record TestUserPermissions
     {
         public GlobalAccessLevels GlobalAccessLevels { get; set; } = new();
-        public Dictionary<int, TestDirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
+        public Dictionary<int, DirectSpaceAccessLevel> DirectAccessLevels { get; set; } = new();
         public AdminAccessLevel Administrative { get; set; }
-    }
-    
-    public record TestDirectSpaceAccessLevel
-    {
-        public ChildrenAccessLevel Epics { get; set; }
-        public ChildrenAccessLevel Issues { get; set; }
-        public EntityAccessLevel Self { get; set; }
-        public Dictionary<int, DirectEpicAccessLevel> DirectEpics { get; set; } = new();
     }
     
     public class PermissionBuilder
@@ -285,84 +264,28 @@ public class OrganizationInitializer(
             return this;
         }
     
-        public PermissionBuilder SetSpacesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
+        public PermissionBuilder SetGlobalAccessLevel(Action<GlobalAccessLevels> action)
         {
-            Permissions.GlobalAccessLevels.Spaces = childrenAccessLevel;
+            action(Permissions.GlobalAccessLevels);
             
             return this;
         }
     
-        public PermissionBuilder SetSpaceAccessLevel(int index, EntityAccessLevel entityAccessLevel)
+        public PermissionBuilder SetSpaceAccessLevel(int index, Action<DirectSpaceAccessLevel> action)
         {
-            GetDirectSpacesLevels(index).Self = entityAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetSpaceEpicsAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
-        {
-            GetDirectSpacesLevels(index).Epics = childrenAccessLevel;
-            
-            return this;
-        }
-        
-    
-        public PermissionBuilder SetSpaceIssuesAccessLevel(int index, ChildrenAccessLevel childrenAccessLevel)
-        {
-            GetDirectSpacesLevels(index).Issues = childrenAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetDefaultSpaceBacklogAccessLevel(EntityAccessLevel entityAccessLevel)
-        {
-            return SetEpicAccessLevel(0, 0, entityAccessLevel);
-        }
-    
-        public PermissionBuilder SetEpicsAccessLevel(ChildrenAccessLevel childrenAccessLevel)
-        {
-            Permissions.GlobalAccessLevels.Epics = childrenAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetIssuesAccessLevel(ChildrenAccessLevel childrenAccessLevel)
-        {
-            Permissions.GlobalAccessLevels.Issues = childrenAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetEpicAccessLevel(int spaceIndex, int epicIndex, EntityAccessLevel entityAccessLevel)
-        {
-            GetDirectEpicsLevels(spaceIndex, epicIndex).Self = entityAccessLevel;
-            
-            return this;
-        }
-    
-        public PermissionBuilder SetEpicIssuesAccessLevel(int spaceIndex, int epicIndex, ChildrenAccessLevel childrenAccessLevel)
-        {
-            GetDirectEpicsLevels(spaceIndex, epicIndex).Issues = childrenAccessLevel;
+            var levels = GetDirectSpacesLevels(index);
+
+            action(levels);
             
             return this;
         }
 
-        private TestDirectSpaceAccessLevel GetDirectSpacesLevels(int spaceIndex)
+        private DirectSpaceAccessLevel GetDirectSpacesLevels(int spaceIndex)
         {
             if (!Permissions.DirectAccessLevels.ContainsKey(spaceIndex))
-                Permissions.DirectAccessLevels[spaceIndex] = new TestDirectSpaceAccessLevel();
+                Permissions.DirectAccessLevels[spaceIndex] = new DirectSpaceAccessLevel();
             
             return Permissions.DirectAccessLevels[spaceIndex];
-        }
-        
-
-        private DirectEpicAccessLevel GetDirectEpicsLevels(int spaceIndex, int epicIndex)
-        {
-            var spaceLevels = GetDirectSpacesLevels(spaceIndex);
-            if (!spaceLevels.DirectEpics.ContainsKey(epicIndex))
-                spaceLevels.DirectEpics[epicIndex] = new DirectEpicAccessLevel();
-            
-            return spaceLevels.DirectEpics[epicIndex];
         }
     }
 
@@ -527,9 +450,5 @@ public class OrganizationInitializer(
 
             return this;
         }
-    }
-
-    public class DirectAccess : Dictionary<int, EntityAccessLevel>
-    {
     }
 }

@@ -19,7 +19,6 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<Issue> Issues { get; init; }
     public DbSet<IssueNumber> IssueNumbers { get; init; }
     public DbSet<Epic> Epics { get; init; }
-    public DbSet<DirectEpicPermission> DirectEpicPermissions { get; init; }
     public DbSet<Space> Spaces { get; init; }
     public DbSet<SpaceCounter> SpaceCounters { get; init; }
     public DbSet<DirectSpacePermission> DirectSpacePermissions { get; init; }

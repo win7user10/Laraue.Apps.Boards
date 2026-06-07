@@ -32,11 +32,9 @@ public interface IMovementService
 
 public class MovementService(
     ICoreMovementService movementService,
-    ISpacesAccessService spacesAccessService,
     IOrganizationAccessService organizationAccessService,
     DatabaseContext context,
-    IStatusAccessService statusAccessService,
-    IIssuesAccessService issuesAccessService)
+    IAccessService accessService)
     : IMovementService
 {
     public async Task MoveSpace(MoveSpaceRequest request, CancellationToken cancellationToken)
@@ -95,15 +93,14 @@ public class MovementService(
     {
         await HasMassMovePermissionOrThrow(request.AuthData, cancellationToken);
         
-        return await spacesAccessService.GetAvailableForRead(
+        return await accessService.GetSpacesWithAllowedEpicCreation(
             request.AuthData with { OrganizationId = request.OrganizationId },
             query => query
-                .Where(q => (q.ChildrenAccessLevel & ChildrenAccessLevel.Create) == ChildrenAccessLevel.Create)
                 .Select(x => new DestinationSpace
                 {
-                    Id = x.Space.Id,
-                    Color = x.Space.Color,
-                    Name = x.Space.Name,
+                    Id = x.Id,
+                    Color = x.Color,
+                    Name = x.Name,
                 })
                 .ToArrayAsyncLinqToDB(cancellationToken),
             cancellationToken);
@@ -112,17 +109,25 @@ public class MovementService(
     public async Task MoveIssue(MoveIssueRequest request, CancellationToken ct)
     {
         // Check that can move Issue
-        await issuesAccessService.HasAccessOrThrow(
+        var accessLevels = await accessService.GetAccessLevelsByIssueId(
             request.AuthData,
             request.IssueId,
-            EntityAccessLevel.Update,
             ct);
+
+        if (accessLevels is null)
+            throw new NotFoundException($"Issue: {request.IssueId} is not found");
+
+        if (!accessLevels.CanUpdateIssue)
+            throw new ForbiddenException($"Issue: {request.IssueId} is not accessible");
         
         // Check that can move to specified status
-        await statusAccessService.CanMoveToStatusOrThrow(
+        var canMove = await accessService.CanMoveToStatus(
             request.AuthData,
             request.StatusId,
             ct);
+        
+        if (!canMove)
+            throw new NotFoundException($"Status: {request.StatusId} is not found");
         
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         await movementService.MoveIssue(
@@ -142,7 +147,7 @@ public class MovementService(
             .Select(x => x.OrganizationId)
             .FirstOrThrowNotFoundEFAsync(SpaceIsNotExistsError(spaceId), cancellationToken);
 
-        var canCreateEpicsInNewSpace = await spacesAccessService.CanCreateEpics(
+        var canCreateEpicsInNewSpace = await accessService.CanCreateEpics(
             new OrganizationAuthData { OrganizationId = organizationId, UserId = userId },
             spaceId,
             cancellationToken);

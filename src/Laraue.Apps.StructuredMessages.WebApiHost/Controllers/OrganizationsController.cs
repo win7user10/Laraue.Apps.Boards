@@ -215,15 +215,4 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             },
             cancellationToken);
     }
-    
-    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
-    [HttpPut("settings/selected-space/{spaceId}")]
-    public Task UpdateSpaceId(
-        [FromRoute] long spaceId,
-        CancellationToken cancellationToken)
-    {
-        return organizationsService.UpdateSelectedSpace(
-            HttpContext.User.GetOrganizationAuthData(),
-            spaceId, cancellationToken);
-    }
 }

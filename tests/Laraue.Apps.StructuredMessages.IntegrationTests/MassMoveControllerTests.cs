@@ -195,7 +195,7 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
                 o
                     .AddUser(userCanNotMoveDueToEpicCreationInTargetMissing)
                     .AddUser(userCanMove, permissions => permissions
-                    .SetEpicsAccessLevel(ChildrenAccessLevel.Create)));
+                    .SetGlobalAccessLevel(x => x.CanCreateEpics = true)));
         
         var epicToMove = sourceOrganization.GetEpic(1, 1);
         var spaceToReceive = destinationOrganization.GetSpace(0);
@@ -240,8 +240,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
             o => o
                 .AddSpace(userId, "SP1")
                 .AddSpace(userId, "SP2", s => s.WithName("Allowed"))
-                .AddUser(participatorId, u => u // User has create epics access only to last space
-                    .SetSpaceEpicsAccessLevel(2, ChildrenAccessLevel.Create)));
+                .AddUser(participatorId, u => u // User has created epics access only to last space
+                    .SetSpaceAccessLevel(2, x => x.CanCreateEpics = true)));
         
         var allowedSpaces = await _controller
             .WithOrganizationAuthorization(sourceOrganization.Id, participatorId)
@@ -287,7 +287,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var organization = await testScope.InitializeOrganization(
             userId,
             o => o
-                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Create | ChildrenAccessLevel.Update))
+                .AddUser(participatorId, u => u
+                    .SetGlobalAccessLevel(x => { x.CanCreateIssues = true; x.CanUpdateIssues = true; }))
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e.AddStatus()))
                 .AddIssueToDefaultStatus(userId));
@@ -313,7 +314,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var organization = await testScope.InitializeOrganization(
             userId,
             o => o
-                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Create))
+                .AddUser(participatorId, u => u
+                    .SetGlobalAccessLevel(x => x.CanCreateIssues = true))
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e.AddStatus()))
                 .AddIssueToDefaultStatus(userId));
@@ -325,8 +327,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
             .WithOrganizationAuthorization(organization.Id, participatorId)
             .Execute(x => x.MoveIssue(issue.Id, newStatus.Id)));
         
-        var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal($"Issue: {issue.Id} is not exists or epic children permission: Update is missing", notFound.Message);
+        var notFound = ex.HasInnerException<ForbiddenException>();
+        Assert.Equal($"Issue: {issue.Id} is not accessible", notFound.Message);
     }
 
     [Fact]
@@ -338,7 +340,8 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
         var organization = await testScope.InitializeOrganization(
             userId,
             o => o
-                .AddUser(participatorId, u => u.SetIssuesAccessLevel(ChildrenAccessLevel.Update))
+                .AddUser(participatorId, u => u
+                    .SetGlobalAccessLevel(x => x.CanUpdateIssues = true))
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e.AddStatus()))
                 .AddIssueToDefaultStatus(userId));
@@ -351,7 +354,7 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
             .Execute(x => x.MoveIssue(issue.Id, newStatus.Id)));
         
         var notFound = ex.HasInnerException<NotFoundException>();
-        Assert.Equal($"Status: {newStatus.Id} is not exists or permission: Update missing on Epic", notFound.Message);
+        Assert.Equal($"Status: {newStatus.Id} is not found", notFound.Message);
     }
     
     
@@ -398,6 +401,6 @@ public class MassMoveControllerTests(WebApiTestHost host) : IClassFixture<WebApi
             .Execute(x => x.MoveIssue(issue.Id, 0)));
         
         var notFoundException = ex.HasInnerException<NotFoundException>();
-        Assert.Equal("Status: 0 is not exists or permission: Update missing on Epic", notFoundException.Message);
+        Assert.Equal("Status: 0 is not found", notFoundException.Message);
     }
 }
