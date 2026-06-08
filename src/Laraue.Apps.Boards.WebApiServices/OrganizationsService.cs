@@ -72,6 +72,18 @@ public interface IOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
+
+    Task CreateAttribute(
+        CreateAttributeRequest request,
+        CancellationToken cancellationToken);
+
+    Task UpdateAttribute(
+        UpdateAttributeRequest request,
+        CancellationToken cancellationToken);
+
+    Task<AttributeDto[]> GetAttributes(
+        GetAttributesRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(
@@ -399,6 +411,70 @@ public class OrganizationsService(
             request.AuthData.OrganizationId,
             cancellationToken);
     }
+
+    public async Task CreateAttribute(CreateAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+
+        if (request is { Type: AttributeType.List, Options.Length: < 1 })
+            throw new BadRequestException(
+                nameof(request.Options),
+                "At least one options required for list attribute");
+        
+        if (request is { Type: not AttributeType.List, Options.Length: > 0 })
+            throw new BadRequestException(
+                nameof(request.Options),
+                "Options are required only for list attribute");
+
+        await coreOrganizationsService.CreateAttribute(
+            request.AuthData.OrganizationId,
+            request.Name,
+            request.Color,
+            request.Type,
+            request.Options?.Select(x => x.Name).ToArray(),
+            cancellationToken);
+    }
+
+    public async Task UpdateAttribute(UpdateAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+        
+        throw new NotImplementedException();
+    }
+
+    public async Task<AttributeDto[]> GetAttributes(GetAttributesRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+        
+        var result = await context.Attributes
+            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
+            .Select(x => new AttributeDto
+            {
+                Type = x.AttributeType,
+                Color = x.Color,
+                Name = x.Name,
+                Id = x.Id,
+                ListValues = x.AttributeListValues!
+                    .Select(v => new AttributeListValueDto
+                    {
+                        Name = v.Value,
+                        Id = v.Id,
+                    })
+                    .ToArray(),
+            })
+            .ToArrayAsync(cancellationToken);
+
+        return result;
+    }
 }
 
 public record CreateOrganizationRequest
@@ -547,4 +623,67 @@ public record OrganizationMember
 public record GetPermittableEntitiesRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
+}
+
+public record CreateAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    
+    [MaxLength(64)]
+    public required string Name { get; set; }
+    
+    [MinLength(7)]
+    [MaxLength(7)]
+    public required string Color { get; set; }
+    
+    public AttributeType Type { get; set; }
+    
+    public NewAttributeListValueDto[]? Options { get; set; }
+}
+
+public record UpdateAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+
+    public long Id { get; set; }
+    
+    [MaxLength(64)]
+    public required string Name { get; set; }
+    
+    [MinLength(7)]
+    [MaxLength(7)]
+    public required string Color { get; set; }
+    
+    public required UpdateAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record NewAttributeListValueDto
+{
+    [MaxLength(64)]
+    public required string Name { get; set; }
+}
+
+public record UpdateAttributeListValueDto : NewAttributeListValueDto
+{
+    public long? Id { get; set; }
+}
+
+public record GetAttributesRequest
+{
+    public required OrganizationAuthData AuthData { get; set; }
+}
+
+public record AttributeDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
+    public required string Color { get; set; }
+    public required AttributeType Type { get; set; }
+    public required AttributeListValueDto[] ListValues { get; set; }
+}
+
+public record AttributeListValueDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
 }

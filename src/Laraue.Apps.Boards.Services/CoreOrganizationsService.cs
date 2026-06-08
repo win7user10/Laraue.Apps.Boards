@@ -7,6 +7,7 @@ using Laraue.Core.Exceptions.Web;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Attribute = Laraue.Apps.Boards.DataAccess.Models.Attribute;
 
 namespace Laraue.Apps.Boards.Services;
 
@@ -64,6 +65,14 @@ public interface ICoreOrganizationsService
     Task<UserOrganizationPreferencesResponse> GetPreferences(
         long organizationId,
         Guid userId,
+        CancellationToken cancellationToken);
+    
+    Task<long> CreateAttribute(
+        long organizationId,
+        string name,
+        string color,
+        AttributeType attributeType,
+        string[]? listValues,
         CancellationToken cancellationToken);
 }
 
@@ -352,7 +361,35 @@ public class CoreOrganizationsService(
             SelectedSpaceId = preferences.SelectedSpaceId,
         };
     }
-    
+
+    public async Task<long> CreateAttribute(
+        long organizationId,
+        string name,
+        string color,
+        AttributeType attributeType,
+        string[]? listValues,
+        CancellationToken cancellationToken)
+    {
+        var attribute = new Attribute
+        {
+            Name = name,
+            AttributeType = attributeType,
+            Color = color,
+            OrganizationId = organizationId,
+            AttributeListValues = listValues?
+                .Select(x => new AttributeListValue
+                {
+                    Value = x
+                })
+                .ToList()
+        };
+        
+        context.Add(attribute);
+        await context.SaveChangesAsync(cancellationToken);
+        
+        return attribute.Id;
+    }
+
     private static UserOrganizationPreferences GetDefaultPreferences(
         long organizationId,
         Guid userId)
