@@ -63,6 +63,16 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
                 .IsUnique();
         });
         
+        modelBuilder.Entity<IssueAttributeTextValue>(entity =>
+        {
+            entity.HasKey(x => new { x.AttributeId, x.IssueId });
+        });
+        
+        modelBuilder.Entity<IssueAttributeListValue>(entity =>
+        {
+            entity.HasKey(x => new { x.AttributeId, x.IssueId });
+        });
+        
         modelBuilder.Entity<Space>(entity =>
         {
             entity

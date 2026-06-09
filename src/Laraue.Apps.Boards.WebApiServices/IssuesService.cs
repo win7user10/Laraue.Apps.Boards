@@ -441,13 +441,43 @@ public class IssuesService(
                 TelegramUsername = x.User.TelegramUserName,
                 CategoryColor = x.Status.Epic.Color,
                 StatusColor = x.Status!.Epic!.IsDefault ? null : x.Status.Color,
+                OrganizationId = x.Status.Epic.Space!.OrganizationId,
+                Number = x.IssueNumber!.Number,
+                SpaceKey = x.Status.Epic.Space.Key,
+                SpaceColor = x.Status.Epic.Space.Color,
             })
             .FirstAsyncEF(cancellationToken);
 
         var sender = UserInitialsUtility.GetInitials(
             result.TelegramUsername,
             result.TelegramFirstName,
-            result.TelegramLastName);;
+            result.TelegramLastName);
+
+        var attributeValues = await context.Attributes
+            .Where(x => x.OrganizationId == result.OrganizationId)
+            .Select(x => new DetailIssueAttributeDto
+            {
+                Id = x.Id,
+                Type = x.AttributeType,
+                Name = x.Name,
+                ListValues = x.AttributeListValues!
+                    .Select(v => new IssueAttributeListValueDto
+                    {
+                        Name = v.Value,
+                        Id = v.Id,
+                    })
+                    .ToArray(),
+                Value = string.Empty, // Fills via mapping
+                Color = x.Color,
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var attributeValuesResult = await GetIssueAttributeValues(request.IssueId, cancellationToken);
+        foreach (var attributeValue in attributeValues)
+        {
+            if (attributeValuesResult.TryGetValue(attributeValue.Id, out var value))
+                attributeValue.Value = value;
+        }
 
         return new IssueDetailDto
         {
@@ -461,7 +491,44 @@ public class IssuesService(
             EpicColor = result.CategoryColor,
             StatusColor = result.StatusColor,
             CanEdit = issueAccessLevels.CanUpdateIssue,
+            AttributeValues = attributeValues,
+            Key = $"{result.SpaceKey}-{result.Number}",
+            SpaceColor = result.SpaceColor,
         };
+    }
+
+    private async Task<Dictionary<long, Dictionary<long, string>>> GetIssuesAttributeValues(
+        IEnumerable<long> issueIds,
+        CancellationToken cancellationToken)
+    {
+        var textValues = context.IssueAttributeTextValues
+            .Where(x => issueIds.Contains(x.IssueId))
+            .Select(x => new { x.AttributeId, x.IssueId, Value = x.Text });
+        
+        var listValues =  context.IssueAttributeListValues
+            .Where(x => issueIds.Contains(x.IssueId))
+            .Select(x => new { x.AttributeId, x.IssueId, Value = x.AttributeListValueId.ToString() });
+
+        var dbResult = await textValues
+            .Union(listValues)
+            .ToArrayAsyncEF(cancellationToken);
+        
+        return dbResult
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.ToDictionary(
+                    y => y.AttributeId,
+                    y => y.Value));
+    }
+
+    private async Task<Dictionary<long, string>> GetIssueAttributeValues(
+        long issueId,
+        CancellationToken cancellationToken)
+    {
+        var result = await GetIssuesAttributeValues([issueId], cancellationToken);
+
+        return result.GetValueOrDefault(issueId, new Dictionary<long, string>());
     }
 
     private async Task EnrichMedia<T>(IList<T> elements, CancellationToken ct)
@@ -759,7 +826,26 @@ public class IssueDetailDto
     public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required string SpaceColor { get; set; }
     public required bool CanEdit { get; set; }
+    public required string Key { get; set; }
+    public DetailIssueAttributeDto[] AttributeValues { get; set; } = [];
+}
+
+public record DetailIssueAttributeDto
+{
+    public long Id { get; set; }
+    public AttributeType Type { get; set; }
+    public required string Name { get; set; }
+    public required string Value { get; set; }
+    public required string Color { get; set; }
+    public IssueAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record IssueAttributeListValueDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
 }
 
 public class IssueDetailDtoData
@@ -775,6 +861,10 @@ public class IssueDetailDtoData
     public required string? CategoryColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required long OrganizationId { get; set; }
+    public required int Number { get; set; }
+    public required string SpaceKey { get; set; }
+    public required string SpaceColor { get; set; }
 }
 
 public record BatchRequest
