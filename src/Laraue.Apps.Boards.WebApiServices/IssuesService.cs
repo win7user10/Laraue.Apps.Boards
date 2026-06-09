@@ -91,6 +91,7 @@ public class IssuesService(
             .ToArray();
         
         await EnrichMedia(projected, cancellationToken);
+        await EnrichAttributes(projected, cancellationToken);
 
         return new BatchResult<IssueListDto>
         {
@@ -180,6 +181,7 @@ public class IssuesService(
             .ToList();
         
         await EnrichMedia(allData, cancellationToken);
+        await EnrichAttributes(allData, cancellationToken);
 
         return result.ToArray();
     }
@@ -314,12 +316,70 @@ public class IssuesService(
         
         if (!accessLevels.CanUpdateIssue)
             throw new ForbiddenException($"Issue: {request.Id} update is forbidden");
+
+
+        var updateAttributeRequests = new List<UpdateIssueAttributeRequest>();
+        var attributeValidationErrors = new List<string>();
+        
+        if (request.AttributeValues.Keys.Count > 0)
+        {
+            var attributes = await context.Attributes
+                .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
+                .Where(x => request.AttributeValues.Keys.Contains(x.Id))
+                .Select(x => new { x.Id, x.AttributeType })
+                .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, ct);
+
+            foreach (var attribute in request.AttributeValues)
+            {
+                if (!attributes.TryGetValue(attribute.Key, out var attributeType))
+                    attributeValidationErrors.Add($"Attribute: {attribute.Key} is not found");
+                
+                if (attributeType == AttributeType.List)
+                {
+                    if (!long.TryParse(attribute.Value, out var value))
+                    {
+                        attributeValidationErrors.Add($"Value: {value} is not a number");
+                        continue;
+                    }
+                    
+                    // TODO - check id correctness
+                    updateAttributeRequests.Add(
+                        new UpdateIssueListAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = value
+                        });
+                }
+
+                if (attributeType == AttributeType.Text)
+                {
+                    // TODO - check for max length
+                    updateAttributeRequests.Add(
+                        new UpdateIssueTextAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = attribute.Value,
+                        });
+                }
+            }
+        }
+
+        if (attributeValidationErrors.Count > 0)
+            throw new BadRequestException(new Dictionary<string, string?[]>
+            {
+                [nameof(request.AttributeValues)] = attributeValidationErrors.ToArray(),
+            });
+        
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
         
         await issuesService.Update(
             request.Id,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
             ct);
+        await issuesService.UpdateAttributes(request.Id, updateAttributeRequests.ToArray(), ct);
+            
+        await transaction.CommitAsync(ct);
     }
 
     public async Task<ShortPaginatedResult<SearchIssueDto>> Search(
@@ -346,6 +406,7 @@ public class IssuesService(
         
         var mapped = temporaryResult.MapTo(Map);
         await EnrichMedia(mapped.Data, ct);
+        await EnrichAttributes(mapped.Data, ct);
         
         var result = await MapToSearchDtos(mapped.Data, ct);
         return new ShortPaginatedResult<SearchIssueDto>(
@@ -531,6 +592,41 @@ public class IssuesService(
         return result.GetValueOrDefault(issueId, new Dictionary<long, string>());
     }
 
+    private async Task EnrichAttributes(IList<IssueListDto> elements, CancellationToken ct)
+    {
+        var ids = elements.Select(x => x.Id).ToArray();
+
+        var textValues = await context.IssueAttributeTextValues
+            .Where(x => ((IEnumerable<long>)ids).Contains(x.IssueId))
+            .Select(x => new { x.Attribute!.Color, x.IssueId, Value = x.Text })
+            .ToArrayAsyncEF(ct);
+        
+        var listValues = await context.IssueAttributeListValues
+            .Where(x => ((IEnumerable<long>)ids).Contains(x.IssueId))
+            .Select(x => new { x.Attribute!.Color, x.IssueId, x.AttributeListValue!.Value })
+            .ToArrayAsyncEF(ct);
+        
+        var all = textValues
+            .Union(listValues)
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(x => x.Key);
+
+        foreach (var element in elements)
+        {
+            if (all.TryGetValue(element.Id, out var attributes))
+            {
+                foreach (var attribute in attributes)
+                {
+                    element.Attributes.Add(new IssueListAttributeDto
+                    {
+                        Value = attribute.Value,
+                        Color = attribute.Color,
+                    });
+                }
+            }
+        }
+    }
+
     private async Task EnrichMedia<T>(IList<T> elements, CancellationToken ct)
         where T : class, ICanContainMedia
     {
@@ -659,7 +755,7 @@ public class IssuesService(
             UserColor = x.User.Color,
             Number = x.IssueNumber!.Number,
             SpaceKey = x.Status.Epic!.Space!.Key,
-            SpaceId = x.Status.Epic.SpaceId,
+            SpaceId = x.Status.Epic.SpaceId
         });
     }
     
@@ -757,6 +853,13 @@ public record IssueListDto : ICanContainMedia
     public required long StatusId { get; set; }
     public required long SpaceId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
+    public List<IssueListAttributeDto> Attributes { get; set; } = [];
+}
+
+public record IssueListAttributeDto
+{
+    public required string Value { get; set; }
+    public required string Color { get; set; }
 }
 
 public record SearchIssueDto : IssueListDto
@@ -803,6 +906,13 @@ public record UpdateIssueRequest
     public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
     public required string Content { get; set; }
+    public required Dictionary<long, string> AttributeValues { get; set; }
+}
+
+public record UpdateIssueAttributeRawRequest
+{
+    public long Id { get; set; }
+    public string? Value { get; set; }
 }
 
 public record SearchRequest : IPaginationData
