@@ -81,6 +81,10 @@ public interface ICoreOrganizationsService
         string color,
         UpdateAttributeListValueRequest[]? listValues,
         CancellationToken cancellationToken);
+    
+    Task DeleteAttribute(
+        long attributeId,
+        CancellationToken cancellationToken);
 }
 
 public class CoreOrganizationsService(
@@ -463,6 +467,13 @@ public class CoreOrganizationsService(
                 .ExecuteDeleteAsync(cancellationToken);
         
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task DeleteAttribute(long attributeId, CancellationToken cancellationToken)
+    {
+        return context.Attributes
+            .Where(x => x.Id == attributeId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     private static UserOrganizationPreferences GetDefaultPreferences(

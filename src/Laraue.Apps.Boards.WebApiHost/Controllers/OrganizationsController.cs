@@ -259,4 +259,19 @@ public class OrganizationsController(IOrganizationsService organizationsService)
             },
             cancellationToken);
     }
+
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpDelete("attributes/{id:long}")]
+    public Task DeleteAttribute(
+        [FromPath] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.DeleteAttribute(
+            new DeleteAttributeRequest
+            {
+                Id = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
 }

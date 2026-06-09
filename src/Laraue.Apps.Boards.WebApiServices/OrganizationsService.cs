@@ -84,6 +84,10 @@ public interface IOrganizationsService
     Task<AttributeDto[]> GetAttributes(
         GetAttributesRequest request,
         CancellationToken cancellationToken);
+
+    Task DeleteAttribute(
+        DeleteAttributeRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(
@@ -445,12 +449,7 @@ public class OrganizationsService(
             AdminAccessLevel.ManageAttributes,
             cancellationToken);
 
-        var attributeExists = await context.Attributes
-            .Where(x => x.Id == request.Id)
-            .AnyAsyncEF(x => x.OrganizationId == request.AuthData.OrganizationId, cancellationToken);
-
-        if (!attributeExists)
-            throw new NotFoundException($"Attribute: {request.Id} is not found");
+        await EnsureAttributeExists(request.AuthData.OrganizationId, request.Id, cancellationToken);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await coreOrganizationsService.UpdateAttribute(
@@ -494,6 +493,28 @@ public class OrganizationsService(
             .ToArrayAsync(cancellationToken);
 
         return result;
+    }
+
+    public async Task DeleteAttribute(DeleteAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+
+        await EnsureAttributeExists(request.AuthData.OrganizationId, request.Id, cancellationToken);
+
+        await coreOrganizationsService.DeleteAttribute(request.Id, cancellationToken);
+    }
+
+    private async Task EnsureAttributeExists(long organizationId, long attributeId, CancellationToken cancellationToken)
+    {
+        var attributeExists = await context.Attributes
+            .Where(x => x.Id == attributeId)
+            .AnyAsyncEF(x => x.OrganizationId == organizationId, cancellationToken);
+
+        if (!attributeExists)
+            throw new NotFoundException($"Attribute: {attributeId} is not found");
     }
 }
 
@@ -675,6 +696,13 @@ public record UpdateAttributeRequest
     public required string Color { get; set; }
     
     public required UpdateAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record DeleteAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+
+    public long Id { get; set; }
 }
 
 public record NewAttributeListValueDto
