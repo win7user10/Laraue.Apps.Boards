@@ -419,14 +419,14 @@ public class OrganizationsService(
             AdminAccessLevel.ManageAttributes,
             cancellationToken);
 
-        if (request is { Type: AttributeType.List, Options.Length: < 1 })
+        if (request is { Type: AttributeType.List, ListValues.Length: < 1 })
             throw new BadRequestException(
-                nameof(request.Options),
+                nameof(request.ListValues),
                 "At least one options required for list attribute");
         
-        if (request is { Type: not AttributeType.List, Options.Length: > 0 })
+        if (request is { Type: not AttributeType.List, ListValues.Length: > 0 })
             throw new BadRequestException(
-                nameof(request.Options),
+                nameof(request.ListValues),
                 "Options are required only for list attribute");
 
         await coreOrganizationsService.CreateAttribute(
@@ -434,7 +434,7 @@ public class OrganizationsService(
             request.Name,
             request.Color,
             request.Type,
-            request.Options?.Select(x => x.Name).ToArray(),
+            request.ListValues?.Select(x => x.Name).ToArray(),
             cancellationToken);
     }
 
@@ -444,8 +444,28 @@ public class OrganizationsService(
             request.AuthData,
             AdminAccessLevel.ManageAttributes,
             cancellationToken);
+
+        var attributeExists = await context.Attributes
+            .Where(x => x.Id == request.Id)
+            .AnyAsyncEF(x => x.OrganizationId == request.AuthData.OrganizationId, cancellationToken);
+
+        if (!attributeExists)
+            throw new NotFoundException($"Attribute: {request.Id} is not found");
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await coreOrganizationsService.UpdateAttribute(
+            request.Id,
+            request.Name,
+            request.Color,
+            request.ListValues?
+                .Select(x => new UpdateAttributeListValueRequest
+                {
+                    Name = x.Name,
+                    Id = x.Id,
+                }).ToArray(),
+            cancellationToken);
         
-        throw new NotImplementedException();
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<AttributeDto[]> GetAttributes(GetAttributesRequest request, CancellationToken cancellationToken)
@@ -638,7 +658,7 @@ public record CreateAttributeRequest
     
     public AttributeType Type { get; set; }
     
-    public NewAttributeListValueDto[]? Options { get; set; }
+    public NewAttributeListValueDto[]? ListValues { get; set; }
 }
 
 public record UpdateAttributeRequest

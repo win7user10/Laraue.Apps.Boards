@@ -74,6 +74,13 @@ public interface ICoreOrganizationsService
         AttributeType attributeType,
         string[]? listValues,
         CancellationToken cancellationToken);
+    
+    Task UpdateAttribute(
+        long attributeId,
+        string name,
+        string color,
+        UpdateAttributeListValueRequest[]? listValues,
+        CancellationToken cancellationToken);
 }
 
 public class CoreOrganizationsService(
@@ -390,6 +397,74 @@ public class CoreOrganizationsService(
         return attribute.Id;
     }
 
+    public async Task UpdateAttribute(
+        long attributeId,
+        string name,
+        string color,
+        UpdateAttributeListValueRequest[]? listValues,
+        CancellationToken cancellationToken)
+    {
+        context.Database.EnsureTransactionStarted();
+        
+        var updatedCount = await context.Attributes
+            .Where(x => x.Id == attributeId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Name, name)
+                .SetProperty(x => x.Color, color),
+            cancellationToken);
+
+        if (updatedCount == 0)
+            return;
+
+        if (listValues == null || listValues.Length == 0)
+        {
+            await context.AttributeListValues
+                .Where(x => x.AttributeId == attributeId)
+                .ExecuteDeleteAsync(cancellationToken);
+            
+            return;
+        }
+
+        var oldListValues = await context.AttributeListValues
+            .Where(x => x.AttributeId == attributeId)
+            .ToArrayAsyncEF(cancellationToken);
+        
+        var oldListValuesDictionary = oldListValues.ToDictionary(x => x.Id, x => x);
+
+        foreach (var listValue in listValues)
+        {
+            // Update old
+            if (listValue.Id.HasValue && oldListValuesDictionary.TryGetValue(listValue.Id.Value, out var oldValue))
+            {
+                oldValue.Value = listValue.Name;
+                context.Attach(oldValue).State = EntityState.Modified;
+            }
+            // Insert new
+            else
+                context.Add(new AttributeListValue
+                {
+                    Value = listValue.Name,
+                    AttributeId = attributeId,
+                });
+        }
+        
+        // Delete old
+        var allListValueIds = listValues
+            .Where(x => x.Id.HasValue)
+            .Select(x => x.Id!.Value);
+
+        var toDelete = oldListValuesDictionary.Keys
+            .Except(allListValueIds)
+            .ToArray();
+        
+        if (toDelete.Length > 0)
+            await context.AttributeListValues
+                .Where(x => ((IEnumerable<long>)toDelete).Contains(x.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     private static UserOrganizationPreferences GetDefaultPreferences(
         long organizationId,
         Guid userId)
@@ -539,4 +614,10 @@ public record CreateOrganizationResponse
 public record UserOrganizationPreferencesResponse
 {
     public long? SelectedSpaceId { get; init; }
+}
+
+public record UpdateAttributeListValueRequest
+{
+    public long? Id { get; set; }
+    public required string Name { get; set; }
 }

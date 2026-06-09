@@ -241,6 +241,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
         return organizationsService.UpdateAttribute(
             request with
             {
+                Id = id,
                 AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);
