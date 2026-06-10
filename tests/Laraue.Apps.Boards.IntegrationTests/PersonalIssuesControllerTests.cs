@@ -85,26 +85,45 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var organization = await testScope.InitializePersonalOrganization(
             userId,
             o => o
+                .AddTextAttribute("Note")
+                .AddListAttribute("Type", ["Bug", "Feature"])
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, i => i
                             .WithContent("Hi")))));
 
         var issue = organization.GetIssue(1, 1, 0, 0);
+        var noteAttribute = organization.GetAttribute(0);
+        var typeAttribute = organization.GetAttribute(1);
+        
+        var request = new UpdateIssueRequest
+        {
+            Content = "New",
+            AttributeValues = new Dictionary<long, string>
+            {
+                [noteAttribute.Id] = "My note",
+                [typeAttribute.Id] = typeAttribute.GetListValue(1).Id.ToString(), // Set ID of 'Feature' value
+            },
+        };
         
         await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Update(
-                issue.Id,
-                new UpdateIssueRequest
-                {
-                    Content = "New",
-                }));
+            .Execute(x => x.Update(issue.Id, request));
 
         issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
         
         Assert.True(issue.CreatedAt < issue.UpdatedAt);
         Assert.Equal("New", issue.Content);
+
+        var textAttribute = await testScope.Database.IssueAttributeTextValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, textAttribute.IssueId);
+        Assert.Equal(noteAttribute.Id, textAttribute.AttributeId);
+        Assert.Equal("My note", textAttribute.Text);
+        
+        var listAttribute = await testScope.Database.IssueAttributeListValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, listAttribute.IssueId);
+        Assert.Equal(typeAttribute.Id, listAttribute.AttributeId);
+        Assert.Equal(typeAttribute.GetListValue(1).Id, listAttribute.AttributeListValueId); // ID of 'Feature' value
     }
     
     [Fact]

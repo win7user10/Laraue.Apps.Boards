@@ -2,6 +2,7 @@
 using Laraue.Apps.Boards.DataAccess.Enums;
 using Laraue.Apps.Boards.DataAccess.Models;
 using Laraue.Apps.Boards.Services;
+using Attribute = Laraue.Apps.Boards.DataAccess.Models.Attribute;
 using Models_Status = Laraue.Apps.Boards.DataAccess.Models.Status;
 using Status = Laraue.Apps.Boards.DataAccess.Models.Status;
 
@@ -18,6 +19,7 @@ public class OrganizationInitializer(
     private string _organizationColor = "#ffffff";
     private DateTime _timestamp = DateTime.UtcNow;
     private bool _isPersonal;
+    private readonly List<TestAttribute> _attributes = new ();
 
     private readonly List<SpaceBuilder> _spaces =
     [
@@ -54,6 +56,20 @@ public class OrganizationInitializer(
     public OrganizationInitializer SetIsPersonal(bool isPersonal)
     {
         _isPersonal = isPersonal;
+
+        return this;
+    }
+
+    public OrganizationInitializer AddTextAttribute(string name)
+    {
+        _attributes.Add(new TextTestAttribute(name));
+
+        return this;
+    }
+
+    public OrganizationInitializer AddListAttribute(string name, string[] possibleValues)
+    {
+        _attributes.Add(new ListTestAttribute(name, possibleValues));
 
         return this;
     }
@@ -145,6 +161,22 @@ public class OrganizationInitializer(
 
             organization.Spaces!.Add(spaceEntity);
             spaceCounters.Add((spaceEntity, lastIssueNumber));
+        }
+
+        organization.Attributes = new List<Attribute>();
+        foreach (var attribute in _attributes)
+        {
+            organization.Attributes!.Add(new Attribute
+            {
+                AttributeType = attribute.AttributeType,
+                Color = "#ffffff",
+                Name = attribute.Name,
+                AttributeListValues = attribute is ListTestAttribute listTestAttribute
+                    ? listTestAttribute.PossibleValues
+                        .Select(x => new AttributeListValue { Value = x })
+                        .ToList()
+                    : null
+            });
         }
 
         context.Add(organization);
@@ -341,6 +373,10 @@ public class OrganizationInitializer(
             return this;
         }
     }
+
+    public abstract record TestAttribute(AttributeType AttributeType, string Name);
+    public record TextTestAttribute(string Name) : TestAttribute(AttributeType.Text, Name);
+    public record ListTestAttribute(string Name, string[] PossibleValues) : TestAttribute(AttributeType.List, Name);
     
     public class EpicBuilder(Guid creatorId, DateTime timestamp)
     {

@@ -162,6 +162,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 new UpdateIssueRequest
                 {
                     Content = "New",
+                    AttributeValues = new Dictionary<long, string>(),
                 }));
 
         issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
@@ -190,6 +191,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 new UpdateIssueRequest
                 {
                     Content = "New",
+                    AttributeValues = new Dictionary<long, string>(),
                 })));
         
         var notFound = ex.HasInnerException<ForbiddenException>();
@@ -218,6 +220,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 new UpdateIssueRequest
                 {
                     Content = "New",
+                    AttributeValues = new Dictionary<long, string>(),
                 }));
 
         issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
@@ -246,6 +249,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 new UpdateIssueRequest
                 {
                     Content = "New",
+                    AttributeValues = new Dictionary<long, string>(),
                 }));
 
         issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);

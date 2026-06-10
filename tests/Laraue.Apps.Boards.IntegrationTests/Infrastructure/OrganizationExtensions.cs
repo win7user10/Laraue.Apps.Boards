@@ -1,4 +1,5 @@
 ﻿using Laraue.Apps.Boards.DataAccess.Models;
+using Attribute = Laraue.Apps.Boards.DataAccess.Models.Attribute;
 
 namespace Laraue.Apps.Boards.IntegrationTests.Infrastructure;
 
@@ -39,5 +40,19 @@ public static class OrganizationExtensions
         int spaceIndex)
     {
         return organization.Spaces![spaceIndex];
+    }
+    
+    public static Attribute GetAttribute(
+        this Organization organization,
+        int attributeIndex)
+    {
+        return organization.Attributes![attributeIndex];
+    }
+    
+    public static AttributeListValue GetListValue(
+        this Attribute attribute,
+        int valueIndex)
+    {
+        return attribute.AttributeListValues![valueIndex];
     }
 }

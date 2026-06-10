@@ -63,6 +63,8 @@ public class Organization
     /// Users of organization.
     /// </summary>
     public IList<OrganizationUser>? Users { get; set; }
+    
+    public IList<Attribute>? Attributes { get; set; }
 }
 
 public enum OrganizationType

@@ -469,6 +469,7 @@ public class IssuesService(
                 Time = element.Time,
                 Media = element.Media,
                 SenderInitial = element.SenderInitial,
+                Attributes = element.Attributes,
             });
         }
         
