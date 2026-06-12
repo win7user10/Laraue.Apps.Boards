@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Laraue.Apps.Boards.DataAccess;
 using Laraue.Apps.Boards.DataAccess.Extensions;
 using Laraue.Apps.Boards.DataAccess.Models;
@@ -9,6 +10,7 @@ using Laraue.Core.DataAccess.Extensions;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -388,19 +390,21 @@ public class IssuesService(
     {
         var temporaryResult = await accessService.GetAvailableIssues(
             request.AuthData,
-            issues =>
+            async issues =>
             {
                 if (request.EpicIds.Length > 0)
                     issues = issues.Where(x => ((IEnumerable<long>)request.EpicIds).Contains(x.Status!.EpicId));
         
                 if (request.SpaceIds.Length > 0)
                     issues = issues.Where(x => ((IEnumerable<long>)request.SpaceIds).Contains(x.Status!.Epic!.SpaceId));
+                
+                issues = await ApplyFilters(issues, request, ct);
         
                 if (!string.IsNullOrEmpty(request.SearchString))
                     issues = issues
                         .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
 
-                return ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
+                return await ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
                     .ShortPaginateLinq2DbAsync(request, ct);
             }, ct);
         
@@ -414,6 +418,87 @@ public class IssuesService(
             mapped.PerPage,
             mapped.HasNextPage,
             result);
+    }
+
+    private async Task<IQueryable<Issue>> ApplyFilters(
+        IQueryable<Issue> query,
+        IHasAttributeFilters request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Filters.Count == 0)
+            return query;
+
+        var filterTypes = await context.Attributes
+            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
+            .Where(x => request.Filters.Keys.Any(y => y == x.Id))
+            .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, cancellationToken);
+
+        var errors = new Dictionary<long, string>();
+        
+        foreach (var filter in request.Filters)
+        {
+            if (!filterTypes.TryGetValue(filter.Key, out var filterType))
+            {
+                errors.Add(filter.Key, "Property was not found");
+                continue;
+            }
+
+            if (filterType == AttributeType.Text)
+            {
+                if (filter.Value.ValueKind != JsonValueKind.String)
+                {
+                    errors.Add(filter.Key, "String value was excepted");
+                    continue;
+                }
+                
+                query = query.InnerJoin(
+                    context.IssueAttributeTextValues,
+                    (i, a) => i.Id == a.IssueId && a.AttributeId == filter.Key && a.Text.StartsWith(filter.Value.GetString()!),
+                    (i, a) => i);
+            }
+
+            if (filterType == AttributeType.List)
+            {
+                if (filter.Value.ValueKind != JsonValueKind.Array)
+                {
+                    errors.Add(filter.Key, "Number array was excepted");
+                    continue;
+                }
+
+                var listAndValues = new List<long>();
+                var hasParsingErrors = false;
+                foreach (var arrayToken in filter.Value.EnumerateArray())
+                {
+                    if (arrayToken.ValueKind != JsonValueKind.Number)
+                    {
+                        errors.Add(filter.Key, $"Got: {arrayToken.GetString()}, but number was excepted");
+                        hasParsingErrors = true;
+                        continue;
+                    }
+                    
+                    listAndValues.Add(arrayToken.GetInt64());
+                }
+                
+                if (hasParsingErrors)
+                    continue;
+                
+                if (listAndValues.Count == 0)
+                    continue;
+                
+                query = query.InnerJoin(
+                    context.IssueAttributeListValues,
+                    (i, a) => i.Id == a.IssueId && a.AttributeId == filter.Key && ((IEnumerable<long>)listAndValues).Contains(a.AttributeListValueId),
+                    (i, a) => i);
+            }
+        }
+
+        if (errors.Any())
+            throw new BadRequestException(new Dictionary<string, string?[]>
+            {
+                [nameof(request.Filters)] = errors.Select(x => $"{x.Key}: {x.Value}").ToArray()
+            });
+
+        return query;
     }
 
     private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
@@ -910,13 +995,13 @@ public record UpdateIssueRequest
     public required Dictionary<long, string> AttributeValues { get; set; }
 }
 
-public record UpdateIssueAttributeRawRequest
+public interface IHasAttributeFilters
 {
-    public long Id { get; set; }
-    public string? Value { get; set; }
+    Dictionary<long, JsonElement> Filters { get; }
+    public OrganizationAuthData AuthData { get; }
 }
 
-public record SearchRequest : IPaginationData
+public record SearchRequest : IPaginationData, IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long[] EpicIds { get; set; } = [];
@@ -924,6 +1009,7 @@ public record SearchRequest : IPaginationData
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public class IssueDetailDto

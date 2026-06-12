@@ -470,11 +470,6 @@ public class OrganizationsService(
 
     public async Task<AttributeDto[]> GetAttributes(GetAttributesRequest request, CancellationToken cancellationToken)
     {
-        await organizationAccessService.HasAccessOrThrow(
-            request.AuthData,
-            AdminAccessLevel.ManageAttributes,
-            cancellationToken);
-        
         var result = await context.Attributes
             .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
             .Select(x => new AttributeDto
