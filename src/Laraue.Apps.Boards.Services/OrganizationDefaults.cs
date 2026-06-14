@@ -26,7 +26,7 @@ public class OrganizationDefaults
             CanUpdateIssues = true,
             CanDeleteIssues = true,
             AdminAccessLevel = isPersonal
-                ? AdminAccessLevel.UpdateOrganization | AdminAccessLevel.MassMove
+                ? AdminAccessLevel.UpdateOrganization | AdminAccessLevel.MassMove | AdminAccessLevel.ManageAttributes
                 : AdminAccessLevel.All,
             UserId = userId,
         };

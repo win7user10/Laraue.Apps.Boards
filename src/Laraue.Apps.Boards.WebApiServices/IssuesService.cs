@@ -12,7 +12,6 @@ using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.Boards.WebApiServices;
 
@@ -76,6 +75,8 @@ public class IssuesService(
 
         var query = context.Issues
             .Where(i => i.StatusId == request.StatusId);
+
+        query = await ApplyFilters(query, request, cancellationToken);
             
         if (!string.IsNullOrEmpty(request.SearchString))
         {
@@ -508,66 +509,6 @@ public class IssuesService(
         return query;
     }
 
-    private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
-    {
-        var spaces = await context.Spaces
-            .Where(x => elements.Select(y => y.SpaceId).Distinct().Contains(x.Id))
-            .ToDictionaryAsyncEF(
-                x => x.Id,
-                x => new NameAndColor
-                {
-                    Name = x.Name,
-                    Color = x.Color,
-                }, ct);
-        
-        var epics = await context.Epics
-            .Where(x => elements.Select(y => y.EpicId).Distinct().Contains(x.Id))
-            .ToDictionaryAsyncEF(
-                x => x.Id,
-                x => new NameAndColor
-                {
-                    Name = x.Name,
-                    Color = x.Color,
-                }, ct);
-        
-        var statuses = await context.Statuses
-            .Where(x => elements.Select(y => y.StatusId).Distinct().Contains(x.Id))
-            .Where(x => !x.Epic!.IsDefault)
-            .ToDictionaryAsyncEF(
-                x => x.Id,
-                x => new NameAndColor
-                {
-                    Name = x.Name,
-                    Color = x.Color,
-                }, ct);
-
-        var result = new List<SearchIssueDto>();
-
-        foreach (var element in elements)
-        {
-            result.Add(new SearchIssueDto
-            {
-                EpicId = element.EpicId,
-                Epic = epics[element.EpicId],
-                StatusId = element.StatusId,
-                Status = statuses.GetValueOrDefault(element.StatusId),
-                SpaceId = element.SpaceId,
-                Space = spaces[element.SpaceId],
-                Id = element.Id,
-                Content = element.Content,
-                Key = element.Key,
-                Sender = element.Sender,
-                SenderColor = element.SenderColor,
-                Time = element.Time,
-                Media = element.Media,
-                SenderInitial = element.SenderInitial,
-                Attributes = element.Attributes,
-            });
-        }
-        
-        return result;
-    }
-
     public async Task<IssueDetailDto> GetIssue(
         GetIssueRequest request,
         CancellationToken cancellationToken)
@@ -649,6 +590,66 @@ public class IssuesService(
             Key = $"{result.SpaceKey}-{result.Number}",
             SpaceColor = result.SpaceColor,
         };
+    }
+
+    private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
+    {
+        var spaces = await context.Spaces
+            .Where(x => elements.Select(y => y.SpaceId).Distinct().Contains(x.Id))
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+        
+        var epics = await context.Epics
+            .Where(x => elements.Select(y => y.EpicId).Distinct().Contains(x.Id))
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+        
+        var statuses = await context.Statuses
+            .Where(x => elements.Select(y => y.StatusId).Distinct().Contains(x.Id))
+            .Where(x => !x.Epic!.IsDefault)
+            .ToDictionaryAsyncEF(
+                x => x.Id,
+                x => new NameAndColor
+                {
+                    Name = x.Name,
+                    Color = x.Color,
+                }, ct);
+
+        var result = new List<SearchIssueDto>();
+
+        foreach (var element in elements)
+        {
+            result.Add(new SearchIssueDto
+            {
+                EpicId = element.EpicId,
+                Epic = epics[element.EpicId],
+                StatusId = element.StatusId,
+                Status = statuses.GetValueOrDefault(element.StatusId),
+                SpaceId = element.SpaceId,
+                Space = spaces[element.SpaceId],
+                Id = element.Id,
+                Content = element.Content,
+                Key = element.Key,
+                Sender = element.Sender,
+                SenderColor = element.SenderColor,
+                Time = element.Time,
+                Media = element.Media,
+                SenderInitial = element.SenderInitial,
+                Attributes = element.Attributes,
+            });
+        }
+        
+        return result;
     }
 
     private async Task<Dictionary<long, Dictionary<long, string>>> GetIssuesAttributeValues(
@@ -875,11 +876,12 @@ public class IssuesService(
     }
 }
 
-public record GetIssuesRequest : BatchRequest
+public record GetIssuesRequest : BatchRequest, IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public string? SearchString { get; set; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public record GetIssueRequest

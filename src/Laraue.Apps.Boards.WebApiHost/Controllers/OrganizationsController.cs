@@ -219,7 +219,7 @@ public class OrganizationsController(IOrganizationsService organizationsService)
 
     [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
     [HttpPost("attributes")]
-    public Task CreateAttribute(
+    public Task<long> CreateAttribute(
         [FromBody] CreateAttributeRequest request,
         CancellationToken cancellationToken = default)
     {

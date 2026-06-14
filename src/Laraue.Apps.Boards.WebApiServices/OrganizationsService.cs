@@ -73,7 +73,7 @@ public interface IOrganizationsService
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
 
-    Task CreateAttribute(
+    Task<long> CreateAttribute(
         CreateAttributeRequest request,
         CancellationToken cancellationToken);
 
@@ -417,7 +417,7 @@ public class OrganizationsService(
             cancellationToken);
     }
 
-    public async Task CreateAttribute(CreateAttributeRequest request, CancellationToken cancellationToken)
+    public async Task<long> CreateAttribute(CreateAttributeRequest request, CancellationToken cancellationToken)
     {
         await organizationAccessService.HasAccessOrThrow(
             request.AuthData,
@@ -434,7 +434,7 @@ public class OrganizationsService(
                 nameof(request.ListValues),
                 "Options are required only for list attribute");
 
-        await coreOrganizationsService.CreateAttribute(
+        return await coreOrganizationsService.CreateAttribute(
             request.AuthData.OrganizationId,
             request.Name,
             request.Color,
@@ -486,6 +486,7 @@ public class OrganizationsService(
                     })
                     .ToArray(),
             })
+            .OrderBy(x => x.Id)
             .ToArrayAsync(cancellationToken);
 
         return result;
@@ -715,7 +716,7 @@ public record UpdateAttributeListValueDto : NewAttributeListValueDto
 
 public record GetAttributesRequest
 {
-    public required OrganizationAuthData AuthData { get; set; }
+    public OrganizationAuthData AuthData { get; set; } = new();
 }
 
 public record AttributeDto
