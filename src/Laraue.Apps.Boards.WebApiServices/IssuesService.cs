@@ -141,21 +141,22 @@ public class IssuesService(
             .ToListAsyncEF(cancellationToken);
 
         var result = new List<ColumnIssues>();
+        
+        var commonQuery = context.Issues.AsQueryable();
+        commonQuery = await ApplyFilters(commonQuery, request, cancellationToken);
+        
         foreach (var statusId in statusIds)
         {
-            var query = context
-                .Issues
+            var query = commonQuery
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
                 query = query
-                    .Where(x => EF.Functions.ILike(
-                        x.Content!,
-                        request.SearchString.AsSearchable()));
+                    .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
             
             var statusResult = await ProjectToTemporaryDto(query
                 .OrderByDescending(x => x.Id))
-                .FullPaginateEFAsync(
+                .FullPaginateLinq2DbAsync(
                     new PaginationData
                     {
                         Page = 0,
@@ -450,10 +451,16 @@ public class IssuesService(
                     errors.Add(filter.Key, "String value was excepted");
                     continue;
                 }
+
+                var filterValue = filter.Value.GetString();
+                if (string.IsNullOrEmpty(filterValue))
+                    continue;
                 
                 query = query.InnerJoin(
                     context.IssueAttributeTextValues,
-                    (i, a) => i.Id == a.IssueId && a.AttributeId == filter.Key && a.Text.StartsWith(filter.Value.GetString()!),
+                    (i, a) => i.Id == a.IssueId
+                        && a.AttributeId == filter.Key
+                        && a.Text.ILike(filterValue.AsSearchable()),
                     (i, a) => i);
             }
 
@@ -881,7 +888,7 @@ public record GetIssueRequest
     public long IssueId { get; set; }
 }
 
-public record GetBoardRequest
+public record GetBoardRequest : IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long EpicId { get; set; }
@@ -889,6 +896,7 @@ public record GetBoardRequest
     [Range(1, 100)]
     public int Take { get; init; }
     public string? SearchString { get; init; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public record GetBoardSummaryRequest

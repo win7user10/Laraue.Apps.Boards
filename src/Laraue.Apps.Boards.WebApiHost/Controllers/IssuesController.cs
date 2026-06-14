@@ -40,9 +40,9 @@ public class IssuesController(IIssuesService issuesService) : ControllerBase
             cancellationToken);
     }
     
-    [HttpGet("board")]
+    [HttpPost("board")]
     public Task<ColumnIssues[]> GetBoard(
-        [FromQuery] GetBoardRequest request,
+        [FromBody] GetBoardRequest request,
         CancellationToken cancellationToken = default)
     {
         return issuesService.GetBoard(
