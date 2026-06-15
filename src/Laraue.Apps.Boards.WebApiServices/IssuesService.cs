@@ -290,6 +290,11 @@ public class IssuesService(
         
         if (!issuesAccessLevel.CanCreateIssue)
             throw new NotFoundException($"Status: {request.StatusId} issue creation is forbidden");
+        
+        var attributeUpdateRequests = await GetAttributeUpdateRequests(
+            request.AuthData.OrganizationId,
+            request.AttributeValues,
+            ct);
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         
@@ -302,6 +307,8 @@ public class IssuesService(
                 StatusId = request.StatusId,
             },
             ct);
+        
+        await issuesService.UpdateAttributes(id, attributeUpdateRequests, ct);
         
         await transaction.CommitAsync(ct);
         
@@ -320,59 +327,11 @@ public class IssuesService(
         
         if (!accessLevels.CanUpdateIssue)
             throw new ForbiddenException($"Issue: {request.Id} update is forbidden");
-
-
-        var updateAttributeRequests = new List<UpdateIssueAttributeRequest>();
-        var attributeValidationErrors = new List<string>();
         
-        if (request.AttributeValues.Keys.Count > 0)
-        {
-            var attributes = await context.Attributes
-                .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
-                .Where(x => request.AttributeValues.Keys.Contains(x.Id))
-                .Select(x => new { x.Id, x.AttributeType })
-                .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, ct);
-
-            foreach (var attribute in request.AttributeValues)
-            {
-                if (!attributes.TryGetValue(attribute.Key, out var attributeType))
-                    attributeValidationErrors.Add($"Attribute: {attribute.Key} is not found");
-                
-                if (attributeType == AttributeType.List)
-                {
-                    if (!long.TryParse(attribute.Value, out var value))
-                    {
-                        attributeValidationErrors.Add($"Value: {value} is not a number");
-                        continue;
-                    }
-                    
-                    // TODO - check id correctness
-                    updateAttributeRequests.Add(
-                        new UpdateIssueListAttributeRequest
-                        {
-                            Id = attribute.Key,
-                            Value = value
-                        });
-                }
-
-                if (attributeType == AttributeType.Text)
-                {
-                    // TODO - check for max length
-                    updateAttributeRequests.Add(
-                        new UpdateIssueTextAttributeRequest
-                        {
-                            Id = attribute.Key,
-                            Value = attribute.Value,
-                        });
-                }
-            }
-        }
-
-        if (attributeValidationErrors.Count > 0)
-            throw new BadRequestException(new Dictionary<string, string?[]>
-            {
-                [nameof(request.AttributeValues)] = attributeValidationErrors.ToArray(),
-            });
+        var attributeUpdateRequests = await GetAttributeUpdateRequests(
+            request.AuthData.OrganizationId,
+            request.AttributeValues,
+            ct);
         
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         
@@ -381,7 +340,7 @@ public class IssuesService(
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
             ct);
-        await issuesService.UpdateAttributes(request.Id, updateAttributeRequests.ToArray(), ct);
+        await issuesService.UpdateAttributes(request.Id, attributeUpdateRequests, ct);
             
         await transaction.CommitAsync(ct);
     }
@@ -590,6 +549,66 @@ public class IssuesService(
             Key = $"{result.SpaceKey}-{result.Number}",
             SpaceColor = result.SpaceColor,
         };
+    }
+
+    private async Task<UpdateIssueAttributeRequest[]> GetAttributeUpdateRequests(
+        long organizationId,
+        Dictionary<long, string> attributeValues,
+        CancellationToken ct)
+    {
+        if (attributeValues.Count == 0)
+            return [];
+        
+        var requests = new List<UpdateIssueAttributeRequest>();
+        var attributeValidationErrors = new List<string>();
+        
+        var attributes = await context.Attributes
+            .Where(x => x.OrganizationId == organizationId)
+            .Where(x => attributeValues.Keys.Contains(x.Id))
+            .Select(x => new { x.Id, x.AttributeType })
+            .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, ct);
+
+        foreach (var attribute in attributeValues)
+        {
+            if (!attributes.TryGetValue(attribute.Key, out var attributeType))
+                attributeValidationErrors.Add($"Attribute: {attribute.Key} is not found");
+                
+            if (attributeType == AttributeType.List)
+            {
+                if (!long.TryParse(attribute.Value, out var value))
+                {
+                    attributeValidationErrors.Add($"Value: {value} is not a number");
+                    continue;
+                }
+                    
+                // TODO - check id correctness
+                requests.Add(
+                    new UpdateIssueListAttributeRequest
+                    {
+                        Id = attribute.Key,
+                        Value = value
+                    });
+            }
+
+            if (attributeType == AttributeType.Text)
+            {
+                // TODO - check for max length
+                requests.Add(
+                    new UpdateIssueTextAttributeRequest
+                    {
+                        Id = attribute.Key,
+                        Value = attribute.Value,
+                    });
+            }
+        }
+
+        if (attributeValidationErrors.Count > 0)
+            throw new BadRequestException(new Dictionary<string, string?[]>
+            {
+                [nameof(attributeValues)] = attributeValidationErrors.ToArray(),
+            });
+
+        return requests.ToArray();
     }
 
     private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
@@ -995,6 +1014,7 @@ public record CreateIssueRequest
     public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public required string Content { get; set; }
+    public Dictionary<long, string> AttributeValues { get; set; } = new();
 }
 
 public record UpdateIssueRequest

@@ -26,7 +26,7 @@ public class IssuesControllerTests(WebApiTestHost host)  : IClassFixture<WebApiT
                 new CreateIssueRequest
                 {
                     Content = "New Issue",
-                    StatusId = status.Id
+                    StatusId = status.Id,
                 }));
 
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);

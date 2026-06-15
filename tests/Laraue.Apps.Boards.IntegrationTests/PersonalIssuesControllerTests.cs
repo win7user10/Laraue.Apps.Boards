@@ -16,20 +16,32 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(userId);
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddTextAttribute("Note")
+                .AddListAttribute("Type", ["Bug", "Feature"]));
 
         var space = organization.Spaces![0];
         var backlog = space.Epics![0];
         var defaultStatus = backlog.Statuses![0];
         
+        var noteAttribute = organization.GetAttribute(0);
+        var typeAttribute = organization.GetAttribute(1);
+        
+        var request = new CreateIssueRequest
+        {
+            Content = "New Issue",
+            StatusId = defaultStatus.Id,
+            AttributeValues = new Dictionary<long, string>
+            {
+                [noteAttribute.Id] = "My note",
+                [typeAttribute.Id] = typeAttribute.GetListValue(1).Id.ToString(), // Set ID of 'Feature' value
+            },
+        };
         var issueId = await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Create(
-                new CreateIssueRequest
-                {
-                    Content = "New Issue",
-                    StatusId = defaultStatus.Id
-                }));
+            .Execute(x => x.Create(request));
 
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
         
@@ -38,6 +50,16 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.NotEqual(default, issue.CreatedAt);
         Assert.NotEqual(default, issue.UpdatedAt);
         Assert.Equal(userId, issue.UserId);
+        
+        var textAttribute = await testScope.Database.IssueAttributeTextValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, textAttribute.IssueId);
+        Assert.Equal(noteAttribute.Id, textAttribute.AttributeId);
+        Assert.Equal("My note", textAttribute.Text);
+        
+        var listAttribute = await testScope.Database.IssueAttributeListValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, listAttribute.IssueId);
+        Assert.Equal(typeAttribute.Id, listAttribute.AttributeId);
+        Assert.Equal(typeAttribute.GetListValue(1).Id, listAttribute.AttributeListValueId); // ID of 'Feature' value
     }
     
     [Fact]
