@@ -572,33 +572,38 @@ public class IssuesService(
         {
             if (!attributes.TryGetValue(attribute.Key, out var attributeType))
                 attributeValidationErrors.Add($"Attribute: {attribute.Key} is not found");
-                
-            if (attributeType == AttributeType.List)
-            {
-                if (!long.TryParse(attribute.Value, out var value))
-                {
-                    attributeValidationErrors.Add($"Value: {value} is not a number");
-                    continue;
-                }
-                    
-                // TODO - check id correctness
-                requests.Add(
-                    new UpdateIssueListAttributeRequest
-                    {
-                        Id = attribute.Key,
-                        Value = value
-                    });
-            }
 
-            if (attributeType == AttributeType.Text)
+            switch (attributeType)
             {
-                // TODO - check for max length
-                requests.Add(
-                    new UpdateIssueTextAttributeRequest
+                case AttributeType.List:
+                {
+                    if (!long.TryParse(attribute.Value, out var value))
                     {
-                        Id = attribute.Key,
-                        Value = attribute.Value,
-                    });
+                        attributeValidationErrors.Add($"Value: {value} is not a number");
+                        continue;
+                    }
+                    
+                    requests.Add(
+                        new UpdateIssueListAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = value
+                        });
+                    break;
+                }
+                case AttributeType.Text when attribute.Value.Length > 255:
+                    attributeValidationErrors.Add($"Value: '{attribute.Value}' length is more than 255 characters");
+                    continue;
+                case AttributeType.Text:
+                    requests.Add(
+                        new UpdateIssueTextAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = attribute.Value,
+                        });
+                    break;
+                default:
+                    throw new NotImplementedException();
             }
         }
 
