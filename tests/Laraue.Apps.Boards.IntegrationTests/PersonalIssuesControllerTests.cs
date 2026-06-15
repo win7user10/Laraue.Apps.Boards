@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.Boards.IntegrationTests.Infrastructure;
+﻿using System.Text.Json;
+using Laraue.Apps.Boards.IntegrationTests.Infrastructure;
 using Laraue.Apps.Boards.WebApiHost.Controllers;
 using Laraue.Apps.Boards.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
@@ -410,5 +411,83 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         
         Assert.NotNull(searchResult);
         Assert.Equal(3, searchResult.Data.Count);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenFilterByCustomListAttribute()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddListAttribute("Color", ["Red", "Green"])
+                .AddSpace(userId, "SP2", s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Build app")
+                            .WithAttributeValue(0, 0)) // Color is 'Red'
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Deliver app")
+                            .WithAttributeValue(0, 1))))); // Color is 'Green'
+        
+        var redAttribute = organization.GetAttribute(0);
+        var searchFilters = new Dictionary<long, JsonElement>
+        {
+            [redAttribute.Id] = JsonElement.Parse($"[{redAttribute.GetListValue(0).Id}]") // Search by 'Color' = 'Red'
+        };
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    Page = 0,
+                    PerPage = 10,
+                    Filters = searchFilters
+                }));
+        
+        Assert.NotNull(searchResult);
+        var result = Assert.Single(searchResult.Data);
+        Assert.Equal("Build app", result.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenFilterByCustomTextAttribute()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddTextAttribute("Jira Issue Number")
+                .AddSpace(userId, "SP2", s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Build app")
+                            .WithAttributeValue(0, "14432"))
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Deliver app")
+                            .WithAttributeValue(0, "53312")))));
+        
+        var issueNumberAttribute = organization.GetAttribute(0);
+        var searchFilters = new Dictionary<long, JsonElement>
+        {
+            [issueNumberAttribute.Id] = JsonElement.Parse("\"5331\"")
+        };
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    Page = 0,
+                    PerPage = 10,
+                    Filters = searchFilters
+                }));
+        
+        Assert.NotNull(searchResult);
+        var result = Assert.Single(searchResult.Data);
+        Assert.Equal("Deliver app", result.Content);
     }
 }

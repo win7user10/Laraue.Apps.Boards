@@ -85,6 +85,23 @@ public class OrganizationInitializer(
             _isPersonal);
 
         organization.Spaces = new List<Space>(); // Add all children manually
+        
+
+        organization.Attributes = new List<Attribute>();
+        foreach (var attribute in _attributes)
+        {
+            organization.Attributes!.Add(new Attribute
+            {
+                AttributeType = attribute.AttributeType,
+                Color = "#ffffff",
+                Name = attribute.Name,
+                AttributeListValues = attribute is ListTestAttribute listTestAttribute
+                    ? listTestAttribute.PossibleValues
+                        .Select(x => new AttributeListValue { Value = x })
+                        .ToList()
+                    : null
+            });
+        }
 
         var spaceCounters = new List<(Space, int)>();
         for (var index = 0; index < _spaces.Count; index++)
@@ -141,6 +158,33 @@ public class OrganizationInitializer(
                     statusForIssue.Issues ??= new List<Issue>();
                     foreach (var issue in issuesByStatusIndex.Value)
                     {
+                        var attributes = organization.Attributes
+                            .Select((attribute, i) => (i, attribute))
+                            .Join(
+                                issue.AttributeValues,
+                                attribute => attribute.i,
+                                attributeValue => attributeValue.Key,
+                                (entity, pair) => new { entity, pair })
+                            .ToArray();
+
+                        var textAttributes = attributes
+                            .Where(x => x.entity.attribute.AttributeType == AttributeType.Text)
+                            .Select(x => new IssueAttributeTextValue
+                            {
+                                Attribute = x.entity.attribute,
+                                Text = x.pair.Value.ToString(),
+                            })
+                            .ToList();
+                        
+                        var listAttributes = attributes
+                            .Where(x => x.entity.attribute.AttributeType == AttributeType.List)
+                            .Select(x => new IssueAttributeListValue
+                            {
+                                Attribute = x.entity.attribute,
+                                AttributeListValue = x.entity.attribute.AttributeListValues!.ElementAt((int)x.pair.Value),
+                            })
+                            .ToList();
+                        
                         statusForIssue.Issues.Add(new Issue
                         {
                             Content = issue.Content,
@@ -151,7 +195,9 @@ public class OrganizationInitializer(
                             {
                                 Space = spaceEntity,
                                 Number = ++lastIssueNumber,
-                            }
+                            },
+                            TextAttributes = textAttributes,
+                            ListAttributes = listAttributes,
                         });
                     }
                 }
@@ -161,22 +207,6 @@ public class OrganizationInitializer(
 
             organization.Spaces!.Add(spaceEntity);
             spaceCounters.Add((spaceEntity, lastIssueNumber));
-        }
-
-        organization.Attributes = new List<Attribute>();
-        foreach (var attribute in _attributes)
-        {
-            organization.Attributes!.Add(new Attribute
-            {
-                AttributeType = attribute.AttributeType,
-                Color = "#ffffff",
-                Name = attribute.Name,
-                AttributeListValues = attribute is ListTestAttribute listTestAttribute
-                    ? listTestAttribute.PossibleValues
-                        .Select(x => new AttributeListValue { Value = x })
-                        .ToList()
-                    : null
-            });
         }
 
         context.Add(organization);
@@ -473,6 +503,8 @@ public class OrganizationInitializer(
         public Guid CreatorId { get; } = creatorId;
         public DateTime Timestamp { get; private set; } = DateTime.UtcNow;
         public string Content { get; private set; } = "IssueContent";
+
+        public Dictionary<int, object> AttributeValues { get; set; } = new();
         
         public IssueBuilder WithContent(string name)
         {
@@ -484,6 +516,13 @@ public class OrganizationInitializer(
         public IssueBuilder WithTimestamp(DateTime timestamp)
         {
             Timestamp = timestamp;
+
+            return this;
+        }
+        
+        public IssueBuilder WithAttributeValue(int index, object value)
+        {
+            AttributeValues[index] = value;
 
             return this;
         }
