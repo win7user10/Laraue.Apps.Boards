@@ -1,5 +1,6 @@
 ﻿using Laraue.Apps.Boards.Services;
 using Laraue.Apps.Boards.WebApiServices;
+using Laraue.Telegram.NET.Abstractions.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -211,6 +212,64 @@ public class OrganizationsController(IOrganizationsService organizationsService)
         return organizationsService.GetOrganizationMembers(
             new GetOrganizationMembersRequest
             {
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPost("attributes")]
+    public Task<long> CreateAttribute(
+        [FromBody] CreateAttributeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.CreateAttribute(
+            request with
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpPut("attributes/{id:long}")]
+    public Task UpdateAttribute(
+        [FromPath] long id,
+        [FromBody] UpdateAttributeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.UpdateAttribute(
+            request with
+            {
+                Id = id,
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpGet("attributes")]
+    public Task<AttributeDto[]> GetAttributes(
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.GetAttributes(
+            new GetAttributesRequest
+            {
+                AuthData = HttpContext.User.GetOrganizationAuthData()
+            },
+            cancellationToken);
+    }
+
+    [Authorize(AuthenticationSchemes = AuthSchemas.Organization)]
+    [HttpDelete("attributes/{id:long}")]
+    public Task DeleteAttribute(
+        [FromPath] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return organizationsService.DeleteAttribute(
+            new DeleteAttributeRequest
+            {
+                Id = id,
                 AuthData = HttpContext.User.GetOrganizationAuthData()
             },
             cancellationToken);

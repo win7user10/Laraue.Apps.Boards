@@ -8,5 +8,6 @@ public enum AdminAccessLevel : byte
     UpdateOrganization = 2,
     DeleteOrganization = 4,
     MassMove = 8,
+    ManageAttributes = 16,
     All = Manage | UpdateOrganization | DeleteOrganization | MassMove,
 }

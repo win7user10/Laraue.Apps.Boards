@@ -3,6 +3,7 @@ using Laraue.Telegram.NET.Interceptors.EFCore;
 using Laraue.Telegram.NET.UpdatesQueue.EFCore;
 using Laraue.Telegram.NET.UpdatesQueue.EFCore.DataAccess;
 using Microsoft.EntityFrameworkCore;
+using Attribute = Laraue.Apps.Boards.DataAccess.Models.Attribute;
 
 namespace Laraue.Apps.Boards.DataAccess;
 
@@ -30,6 +31,11 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
     public DbSet<TelegramMessageVideo> TelegramVideos { get; init; }
     public DbSet<TelegramMessage> TelegramMessages { get; init; }
     public DbSet<TelegramMediaGroup> TelegramMediaGroups { get; init; }
+    
+    public DbSet<Attribute> Attributes { get; set; }
+    public DbSet<AttributeListValue> AttributeListValues { get; set; }
+    public DbSet<IssueAttributeListValue> IssueAttributeListValues { get; set; }
+    public DbSet<IssueAttributeTextValue> IssueAttributeTextValues { get; set; }
 
     public DbSet<Update> Updates { get; set; }
     public DbSet<FailedUpdate> FailedUpdates { get; set; }
@@ -55,6 +61,21 @@ public class DatabaseContext : DbContext, IUpdatesQueueDbContext, IInterceptorsD
             entity
                 .HasIndex(x => new { x.SpaceId, x.Number })
                 .IsUnique();
+        });
+        
+        modelBuilder.Entity<IssueAttributeTextValue>(entity =>
+        {
+            entity.HasKey(x => new { x.IssueId, x.AttributeId, });
+            entity
+                .HasIndex(x => x.Text)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+        });
+        
+        modelBuilder.Entity<IssueAttributeListValue>(entity =>
+        {
+            entity.HasKey(x => new { x.IssueId, x.AttributeId });
+            entity.HasIndex(x => x.AttributeListValueId);
         });
         
         modelBuilder.Entity<Space>(entity =>

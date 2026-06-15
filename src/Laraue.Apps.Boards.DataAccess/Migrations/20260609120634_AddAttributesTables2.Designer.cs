@@ -3,6 +3,7 @@ using System;
 using Laraue.Apps.Boards.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260609120634_AddAttributesTables2")]
+    partial class AddAttributesTables2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -269,13 +272,13 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
 
             modelBuilder.Entity("Laraue.Apps.Boards.DataAccess.Models.IssueAttributeListValue", b =>
                 {
-                    b.Property<long>("IssueId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("issue_id");
-
                     b.Property<long>("AttributeId")
                         .HasColumnType("bigint")
                         .HasColumnName("attribute_id");
+
+                    b.Property<long>("IssueId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issue_id");
 
                     b.Property<long>("AttributeListValueId")
                         .HasColumnType("bigint")
@@ -285,27 +288,27 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("id");
 
-                    b.HasKey("IssueId", "AttributeId")
+                    b.HasKey("AttributeId", "IssueId")
                         .HasName("pk_issue_attribute_list_values");
-
-                    b.HasIndex("AttributeId")
-                        .HasDatabaseName("ix_issue_attribute_list_values_attribute_id");
 
                     b.HasIndex("AttributeListValueId")
                         .HasDatabaseName("ix_issue_attribute_list_values_attribute_list_value_id");
+
+                    b.HasIndex("IssueId")
+                        .HasDatabaseName("ix_issue_attribute_list_values_issue_id");
 
                     b.ToTable("issue_attribute_list_values", (string)null);
                 });
 
             modelBuilder.Entity("Laraue.Apps.Boards.DataAccess.Models.IssueAttributeTextValue", b =>
                 {
-                    b.Property<long>("IssueId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("issue_id");
-
                     b.Property<long>("AttributeId")
                         .HasColumnType("bigint")
                         .HasColumnName("attribute_id");
+
+                    b.Property<long>("IssueId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issue_id");
 
                     b.Property<string>("Text")
                         .IsRequired()
@@ -313,17 +316,11 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("text");
 
-                    b.HasKey("IssueId", "AttributeId")
+                    b.HasKey("AttributeId", "IssueId")
                         .HasName("pk_issue_attribute_text_values");
 
-                    b.HasIndex("AttributeId")
-                        .HasDatabaseName("ix_issue_attribute_text_values_attribute_id");
-
-                    b.HasIndex("Text")
-                        .HasDatabaseName("ix_issue_attribute_text_values_text");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Text"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Text"), new[] { "gin_trgm_ops" });
+                    b.HasIndex("IssueId")
+                        .HasDatabaseName("ix_issue_attribute_text_values_issue_id");
 
                     b.ToTable("issue_attribute_text_values", (string)null);
                 });
@@ -966,7 +963,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             modelBuilder.Entity("Laraue.Apps.Boards.DataAccess.Models.Attribute", b =>
                 {
                     b.HasOne("Laraue.Apps.Boards.DataAccess.Models.Organization", "Organization")
-                        .WithMany("Attributes")
+                        .WithMany()
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
@@ -1074,7 +1071,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasConstraintName("fk_issue_attribute_list_values_attribute_list_values_attribute");
 
                     b.HasOne("Laraue.Apps.Boards.DataAccess.Models.Issue", "Issue")
-                        .WithMany("ListAttributes")
+                        .WithMany()
                         .HasForeignKey("IssueId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
@@ -1097,7 +1094,7 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
                         .HasConstraintName("fk_issue_attribute_text_values_attributes_attribute_id");
 
                     b.HasOne("Laraue.Apps.Boards.DataAccess.Models.Issue", "Issue")
-                        .WithMany("TextAttributes")
+                        .WithMany()
                         .HasForeignKey("IssueId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
@@ -1267,16 +1264,10 @@ namespace Laraue.Apps.StructuredMessages.DataAccess.Migrations
             modelBuilder.Entity("Laraue.Apps.Boards.DataAccess.Models.Issue", b =>
                 {
                     b.Navigation("IssueNumber");
-
-                    b.Navigation("ListAttributes");
-
-                    b.Navigation("TextAttributes");
                 });
 
             modelBuilder.Entity("Laraue.Apps.Boards.DataAccess.Models.Organization", b =>
                 {
-                    b.Navigation("Attributes");
-
                     b.Navigation("Spaces");
 
                     b.Navigation("Users");

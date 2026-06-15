@@ -2,6 +2,7 @@
 using Laraue.Apps.Boards.DataAccess.Models;
 using Laraue.Core.DataAccess.EFCore.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -14,8 +15,13 @@ public interface ICoreIssuesService
         CancellationToken cancellationToken);
     
     Task Update(
-        long messageId,
+        long issueId,
         Action<UpdateSettersBuilder<Issue>> setters,
+        CancellationToken cancellationToken);
+    
+    Task UpdateAttributes(
+        long issueId,
+        UpdateIssueAttributeRequest[] attributeRequests,
         CancellationToken cancellationToken);
     
     Task Delete(
@@ -67,14 +73,14 @@ public class CoreIssuesService(
     }
 
     public async Task Update(
-        long messageId,
+        long issueId,
         Action<UpdateSettersBuilder<Issue>> setters,
         CancellationToken cancellationToken)
     {
         var date = dateTimeProvider.UtcNow;
 
         await context.Issues
-            .Where(x => x.Id == messageId)
+            .Where(x => x.Id == issueId)
             .ExecuteUpdateAsync(
                 upd =>
                 {
@@ -83,7 +89,119 @@ public class CoreIssuesService(
                 },
                 cancellationToken);
         
-        await TouchMessageBoard(messageId, date, cancellationToken);
+        await TouchMessageBoard(issueId, date, cancellationToken);
+    }
+
+    public async Task UpdateAttributes(
+        long issueId,
+        UpdateIssueAttributeRequest[] attributeRequests,
+        CancellationToken cancellationToken)
+    {
+        context.Database.EnsureTransactionStarted();
+        
+        await UpdateTextAttributes(
+            issueId,
+            attributeRequests.OfType<UpdateIssueTextAttributeRequest>().ToArray(),
+            cancellationToken);
+        
+        await UpdateListAttributes(
+            issueId,
+            attributeRequests.OfType<UpdateIssueListAttributeRequest>().ToArray(),
+            cancellationToken);
+    }
+    
+    private async Task UpdateListAttributes(
+        long issueId,
+        UpdateIssueListAttributeRequest[] attributeRequests,
+        CancellationToken cancellationToken)
+    {
+        var oldAttributes = (await context.IssueAttributeListValues
+            .Where(x => x.IssueId == issueId)
+            .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.AttributeId);
+
+        if (attributeRequests.Any())
+        {
+            foreach (var request in attributeRequests)
+            {
+                // Update old
+                if (oldAttributes.TryGetValue(request.Id, out var oldAttribute))
+                {
+                    oldAttribute.AttributeListValueId = request.Value;
+                    context.Entry(oldAttribute).State = EntityState.Modified;
+                }
+                // Insert new
+                else
+                {
+                    context.Add(new IssueAttributeListValue
+                    {
+                        AttributeId = request.Id,
+                        IssueId = issueId,
+                        AttributeListValueId = request.Value,
+                    });
+                }
+            }
+            
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        
+        // Drop old
+        var toDelete = oldAttributes.Keys
+            .Except(attributeRequests.Select(x => x.Id))
+            .ToArray();
+
+        if (toDelete.Length != 0)
+            await context.IssueAttributeListValues
+                .Where(x => x.IssueId == issueId)
+                .Where(x => ((IEnumerable<long>)toDelete).Contains(x.AttributeId))
+                .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private async Task UpdateTextAttributes(
+        long issueId,
+        UpdateIssueTextAttributeRequest[] attributeRequests,
+        CancellationToken cancellationToken)
+    {
+        var oldAttributes = (await context.IssueAttributeTextValues
+            .Where(x => x.IssueId == issueId)
+            .ToArrayAsyncEF(cancellationToken))
+            .ToDictionary(x => x.AttributeId);
+
+        if (attributeRequests.Any())
+        {
+            foreach (var request in attributeRequests)
+            {
+                // Update old
+                if (oldAttributes.TryGetValue(request.Id, out var oldAttribute))
+                {
+                    oldAttribute.Text = request.Value;
+                    context.Entry(oldAttribute).State = EntityState.Modified;
+                }
+                // Insert new
+                else
+                {
+                    context.Add(new IssueAttributeTextValue
+                    {
+                        AttributeId = request.Id,
+                        IssueId = issueId,
+                        Text = request.Value,
+                    });
+                }
+            }
+            
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        
+        // Drop old
+        var toDelete = oldAttributes.Keys
+            .Except(attributeRequests.Select(x => x.Id))
+            .ToArray();
+
+        if (toDelete.Length != 0)
+            await context.IssueAttributeTextValues
+                .Where(x => x.IssueId == issueId)
+                .Where(x => ((IEnumerable<long>)toDelete).Contains(x.AttributeId))
+                .ExecuteDeleteAsync(cancellationToken);
     }
 
     public Task Delete(long id, CancellationToken cancellationToken)
@@ -112,4 +230,19 @@ public class CreateIssueRequest
     public required DateTime CreatedAt { get; set; }
     public long? TelegramMessageId { get; set; }
     public long StatusId { get; set; }
+}
+
+public abstract record UpdateIssueAttributeRequest
+{
+    public long Id { get; set; }
+}
+
+public record UpdateIssueTextAttributeRequest : UpdateIssueAttributeRequest
+{
+    public required string Value { get; set; }
+}
+
+public record UpdateIssueListAttributeRequest : UpdateIssueAttributeRequest
+{
+    public required long Value { get; set; }
 }

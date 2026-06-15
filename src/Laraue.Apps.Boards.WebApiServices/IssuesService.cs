@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Laraue.Apps.Boards.DataAccess;
 using Laraue.Apps.Boards.DataAccess.Extensions;
 using Laraue.Apps.Boards.DataAccess.Models;
@@ -9,8 +10,8 @@ using Laraue.Core.DataAccess.Extensions;
 using Laraue.Core.DataAccess.Linq2DB.Extensions;
 using Laraue.Core.DateTime.Services.Abstractions;
 using Laraue.Core.Exceptions.Web;
+using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
 
 namespace Laraue.Apps.Boards.WebApiServices;
 
@@ -74,6 +75,8 @@ public class IssuesService(
 
         var query = context.Issues
             .Where(i => i.StatusId == request.StatusId);
+
+        query = await ApplyFilters(query, request, cancellationToken);
             
         if (!string.IsNullOrEmpty(request.SearchString))
         {
@@ -91,6 +94,7 @@ public class IssuesService(
             .ToArray();
         
         await EnrichMedia(projected, cancellationToken);
+        await EnrichAttributes(projected, cancellationToken);
 
         return new BatchResult<IssueListDto>
         {
@@ -138,21 +142,22 @@ public class IssuesService(
             .ToListAsyncEF(cancellationToken);
 
         var result = new List<ColumnIssues>();
+        
+        var commonQuery = context.Issues.AsQueryable();
+        commonQuery = await ApplyFilters(commonQuery, request, cancellationToken);
+        
         foreach (var statusId in statusIds)
         {
-            var query = context
-                .Issues
+            var query = commonQuery
                 .Where(x => x.StatusId == statusId);
             
             if (!string.IsNullOrEmpty(request.SearchString))
                 query = query
-                    .Where(x => EF.Functions.ILike(
-                        x.Content!,
-                        request.SearchString.AsSearchable()));
+                    .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
             
             var statusResult = await ProjectToTemporaryDto(query
                 .OrderByDescending(x => x.Id))
-                .FullPaginateEFAsync(
+                .FullPaginateLinq2DbAsync(
                     new PaginationData
                     {
                         Page = 0,
@@ -180,6 +185,7 @@ public class IssuesService(
             .ToList();
         
         await EnrichMedia(allData, cancellationToken);
+        await EnrichAttributes(allData, cancellationToken);
 
         return result.ToArray();
     }
@@ -284,6 +290,11 @@ public class IssuesService(
         
         if (!issuesAccessLevel.CanCreateIssue)
             throw new NotFoundException($"Status: {request.StatusId} issue creation is forbidden");
+        
+        var attributeUpdateRequests = await GetAttributeUpdateRequests(
+            request.AuthData.OrganizationId,
+            request.AttributeValues,
+            ct);
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
         
@@ -296,6 +307,8 @@ public class IssuesService(
                 StatusId = request.StatusId,
             },
             ct);
+        
+        await issuesService.UpdateAttributes(id, attributeUpdateRequests, ct);
         
         await transaction.CommitAsync(ct);
         
@@ -315,11 +328,21 @@ public class IssuesService(
         if (!accessLevels.CanUpdateIssue)
             throw new ForbiddenException($"Issue: {request.Id} update is forbidden");
         
+        var attributeUpdateRequests = await GetAttributeUpdateRequests(
+            request.AuthData.OrganizationId,
+            request.AttributeValues,
+            ct);
+        
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        
         await issuesService.Update(
             request.Id,
             upd => upd
                 .SetProperty(x => x.Content, request.Content),
             ct);
+        await issuesService.UpdateAttributes(request.Id, attributeUpdateRequests, ct);
+            
+        await transaction.CommitAsync(ct);
     }
 
     public async Task<ShortPaginatedResult<SearchIssueDto>> Search(
@@ -328,24 +351,27 @@ public class IssuesService(
     {
         var temporaryResult = await accessService.GetAvailableIssues(
             request.AuthData,
-            issues =>
+            async issues =>
             {
                 if (request.EpicIds.Length > 0)
                     issues = issues.Where(x => ((IEnumerable<long>)request.EpicIds).Contains(x.Status!.EpicId));
         
                 if (request.SpaceIds.Length > 0)
                     issues = issues.Where(x => ((IEnumerable<long>)request.SpaceIds).Contains(x.Status!.Epic!.SpaceId));
+                
+                issues = await ApplyFilters(issues, request, ct);
         
                 if (!string.IsNullOrEmpty(request.SearchString))
                     issues = issues
                         .Where(x => x.Content!.ILike(request.SearchString.AsSearchable()));
 
-                return ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
+                return await ProjectToTemporaryDto(issues.OrderByDescending(i => i.Id))
                     .ShortPaginateLinq2DbAsync(request, ct);
             }, ct);
         
         var mapped = temporaryResult.MapTo(Map);
         await EnrichMedia(mapped.Data, ct);
+        await EnrichAttributes(mapped.Data, ct);
         
         var result = await MapToSearchDtos(mapped.Data, ct);
         return new ShortPaginatedResult<SearchIssueDto>(
@@ -353,6 +379,241 @@ public class IssuesService(
             mapped.PerPage,
             mapped.HasNextPage,
             result);
+    }
+
+    private async Task<IQueryable<Issue>> ApplyFilters(
+        IQueryable<Issue> query,
+        IHasAttributeFilters request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Filters.Count == 0)
+            return query;
+
+        var filterTypes = await context.Attributes
+            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
+            .Where(x => request.Filters.Keys.Any(y => y == x.Id))
+            .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, cancellationToken);
+
+        var errors = new Dictionary<long, string>();
+        
+        foreach (var filter in request.Filters)
+        {
+            if (!filterTypes.TryGetValue(filter.Key, out var filterType))
+            {
+                errors.Add(filter.Key, "Property was not found");
+                continue;
+            }
+
+            if (filterType == AttributeType.Text)
+            {
+                if (filter.Value.ValueKind != JsonValueKind.String)
+                {
+                    errors.Add(filter.Key, "String value was excepted");
+                    continue;
+                }
+
+                var filterValue = filter.Value.GetString();
+                if (string.IsNullOrEmpty(filterValue))
+                    continue;
+                
+                query = query.InnerJoin(
+                    context.IssueAttributeTextValues,
+                    (i, a) => i.Id == a.IssueId
+                        && a.AttributeId == filter.Key
+                        && a.Text.ILike(filterValue.AsSearchable()),
+                    (i, a) => i);
+            }
+
+            if (filterType == AttributeType.List)
+            {
+                if (filter.Value.ValueKind != JsonValueKind.Array)
+                {
+                    errors.Add(filter.Key, "Number array was excepted");
+                    continue;
+                }
+
+                var listAndValues = new List<long>();
+                var hasParsingErrors = false;
+                foreach (var arrayToken in filter.Value.EnumerateArray())
+                {
+                    if (arrayToken.ValueKind != JsonValueKind.Number)
+                    {
+                        errors.Add(filter.Key, $"Got: {arrayToken.GetString()}, but number was excepted");
+                        hasParsingErrors = true;
+                        continue;
+                    }
+                    
+                    listAndValues.Add(arrayToken.GetInt64());
+                }
+                
+                if (hasParsingErrors)
+                    continue;
+                
+                if (listAndValues.Count == 0)
+                    continue;
+                
+                query = query.InnerJoin(
+                    context.IssueAttributeListValues,
+                    (i, a) => i.Id == a.IssueId && a.AttributeId == filter.Key && ((IEnumerable<long>)listAndValues).Contains(a.AttributeListValueId),
+                    (i, a) => i);
+            }
+        }
+
+        if (errors.Any())
+            throw new BadRequestException(new Dictionary<string, string?[]>
+            {
+                [nameof(request.Filters)] = errors.Select(x => $"{x.Key}: {x.Value}").ToArray()
+            });
+
+        return query;
+    }
+
+    public async Task<IssueDetailDto> GetIssue(
+        GetIssueRequest request,
+        CancellationToken cancellationToken)
+    {
+        var issueAccessLevels = await accessService.GetAccessLevelsByIssueId(
+            request.AuthData,
+            request.IssueId,
+            cancellationToken);
+
+        if (issueAccessLevels is null)
+            throw new NotFoundException($"Issue: {request.IssueId} is not found or not accessible");
+
+        var result = await context.Issues
+            .Where(x => x.Id == request.IssueId)
+            .Select(x => new IssueDetailDtoData
+            {
+                Id = x.Id,
+                Content = x.Content,
+                Time = x.CreatedAt,
+                CategoryName = x.Status!.Epic!.Name,
+                StatusName = x.Status!.Epic!.IsDefault ? null : x.Status!.Name,
+                TelegramFirstName = x.User!.TelegramFirstName,
+                TelegramLastName = x.User!.TelegramLastName,
+                TelegramId = x.User.TelegramId,
+                TelegramUsername = x.User.TelegramUserName,
+                CategoryColor = x.Status.Epic.Color,
+                StatusColor = x.Status!.Epic!.IsDefault ? null : x.Status.Color,
+                OrganizationId = x.Status.Epic.Space!.OrganizationId,
+                Number = x.IssueNumber!.Number,
+                SpaceKey = x.Status.Epic.Space.Key,
+                SpaceColor = x.Status.Epic.Space.Color,
+            })
+            .FirstAsyncEF(cancellationToken);
+
+        var sender = UserInitialsUtility.GetInitials(
+            result.TelegramUsername,
+            result.TelegramFirstName,
+            result.TelegramLastName);
+
+        var attributeValues = await context.Attributes
+            .Where(x => x.OrganizationId == result.OrganizationId)
+            .Select(x => new DetailIssueAttributeDto
+            {
+                Id = x.Id,
+                Type = x.AttributeType,
+                Name = x.Name,
+                ListValues = x.AttributeListValues!
+                    .Select(v => new IssueAttributeListValueDto
+                    {
+                        Name = v.Value,
+                        Id = v.Id,
+                    })
+                    .ToArray(),
+                Value = string.Empty, // Fills via mapping
+                Color = x.Color,
+            })
+            .ToArrayAsyncEF(cancellationToken);
+
+        var attributeValuesResult = await GetIssueAttributeValues(request.IssueId, cancellationToken);
+        foreach (var attributeValue in attributeValues)
+        {
+            if (attributeValuesResult.TryGetValue(attributeValue.Id, out var value))
+                attributeValue.Value = value;
+        }
+
+        return new IssueDetailDto
+        {
+            Id = result.Id,
+            Content = result.Content,
+            Sender = sender.Sender,
+            SenderInitial = sender.Initial,
+            Time = result.Time,
+            EpicName = result.CategoryName,
+            StatusName = result.StatusName,
+            EpicColor = result.CategoryColor,
+            StatusColor = result.StatusColor,
+            CanEdit = issueAccessLevels.CanUpdateIssue,
+            AttributeValues = attributeValues,
+            Key = $"{result.SpaceKey}-{result.Number}",
+            SpaceColor = result.SpaceColor,
+        };
+    }
+
+    private async Task<UpdateIssueAttributeRequest[]> GetAttributeUpdateRequests(
+        long organizationId,
+        Dictionary<long, string> attributeValues,
+        CancellationToken ct)
+    {
+        if (attributeValues.Count == 0)
+            return [];
+        
+        var requests = new List<UpdateIssueAttributeRequest>();
+        var attributeValidationErrors = new List<string>();
+        
+        var attributes = await context.Attributes
+            .Where(x => x.OrganizationId == organizationId)
+            .Where(x => attributeValues.Keys.Contains(x.Id))
+            .Select(x => new { x.Id, x.AttributeType })
+            .ToDictionaryAsyncEF(x => x.Id, x => x.AttributeType, ct);
+
+        foreach (var attribute in attributeValues)
+        {
+            if (!attributes.TryGetValue(attribute.Key, out var attributeType))
+                attributeValidationErrors.Add($"Attribute: {attribute.Key} is not found");
+
+            switch (attributeType)
+            {
+                case AttributeType.List:
+                {
+                    if (!long.TryParse(attribute.Value, out var value))
+                    {
+                        attributeValidationErrors.Add($"Value: {value} is not a number");
+                        continue;
+                    }
+                    
+                    requests.Add(
+                        new UpdateIssueListAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = value
+                        });
+                    break;
+                }
+                case AttributeType.Text when attribute.Value.Length > 255:
+                    attributeValidationErrors.Add($"Value: '{attribute.Value}' length is more than 255 characters");
+                    continue;
+                case AttributeType.Text:
+                    requests.Add(
+                        new UpdateIssueTextAttributeRequest
+                        {
+                            Id = attribute.Key,
+                            Value = attribute.Value,
+                        });
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        if (attributeValidationErrors.Count > 0)
+            throw new BadRequestException(new Dictionary<string, string?[]>
+            {
+                [nameof(attributeValues)] = attributeValidationErrors.ToArray(),
+            });
+
+        return requests.ToArray();
     }
 
     private async Task<List<SearchIssueDto>> MapToSearchDtos(IList<IssueListDto> elements, CancellationToken ct)
@@ -408,60 +669,80 @@ public class IssuesService(
                 Time = element.Time,
                 Media = element.Media,
                 SenderInitial = element.SenderInitial,
+                Attributes = element.Attributes,
             });
         }
         
         return result;
     }
 
-    public async Task<IssueDetailDto> GetIssue(
-        GetIssueRequest request,
+    private async Task<Dictionary<long, Dictionary<long, string>>> GetIssuesAttributeValues(
+        IEnumerable<long> issueIds,
         CancellationToken cancellationToken)
     {
-        var issueAccessLevels = await accessService.GetAccessLevelsByIssueId(
-            request.AuthData,
-            request.IssueId,
-            cancellationToken);
+        var textValues = context.IssueAttributeTextValues
+            .Where(x => issueIds.Contains(x.IssueId))
+            .Select(x => new { x.AttributeId, x.IssueId, Value = x.Text });
+        
+        var listValues =  context.IssueAttributeListValues
+            .Where(x => issueIds.Contains(x.IssueId))
+            .Select(x => new { x.AttributeId, x.IssueId, Value = x.AttributeListValueId.ToString() });
 
-        if (issueAccessLevels is null)
-            throw new NotFoundException($"Issue: {request.IssueId} is not found or not accessible");
+        var dbResult = await textValues
+            .Union(listValues)
+            .ToArrayAsyncEF(cancellationToken);
+        
+        return dbResult
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.ToDictionary(
+                    y => y.AttributeId,
+                    y => y.Value));
+    }
 
-        var result = await context.Issues
-            .Where(x => x.Id == request.IssueId)
-            .Select(x => new IssueDetailDtoData
-            {
-                Id = x.Id,
-                Content = x.Content,
-                Time = x.CreatedAt,
-                CategoryName = x.Status!.Epic!.Name,
-                StatusName = x.Status!.Epic!.IsDefault ? null : x.Status!.Name,
-                TelegramFirstName = x.User!.TelegramFirstName,
-                TelegramLastName = x.User!.TelegramLastName,
-                TelegramId = x.User.TelegramId,
-                TelegramUsername = x.User.TelegramUserName,
-                CategoryColor = x.Status.Epic.Color,
-                StatusColor = x.Status!.Epic!.IsDefault ? null : x.Status.Color,
-            })
-            .FirstAsyncEF(cancellationToken);
+    private async Task<Dictionary<long, string>> GetIssueAttributeValues(
+        long issueId,
+        CancellationToken cancellationToken)
+    {
+        var result = await GetIssuesAttributeValues([issueId], cancellationToken);
 
-        var sender = UserInitialsUtility.GetInitials(
-            result.TelegramUsername,
-            result.TelegramFirstName,
-            result.TelegramLastName);;
+        return result.GetValueOrDefault(issueId, new Dictionary<long, string>());
+    }
 
-        return new IssueDetailDto
+    private async Task EnrichAttributes(IList<IssueListDto> elements, CancellationToken ct)
+    {
+        var ids = elements.Select(x => x.Id).ToArray();
+
+        var textValues = await context.IssueAttributeTextValues
+            .Where(x => ((IEnumerable<long>)ids).Contains(x.IssueId))
+            .Select(x => new { x.Attribute!.Color, x.IssueId, Value = x.Text })
+            .ToArrayAsyncEF(ct);
+        
+        var listValues = await context.IssueAttributeListValues
+            .Where(x => ((IEnumerable<long>)ids).Contains(x.IssueId))
+            .Select(x => new { x.Attribute!.Color, x.IssueId, x.AttributeListValue!.Value })
+            .ToArrayAsyncEF(ct);
+        
+        var all = textValues
+            .Union(listValues)
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(x => x.Key);
+
+        foreach (var element in elements)
         {
-            Id = result.Id,
-            Content = result.Content,
-            Sender = sender.Sender,
-            SenderInitial = sender.Initial,
-            Time = result.Time,
-            EpicName = result.CategoryName,
-            StatusName = result.StatusName,
-            EpicColor = result.CategoryColor,
-            StatusColor = result.StatusColor,
-            CanEdit = issueAccessLevels.CanUpdateIssue,
-        };
+            if (all.TryGetValue(element.Id, out var attributes))
+            {
+                foreach (var attribute in attributes)
+                {
+                    element.Attributes.Add(new IssueListAttributeDto
+                    {
+                        Value = attribute.Value,
+                        Color = attribute.Color,
+                    });
+                }
+            }
+        }
     }
 
     private async Task EnrichMedia<T>(IList<T> elements, CancellationToken ct)
@@ -592,7 +873,7 @@ public class IssuesService(
             UserColor = x.User.Color,
             Number = x.IssueNumber!.Number,
             SpaceKey = x.Status.Epic!.Space!.Key,
-            SpaceId = x.Status.Epic.SpaceId,
+            SpaceId = x.Status.Epic.SpaceId
         });
     }
     
@@ -619,11 +900,12 @@ public class IssuesService(
     }
 }
 
-public record GetIssuesRequest : BatchRequest
+public record GetIssuesRequest : BatchRequest, IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public string? SearchString { get; set; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public record GetIssueRequest
@@ -632,7 +914,7 @@ public record GetIssueRequest
     public long IssueId { get; set; }
 }
 
-public record GetBoardRequest
+public record GetBoardRequest : IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long EpicId { get; set; }
@@ -640,6 +922,7 @@ public record GetBoardRequest
     [Range(1, 100)]
     public int Take { get; init; }
     public string? SearchString { get; init; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public record GetBoardSummaryRequest
@@ -690,6 +973,13 @@ public record IssueListDto : ICanContainMedia
     public required long StatusId { get; set; }
     public required long SpaceId { get; set; }
     public List<MediaInfo> Media { get; set; } = [];
+    public List<IssueListAttributeDto> Attributes { get; set; } = [];
+}
+
+public record IssueListAttributeDto
+{
+    public required string Value { get; set; }
+    public required string Color { get; set; }
 }
 
 public record SearchIssueDto : IssueListDto
@@ -729,6 +1019,7 @@ public record CreateIssueRequest
     public OrganizationAuthData AuthData { get; set; } = new();
     public long StatusId { get; set; }
     public required string Content { get; set; }
+    public Dictionary<long, string> AttributeValues { get; set; } = new();
 }
 
 public record UpdateIssueRequest
@@ -736,9 +1027,16 @@ public record UpdateIssueRequest
     public OrganizationAuthData AuthData { get; set; } = new();
     public long Id { get; set; }
     public required string Content { get; set; }
+    public required Dictionary<long, string> AttributeValues { get; set; }
 }
 
-public record SearchRequest : IPaginationData
+public interface IHasAttributeFilters
+{
+    Dictionary<long, JsonElement> Filters { get; }
+    public OrganizationAuthData AuthData { get; }
+}
+
+public record SearchRequest : IPaginationData, IHasAttributeFilters
 {
     public OrganizationAuthData AuthData { get; set; } = new();
     public long[] EpicIds { get; set; } = [];
@@ -746,6 +1044,7 @@ public record SearchRequest : IPaginationData
     public string? SearchString { get; set; }
     public int Page { get; init; }
     public int PerPage { get; init; }
+    public Dictionary<long, JsonElement> Filters { get; set; } = new();
 }
 
 public class IssueDetailDto
@@ -759,7 +1058,26 @@ public class IssueDetailDto
     public required string? EpicColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required string SpaceColor { get; set; }
     public required bool CanEdit { get; set; }
+    public required string Key { get; set; }
+    public DetailIssueAttributeDto[] AttributeValues { get; set; } = [];
+}
+
+public record DetailIssueAttributeDto
+{
+    public long Id { get; set; }
+    public AttributeType Type { get; set; }
+    public required string Name { get; set; }
+    public required string Value { get; set; }
+    public required string Color { get; set; }
+    public IssueAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record IssueAttributeListValueDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
 }
 
 public class IssueDetailDtoData
@@ -775,6 +1093,10 @@ public class IssueDetailDtoData
     public required string? CategoryColor { get; set; }
     public required string? StatusName { get; set; }
     public required string? StatusColor { get; set; }
+    public required long OrganizationId { get; set; }
+    public required int Number { get; set; }
+    public required string SpaceKey { get; set; }
+    public required string SpaceColor { get; set; }
 }
 
 public record BatchRequest

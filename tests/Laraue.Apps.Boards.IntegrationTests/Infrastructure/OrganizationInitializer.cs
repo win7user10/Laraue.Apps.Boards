@@ -2,6 +2,7 @@
 using Laraue.Apps.Boards.DataAccess.Enums;
 using Laraue.Apps.Boards.DataAccess.Models;
 using Laraue.Apps.Boards.Services;
+using Attribute = Laraue.Apps.Boards.DataAccess.Models.Attribute;
 using Models_Status = Laraue.Apps.Boards.DataAccess.Models.Status;
 using Status = Laraue.Apps.Boards.DataAccess.Models.Status;
 
@@ -18,6 +19,7 @@ public class OrganizationInitializer(
     private string _organizationColor = "#ffffff";
     private DateTime _timestamp = DateTime.UtcNow;
     private bool _isPersonal;
+    private readonly List<TestAttribute> _attributes = new ();
 
     private readonly List<SpaceBuilder> _spaces =
     [
@@ -58,6 +60,20 @@ public class OrganizationInitializer(
         return this;
     }
 
+    public OrganizationInitializer AddTextAttribute(string name)
+    {
+        _attributes.Add(new TextTestAttribute(name));
+
+        return this;
+    }
+
+    public OrganizationInitializer AddListAttribute(string name, string[] possibleValues)
+    {
+        _attributes.Add(new ListTestAttribute(name, possibleValues));
+
+        return this;
+    }
+
     public async Task<Organization> Initialize()
     {
         var organization = OrganizationDefaults.GetNewOrganizationEntity(
@@ -69,6 +85,23 @@ public class OrganizationInitializer(
             _isPersonal);
 
         organization.Spaces = new List<Space>(); // Add all children manually
+        
+
+        organization.Attributes = new List<Attribute>();
+        foreach (var attribute in _attributes)
+        {
+            organization.Attributes!.Add(new Attribute
+            {
+                AttributeType = attribute.AttributeType,
+                Color = "#ffffff",
+                Name = attribute.Name,
+                AttributeListValues = attribute is ListTestAttribute listTestAttribute
+                    ? listTestAttribute.PossibleValues
+                        .Select(x => new AttributeListValue { Value = x })
+                        .ToList()
+                    : null
+            });
+        }
 
         var spaceCounters = new List<(Space, int)>();
         for (var index = 0; index < _spaces.Count; index++)
@@ -125,6 +158,33 @@ public class OrganizationInitializer(
                     statusForIssue.Issues ??= new List<Issue>();
                     foreach (var issue in issuesByStatusIndex.Value)
                     {
+                        var attributes = organization.Attributes
+                            .Select((attribute, i) => (i, attribute))
+                            .Join(
+                                issue.AttributeValues,
+                                attribute => attribute.i,
+                                attributeValue => attributeValue.Key,
+                                (entity, pair) => new { entity, pair })
+                            .ToArray();
+
+                        var textAttributes = attributes
+                            .Where(x => x.entity.attribute.AttributeType == AttributeType.Text)
+                            .Select(x => new IssueAttributeTextValue
+                            {
+                                Attribute = x.entity.attribute,
+                                Text = x.pair.Value.ToString(),
+                            })
+                            .ToList();
+                        
+                        var listAttributes = attributes
+                            .Where(x => x.entity.attribute.AttributeType == AttributeType.List)
+                            .Select(x => new IssueAttributeListValue
+                            {
+                                Attribute = x.entity.attribute,
+                                AttributeListValue = x.entity.attribute.AttributeListValues!.ElementAt((int)x.pair.Value),
+                            })
+                            .ToList();
+                        
                         statusForIssue.Issues.Add(new Issue
                         {
                             Content = issue.Content,
@@ -135,7 +195,9 @@ public class OrganizationInitializer(
                             {
                                 Space = spaceEntity,
                                 Number = ++lastIssueNumber,
-                            }
+                            },
+                            TextAttributes = textAttributes,
+                            ListAttributes = listAttributes,
                         });
                     }
                 }
@@ -341,6 +403,10 @@ public class OrganizationInitializer(
             return this;
         }
     }
+
+    public abstract record TestAttribute(AttributeType AttributeType, string Name);
+    public record TextTestAttribute(string Name) : TestAttribute(AttributeType.Text, Name);
+    public record ListTestAttribute(string Name, string[] PossibleValues) : TestAttribute(AttributeType.List, Name);
     
     public class EpicBuilder(Guid creatorId, DateTime timestamp)
     {
@@ -437,6 +503,8 @@ public class OrganizationInitializer(
         public Guid CreatorId { get; } = creatorId;
         public DateTime Timestamp { get; private set; } = DateTime.UtcNow;
         public string Content { get; private set; } = "IssueContent";
+
+        public Dictionary<int, object> AttributeValues { get; set; } = new();
         
         public IssueBuilder WithContent(string name)
         {
@@ -448,6 +516,13 @@ public class OrganizationInitializer(
         public IssueBuilder WithTimestamp(DateTime timestamp)
         {
             Timestamp = timestamp;
+
+            return this;
+        }
+        
+        public IssueBuilder WithAttributeValue(int index, object value)
+        {
+            AttributeValues[index] = value;
 
             return this;
         }

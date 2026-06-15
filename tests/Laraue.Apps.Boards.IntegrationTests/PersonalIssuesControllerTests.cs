@@ -1,4 +1,5 @@
-﻿using Laraue.Apps.Boards.IntegrationTests.Infrastructure;
+﻿using System.Text.Json;
+using Laraue.Apps.Boards.IntegrationTests.Infrastructure;
 using Laraue.Apps.Boards.WebApiHost.Controllers;
 using Laraue.Apps.Boards.WebApiServices;
 using LinqToDB.EntityFrameworkCore;
@@ -15,20 +16,32 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
     {
         using var testScope = host.CreateTestScope();
         var userId = await testScope.CreateUser();
-        var organization = await testScope.InitializePersonalOrganization(userId);
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddTextAttribute("Note")
+                .AddListAttribute("Type", ["Bug", "Feature"]));
 
         var space = organization.Spaces![0];
         var backlog = space.Epics![0];
         var defaultStatus = backlog.Statuses![0];
         
+        var noteAttribute = organization.GetAttribute(0);
+        var typeAttribute = organization.GetAttribute(1);
+        
+        var request = new CreateIssueRequest
+        {
+            Content = "New Issue",
+            StatusId = defaultStatus.Id,
+            AttributeValues = new Dictionary<long, string>
+            {
+                [noteAttribute.Id] = "My note",
+                [typeAttribute.Id] = typeAttribute.GetListValue(1).Id.ToString(), // Set ID of 'Feature' value
+            },
+        };
         var issueId = await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Create(
-                new CreateIssueRequest
-                {
-                    Content = "New Issue",
-                    StatusId = defaultStatus.Id
-                }));
+            .Execute(x => x.Create(request));
 
         var issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issueId);
         
@@ -37,6 +50,16 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         Assert.NotEqual(default, issue.CreatedAt);
         Assert.NotEqual(default, issue.UpdatedAt);
         Assert.Equal(userId, issue.UserId);
+        
+        var textAttribute = await testScope.Database.IssueAttributeTextValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, textAttribute.IssueId);
+        Assert.Equal(noteAttribute.Id, textAttribute.AttributeId);
+        Assert.Equal("My note", textAttribute.Text);
+        
+        var listAttribute = await testScope.Database.IssueAttributeListValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, listAttribute.IssueId);
+        Assert.Equal(typeAttribute.Id, listAttribute.AttributeId);
+        Assert.Equal(typeAttribute.GetListValue(1).Id, listAttribute.AttributeListValueId); // ID of 'Feature' value
     }
     
     [Fact]
@@ -85,26 +108,45 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         var organization = await testScope.InitializePersonalOrganization(
             userId,
             o => o
+                .AddTextAttribute("Note")
+                .AddListAttribute("Type", ["Bug", "Feature"])
                 .AddSpace(userId, s => s
                     .AddEpic(userId, e => e
                         .AddIssue(userId, 0, i => i
                             .WithContent("Hi")))));
 
         var issue = organization.GetIssue(1, 1, 0, 0);
+        var noteAttribute = organization.GetAttribute(0);
+        var typeAttribute = organization.GetAttribute(1);
+        
+        var request = new UpdateIssueRequest
+        {
+            Content = "New",
+            AttributeValues = new Dictionary<long, string>
+            {
+                [noteAttribute.Id] = "My note",
+                [typeAttribute.Id] = typeAttribute.GetListValue(1).Id.ToString(), // Set ID of 'Feature' value
+            },
+        };
         
         await _issuesController
             .WithOrganizationAuthorization(organization.Id, userId)
-            .Execute(x => x.Update(
-                issue.Id,
-                new UpdateIssueRequest
-                {
-                    Content = "New",
-                }));
+            .Execute(x => x.Update(issue.Id, request));
 
         issue = await testScope.Database.Issues.FirstAsyncEF(e => e.Id == issue.Id);
         
         Assert.True(issue.CreatedAt < issue.UpdatedAt);
         Assert.Equal("New", issue.Content);
+
+        var textAttribute = await testScope.Database.IssueAttributeTextValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, textAttribute.IssueId);
+        Assert.Equal(noteAttribute.Id, textAttribute.AttributeId);
+        Assert.Equal("My note", textAttribute.Text);
+        
+        var listAttribute = await testScope.Database.IssueAttributeListValues.SingleAsyncEF();
+        Assert.Equal(issue.Id, listAttribute.IssueId);
+        Assert.Equal(typeAttribute.Id, listAttribute.AttributeId);
+        Assert.Equal(typeAttribute.GetListValue(1).Id, listAttribute.AttributeListValueId); // ID of 'Feature' value
     }
     
     [Fact]
@@ -391,5 +433,83 @@ public class PersonalIssuesControllerTests(WebApiTestHost host)  : IClassFixture
         
         Assert.NotNull(searchResult);
         Assert.Equal(3, searchResult.Data.Count);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenFilterByCustomListAttribute()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddListAttribute("Color", ["Red", "Green"])
+                .AddSpace(userId, "SP2", s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Build app")
+                            .WithAttributeValue(0, 0)) // Color is 'Red'
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Deliver app")
+                            .WithAttributeValue(0, 1))))); // Color is 'Green'
+        
+        var redAttribute = organization.GetAttribute(0);
+        var searchFilters = new Dictionary<long, JsonElement>
+        {
+            [redAttribute.Id] = JsonElement.Parse($"[{redAttribute.GetListValue(0).Id}]") // Search by 'Color' = 'Red'
+        };
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    Page = 0,
+                    PerPage = 10,
+                    Filters = searchFilters
+                }));
+        
+        Assert.NotNull(searchResult);
+        var result = Assert.Single(searchResult.Data);
+        Assert.Equal("Build app", result.Content);
+    }
+    
+    [Fact]
+    public async Task User_ShouldSearchIssues_WhenFilterByCustomTextAttribute()
+    {
+        using var testScope = host.CreateTestScope();
+        var userId = await testScope.CreateUser();
+        var organization = await testScope.InitializePersonalOrganization(
+            userId,
+            o => o
+                .AddTextAttribute("Jira Issue Number")
+                .AddSpace(userId, "SP2", s => s
+                    .AddEpic(userId, e => e
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Build app")
+                            .WithAttributeValue(0, "14432"))
+                        .AddIssue(userId, 0, issue => issue
+                            .WithContent("Deliver app")
+                            .WithAttributeValue(0, "53312")))));
+        
+        var issueNumberAttribute = organization.GetAttribute(0);
+        var searchFilters = new Dictionary<long, JsonElement>
+        {
+            [issueNumberAttribute.Id] = JsonElement.Parse("\"5331\"")
+        };
+
+        var searchResult = await _issuesController
+            .WithOrganizationAuthorization(organization.Id, userId)
+            .Execute(x => x.Search(
+                new SearchRequest
+                {
+                    Page = 0,
+                    PerPage = 10,
+                    Filters = searchFilters
+                }));
+        
+        Assert.NotNull(searchResult);
+        var result = Assert.Single(searchResult.Data);
+        Assert.Equal("Deliver app", result.Content);
     }
 }

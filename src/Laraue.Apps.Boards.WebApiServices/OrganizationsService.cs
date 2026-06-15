@@ -72,6 +72,22 @@ public interface IOrganizationsService
     Task<PermittableSpace[]> GetPermittableEntities(
         GetPermittableEntitiesRequest request,
         CancellationToken cancellationToken);
+
+    Task<long> CreateAttribute(
+        CreateAttributeRequest request,
+        CancellationToken cancellationToken);
+
+    Task UpdateAttribute(
+        UpdateAttributeRequest request,
+        CancellationToken cancellationToken);
+
+    Task<AttributeDto[]> GetAttributes(
+        GetAttributesRequest request,
+        CancellationToken cancellationToken);
+
+    Task DeleteAttribute(
+        DeleteAttributeRequest request,
+        CancellationToken cancellationToken);
 }
 
 public class OrganizationsService(
@@ -122,6 +138,7 @@ public class OrganizationsService(
                     Color = x.Organization.Color,
                     CanManage = x.AdminAccessLevel.HasFlag(AdminAccessLevel.Manage),
                     CanMassMove = x.AdminAccessLevel.HasFlag(AdminAccessLevel.MassMove),
+                    CanManageAttributes = x.AdminAccessLevel.HasFlag(AdminAccessLevel.ManageAttributes),
                     Slug = x.Organization.Slug,
                     SlugPostfix = x.Organization.SlugPostfix,
                 })
@@ -399,6 +416,103 @@ public class OrganizationsService(
             request.AuthData.OrganizationId,
             cancellationToken);
     }
+
+    public async Task<long> CreateAttribute(CreateAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+
+        if (request is { Type: AttributeType.List, ListValues.Length: < 1 })
+            throw new BadRequestException(
+                nameof(request.ListValues),
+                "At least one options required for list attribute");
+        
+        if (request is { Type: not AttributeType.List, ListValues.Length: > 0 })
+            throw new BadRequestException(
+                nameof(request.ListValues),
+                "Options are required only for list attribute");
+
+        return await coreOrganizationsService.CreateAttribute(
+            request.AuthData.OrganizationId,
+            request.Name,
+            request.Color,
+            request.Type,
+            request.ListValues?.Select(x => x.Name).ToArray(),
+            cancellationToken);
+    }
+
+    public async Task UpdateAttribute(UpdateAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+
+        await EnsureAttributeExists(request.AuthData.OrganizationId, request.Id, cancellationToken);
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await coreOrganizationsService.UpdateAttribute(
+            request.Id,
+            request.Name,
+            request.Color,
+            request.ListValues?
+                .Select(x => new UpdateAttributeListValueRequest
+                {
+                    Name = x.Name,
+                    Id = x.Id,
+                }).ToArray(),
+            cancellationToken);
+        
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<AttributeDto[]> GetAttributes(GetAttributesRequest request, CancellationToken cancellationToken)
+    {
+        var result = await context.Attributes
+            .Where(x => x.OrganizationId == request.AuthData.OrganizationId)
+            .Select(x => new AttributeDto
+            {
+                Type = x.AttributeType,
+                Color = x.Color,
+                Name = x.Name,
+                Id = x.Id,
+                ListValues = x.AttributeListValues!
+                    .Select(v => new AttributeListValueDto
+                    {
+                        Name = v.Value,
+                        Id = v.Id,
+                    })
+                    .ToArray(),
+            })
+            .OrderBy(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return result;
+    }
+
+    public async Task DeleteAttribute(DeleteAttributeRequest request, CancellationToken cancellationToken)
+    {
+        await organizationAccessService.HasAccessOrThrow(
+            request.AuthData,
+            AdminAccessLevel.ManageAttributes,
+            cancellationToken);
+
+        await EnsureAttributeExists(request.AuthData.OrganizationId, request.Id, cancellationToken);
+
+        await coreOrganizationsService.DeleteAttribute(request.Id, cancellationToken);
+    }
+
+    private async Task EnsureAttributeExists(long organizationId, long attributeId, CancellationToken cancellationToken)
+    {
+        var attributeExists = await context.Attributes
+            .Where(x => x.Id == attributeId)
+            .AnyAsyncEF(x => x.OrganizationId == organizationId, cancellationToken);
+
+        if (!attributeExists)
+            throw new NotFoundException($"Attribute: {attributeId} is not found");
+    }
 }
 
 public record CreateOrganizationRequest
@@ -475,6 +589,7 @@ public record OrganizationDto
     public required bool CanCreateSpaces { get; set; }
     public required bool CanMassMove { get; set; }
     public required bool CanManage { get; set; }
+    public required bool CanManageAttributes { get; set; }
     public required string Slug { get; set; }
     public required string SlugPostfix { get; set; }
     public UserOrganizationPreferencesResponse Preferences { get; set; } = new();
@@ -547,4 +662,74 @@ public record OrganizationMember
 public record GetPermittableEntitiesRequest
 {
     public required OrganizationAuthData AuthData { get; set; }
+}
+
+public record CreateAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+    
+    [MaxLength(64)]
+    public required string Name { get; set; }
+    
+    [MinLength(7)]
+    [MaxLength(7)]
+    public required string Color { get; set; }
+    
+    public AttributeType Type { get; set; }
+    
+    public NewAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record UpdateAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+
+    public long Id { get; set; }
+    
+    [MaxLength(64)]
+    public required string Name { get; set; }
+    
+    [MinLength(7)]
+    [MaxLength(7)]
+    public required string Color { get; set; }
+    
+    public required UpdateAttributeListValueDto[]? ListValues { get; set; }
+}
+
+public record DeleteAttributeRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+
+    public long Id { get; set; }
+}
+
+public record NewAttributeListValueDto
+{
+    [MaxLength(64)]
+    public required string Name { get; set; }
+}
+
+public record UpdateAttributeListValueDto : NewAttributeListValueDto
+{
+    public long? Id { get; set; }
+}
+
+public record GetAttributesRequest
+{
+    public OrganizationAuthData AuthData { get; set; } = new();
+}
+
+public record AttributeDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
+    public required string Color { get; set; }
+    public required AttributeType Type { get; set; }
+    public required AttributeListValueDto[] ListValues { get; set; }
+}
+
+public record AttributeListValueDto
+{
+    public long Id { get; set; }
+    public required string Name { get; set; }
 }
