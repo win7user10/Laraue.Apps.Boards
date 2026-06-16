@@ -203,6 +203,8 @@ public class IssuesService(
                     x.Id,
                     x.Color,
                     x.Name,
+                    x.IsDefault,
+                    x.TouchedAt,
                 })
                 .ToArrayAsyncEF(cancellationToken),
             cancellationToken);
@@ -240,16 +242,17 @@ public class IssuesService(
                 Id = category.Key,
                 Color = category.Value.Color,
                 Name = category.Value.Name,
+                TouchedAt = category.Value.TouchedAt,
+                IsDefault = category.Value.IsDefault,
                 Columns = statusByCategoryId[category.Key]
+                    .OrderBy(s => s.SortOrder)
                     .Select(s => new ColumnSummary
                     {
                         Id = s.Id,
                         Color = s.Color,
                         Name = s.Name,
                         Count = counts.GetValueOrDefault(s.Id, 0),
-                        SortOrder = s.SortOrder,
                     })
-                    .OrderBy(s => s.SortOrder)
                     .ToArray()
             })
             .ToArray();
@@ -1123,7 +1126,6 @@ public class ColumnSummary
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required int Count { get; set; }
-    public required int SortOrder { get; set; }
 }
 
 public record EpicSummary
@@ -1132,4 +1134,6 @@ public record EpicSummary
     public required string Name { get; set; }
     public required string? Color { get; set; }
     public required ColumnSummary[] Columns { get; set; }
+    public required DateTime TouchedAt { get; set; }
+    public required bool IsDefault { get; set; }
 }
