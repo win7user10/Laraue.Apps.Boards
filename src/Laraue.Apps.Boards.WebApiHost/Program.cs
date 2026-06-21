@@ -19,6 +19,8 @@ builder
     .AddApplicationServices()
     .AddDatabaseServices(dbConnectionStringName);
 
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
 app.UseAuthentication();
@@ -47,4 +49,5 @@ if (origins is not null)
             .AllowAnyHeader());
 }
 
+app.MapHealthChecks("/_health");
 app.Run();
