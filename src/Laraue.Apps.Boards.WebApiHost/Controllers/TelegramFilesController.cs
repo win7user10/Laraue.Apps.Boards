@@ -20,7 +20,7 @@ public class TelegramFilesController(
     : ControllerBase
 {
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetPhoto(
+    public async Task<IActionResult> GetFileById(
         Guid id,
         CancellationToken cancellationToken)
     {
